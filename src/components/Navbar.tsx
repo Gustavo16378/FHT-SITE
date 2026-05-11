@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Menu, X } from 'lucide-react'
+import { useScrollDirection } from '../hooks/useScrollDirection'
 
 const navLinks = [
   { label: 'Competições', href: '#competicoes' },
@@ -16,6 +17,7 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const scrollYRef = useRef(0)
+  const navHidden = useScrollDirection()
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 40)
@@ -130,6 +132,10 @@ export default function Navbar() {
             ? 'bg-night backdrop-blur-md shadow-lg shadow-black/30'
             : 'bg-transparent'
         }`}
+        style={{
+          transform: navHidden && !menuOpen ? 'translateY(-100%)' : 'translateY(0)',
+          transition: 'transform 0.3s ease, background-color 0.3s ease',
+        }}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 lg:h-20">

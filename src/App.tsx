@@ -1,4 +1,5 @@
 import Navbar from './components/Navbar'
+import ScrollProgress from './components/ScrollProgress'
 import Hero from './components/Hero'
 import Competitions from './components/Competitions'
 import Registration from './components/Registration'
@@ -16,6 +17,7 @@ export default function App() {
   return (
     <>
       <Navbar />
+      <ScrollProgress />
       <main>
         <Hero />
         <Competitions />

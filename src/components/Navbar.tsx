@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { Menu, X } from 'lucide-react'
 
 const navLinks = [
@@ -14,6 +15,7 @@ const navLinks = [
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const scrollYRef = useRef(0)
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 40)
@@ -21,104 +23,165 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
-  return (
-    <nav
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        scrolled
-          ? 'bg-night backdrop-blur-md shadow-lg shadow-black/30'
-          : 'bg-transparent'
-      }`}
-    >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 lg:h-20">
-          {/* Logo */}
-          <a href="#hero" className="flex items-center gap-2 group">
-            <div className="w-10 h-10 bg-federation rounded-lg flex items-center justify-center border-2 border-gold/30 group-hover:border-gold transition-colors duration-250">
-              <span className="font-display text-gold text-xl leading-none">FHT</span>
-            </div>
-            <div className="hidden sm:block">
-              <p className="font-display text-fht-white text-lg leading-none tracking-wide">FEDERAÇÃO DE HANDEBOL</p>
-              <p className="font-body text-gray-soft text-xs tracking-widest uppercase">DO TOCANTINS</p>
-            </div>
-          </a>
+  // Scroll lock compatível com iOS e Android
+  useEffect(() => {
+    if (menuOpen) {
+      scrollYRef.current = window.scrollY
+      document.body.style.position = 'fixed'
+      document.body.style.top = `-${scrollYRef.current}px`
+      document.body.style.width = '100%'
+      document.body.style.overflowY = 'scroll'
+    } else {
+      document.body.style.position = ''
+      document.body.style.top = ''
+      document.body.style.width = ''
+      document.body.style.overflowY = ''
+      window.scrollTo(0, scrollYRef.current)
+    }
+    return () => {
+      document.body.style.position = ''
+      document.body.style.top = ''
+      document.body.style.width = ''
+      document.body.style.overflowY = ''
+    }
+  }, [menuOpen])
 
-          {/* Desktop links */}
-          <ul className="hidden lg:flex items-center gap-6">
-            {navLinks.map((link) => (
-              <li key={link.href}>
-                <a
-                  href={link.href}
-                  className="font-body text-gray-soft hover:text-fht-white text-sm font-medium tracking-wide transition-colors duration-250 relative group"
-                >
-                  {link.label}
-                  <span className="absolute -bottom-1 left-0 w-0 h-px bg-gold group-hover:w-full transition-all duration-250" />
-                </a>
-              </li>
-            ))}
-          </ul>
-
-          {/* CTA + Hamburger */}
-          <div className="flex items-center gap-3">
-            <a
-              href="#cadastro"
-              className="hidden md:block font-display text-night bg-gold hover:bg-gold-light px-5 py-2 rounded-lg text-sm tracking-wider transition-colors duration-250"
-            >
-              CADASTRAR EQUIPE
-            </a>
-            <button
-              className="lg:hidden text-fht-white p-2"
-              onClick={() => setMenuOpen(!menuOpen)}
-              aria-label="Menu"
-            >
-              {menuOpen ? <X size={24} /> : <Menu size={24} />}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Mobile menu */}
+  const mobileMenu = (
+    <>
+      {/* Overlay com blur — renderizado via portal direto no body */}
       <div
-        className={`lg:hidden fixed top-0 right-0 h-full w-72 bg-night border-l border-federation/30 transform transition-transform duration-300 z-50 ${
-          menuOpen ? 'translate-x-0' : 'translate-x-full'
+        onClick={() => setMenuOpen(false)}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 9998,
+          background: 'rgba(0,0,0,0.45)',
+          backdropFilter: 'blur(4px)',
+          WebkitBackdropFilter: 'blur(4px)',
+          opacity: menuOpen ? 1 : 0,
+          pointerEvents: menuOpen ? 'auto' : 'none',
+          transition: 'opacity 0.3s ease',
+        }}
+      />
+
+      {/* Painel lateral */}
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          right: 0,
+          height: '100%',
+          width: '18rem',
+          background: '#070D1E',
+          borderLeft: '1px solid rgba(26,58,143,0.4)',
+          zIndex: 9999,
+          transform: menuOpen ? 'translateX(0)' : 'translateX(100%)',
+          transition: 'transform 0.3s ease',
+          display: 'flex',
+          flexDirection: 'column',
+          paddingTop: '5rem',
+          paddingBottom: '2rem',
+          paddingLeft: '1.5rem',
+          paddingRight: '1.5rem',
+        }}
+      >
+        <button
+          style={{ position: 'absolute', top: '1rem', right: '1rem', color: '#F8F9FC', background: 'none', border: 'none', cursor: 'pointer' }}
+          onClick={() => setMenuOpen(false)}
+          aria-label="Fechar menu"
+        >
+          <X size={24} />
+        </button>
+
+        <ul style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1, listStyle: 'none' }}>
+          {navLinks.map((link) => (
+            <li key={link.href}>
+              <a
+                href={link.href}
+                onClick={() => setMenuOpen(false)}
+                style={{ display: 'block', padding: '0.5rem 0', color: '#F8F9FC', fontFamily: 'Barlow, sans-serif', fontSize: '1.125rem', fontWeight: 500, textDecoration: 'none', borderBottom: '1px solid rgba(26,58,143,0.25)', transition: 'color 0.2s' }}
+                onMouseEnter={e => (e.currentTarget.style.color = '#F5C518')}
+                onMouseLeave={e => (e.currentTarget.style.color = '#F8F9FC')}
+              >
+                {link.label}
+              </a>
+            </li>
+          ))}
+        </ul>
+
+        <a
+          href="#cadastro"
+          onClick={() => setMenuOpen(false)}
+          style={{ display: 'block', textAlign: 'center', padding: '0.75rem', background: '#F5C518', color: '#070D1E', fontFamily: '"Bebas Neue", cursive', fontSize: '1rem', letterSpacing: '0.1em', borderRadius: '0.5rem', textDecoration: 'none', transition: 'background 0.2s' }}
+          onMouseEnter={e => (e.currentTarget.style.background = '#FFD94A')}
+          onMouseLeave={e => (e.currentTarget.style.background = '#F5C518')}
+        >
+          CADASTRAR EQUIPE
+        </a>
+      </div>
+    </>
+  )
+
+  return (
+    <>
+      <nav
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+          scrolled
+            ? 'bg-night backdrop-blur-md shadow-lg shadow-black/30'
+            : 'bg-transparent'
         }`}
       >
-        <div className="flex flex-col h-full pt-20 pb-8 px-6">
-          <button
-            className="absolute top-4 right-4 text-fht-white"
-            onClick={() => setMenuOpen(false)}
-          >
-            <X size={24} />
-          </button>
-          <ul className="flex flex-col gap-4 flex-1">
-            {navLinks.map((link) => (
-              <li key={link.href}>
-                <a
-                  href={link.href}
-                  onClick={() => setMenuOpen(false)}
-                  className="font-body text-fht-white text-lg font-medium hover:text-gold transition-colors duration-250 block py-1 border-b border-federation/20"
-                >
-                  {link.label}
-                </a>
-              </li>
-            ))}
-          </ul>
-          <a
-            href="#cadastro"
-            onClick={() => setMenuOpen(false)}
-            className="font-display text-night bg-gold hover:bg-gold-light text-center py-3 rounded-lg tracking-wider transition-colors duration-250"
-          >
-            CADASTRAR EQUIPE
-          </a>
-        </div>
-      </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16 lg:h-20">
+            {/* Logo */}
+            <a href="#hero" className="flex items-center gap-2 group">
+              <div className="w-10 h-10 bg-federation rounded-lg flex items-center justify-center border-2 border-gold/30 group-hover:border-gold transition-colors duration-250">
+                <span className="font-display text-gold text-xl leading-none">FHT</span>
+              </div>
+              <div className="hidden sm:block">
+                <p className="font-display text-fht-white text-lg leading-none tracking-wide">FEDERAÇÃO DE HANDEBOL</p>
+                <p className="font-body text-gray-soft text-xs tracking-widest uppercase">DO TOCANTINS</p>
+              </div>
+            </a>
 
-      {/* Mobile overlay */}
-      {menuOpen && (
-        <div
-          className="lg:hidden fixed inset-0 bg-black/60 z-40"
-          onClick={() => setMenuOpen(false)}
-        />
-      )}
-    </nav>
+            {/* Desktop links */}
+            <ul className="hidden lg:flex items-center gap-6">
+              {navLinks.map((link) => (
+                <li key={link.href}>
+                  <a
+                    href={link.href}
+                    className="font-body text-gray-soft hover:text-fht-white text-sm font-medium tracking-wide transition-colors duration-250 relative group"
+                  >
+                    {link.label}
+                    <span className="absolute -bottom-1 left-0 w-0 h-px bg-gold group-hover:w-full transition-all duration-250" />
+                  </a>
+                </li>
+              ))}
+            </ul>
+
+            {/* CTA + Hambúrguer */}
+            <div className="flex items-center gap-3">
+              <a
+                href="#cadastro"
+                className="hidden md:block font-display text-night bg-gold hover:bg-gold-light px-5 py-2 rounded-lg text-sm tracking-wider transition-colors duration-250"
+              >
+                CADASTRAR EQUIPE
+              </a>
+              <button
+                className="lg:hidden text-fht-white p-2"
+                onClick={() => setMenuOpen(!menuOpen)}
+                aria-label="Menu"
+              >
+                {menuOpen ? <X size={24} /> : <Menu size={24} />}
+              </button>
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      {/* Portal renderiza overlay e painel direto no document.body,
+          sem interferência de nenhum stacking context da página */}
+      {createPortal(mobileMenu, document.body)}
+    </>
   )
 }

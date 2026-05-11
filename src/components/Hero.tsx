@@ -33,11 +33,11 @@ export default function Hero() {
       {/* Linha amarela decorativa */}
       <div className="absolute left-0 top-1/3 w-1 h-24 sm:h-32 bg-gold" />
 
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-20">
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 sm:pt-24 pb-10 sm:pb-20">
 
         {/* Badge próxima competição */}
         <div
-          className={`inline-flex flex-wrap items-center gap-2 bg-federation/30 border border-federation/50 rounded-full px-3 sm:px-4 py-2 mb-6 sm:mb-8 transition-all duration-700 ${
+          className={`inline-flex flex-wrap items-center gap-2 bg-federation/30 border border-federation/50 rounded-full px-3 sm:px-4 py-1.5 sm:py-2 mb-4 sm:mb-8 transition-all duration-700 ${
             visible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'
           }`}
         >
@@ -51,7 +51,7 @@ export default function Hero() {
 
         {/* Título */}
         <h1
-          className={`font-display text-fht-white text-5xl sm:text-7xl lg:text-8xl xl:text-9xl leading-none mb-5 sm:mb-6 transition-all duration-700 delay-100 ${
+          className={`font-display text-fht-white text-[2.4rem] sm:text-7xl lg:text-8xl xl:text-9xl leading-none mb-3 sm:mb-6 transition-all duration-700 delay-100 ${
             visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
           }`}
         >
@@ -62,7 +62,7 @@ export default function Hero() {
 
         {/* Subtítulo */}
         <p
-          className={`font-body text-gray-soft text-base sm:text-lg lg:text-xl max-w-2xl mb-8 sm:mb-10 leading-relaxed transition-all duration-700 delay-200 ${
+          className={`font-body text-gray-soft text-sm sm:text-lg lg:text-xl max-w-2xl mb-5 sm:mb-10 leading-relaxed transition-all duration-700 delay-200 ${
             visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
           }`}
         >
@@ -72,19 +72,19 @@ export default function Hero() {
 
         {/* CTAs */}
         <div
-          className={`flex flex-col sm:flex-row gap-3 sm:gap-4 mb-12 sm:mb-16 transition-all duration-700 delay-300 ${
+          className={`flex flex-col sm:flex-row gap-2.5 sm:gap-4 mb-8 sm:mb-16 transition-all duration-700 delay-300 ${
             visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
           }`}
         >
           <a
             href="#cadastro"
-            className="font-display text-night bg-gold hover:bg-gold-light text-center px-8 py-4 rounded-lg text-xl tracking-wider transition-colors duration-250 shadow-lg shadow-gold/20"
+            className="font-display text-night bg-gold hover:bg-gold-light text-center px-6 py-3 sm:px-8 sm:py-4 rounded-lg text-lg sm:text-xl tracking-wider transition-colors duration-250 shadow-lg shadow-gold/20"
           >
             CADASTRAR ATLETA
           </a>
           <a
             href="#competicoes"
-            className="font-display text-fht-white border-2 border-fht-white/30 hover:border-fht-white text-center px-8 py-4 rounded-lg text-xl tracking-wider transition-colors duration-250"
+            className="font-display text-fht-white border-2 border-fht-white/30 hover:border-fht-white text-center px-6 py-3 sm:px-8 sm:py-4 rounded-lg text-lg sm:text-xl tracking-wider transition-colors duration-250"
           >
             VER COMPETIÇÕES
           </a>
@@ -98,8 +98,8 @@ export default function Hero() {
         >
           {stats.map((stat, i) => (
             <div key={i} className="border-l-2 border-gold/50 pl-4">
-              <p className="font-display text-gold text-4xl sm:text-5xl leading-none">{stat.value}</p>
-              <p className="font-body text-gray-soft text-xs sm:text-sm mt-1">{stat.label}</p>
+              <p className="font-display text-gold text-3xl sm:text-5xl leading-none">{stat.value}</p>
+              <p className="font-body text-gray-soft text-xs mt-1">{stat.label}</p>
             </div>
           ))}
         </div>

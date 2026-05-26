@@ -59,8 +59,8 @@ export default function Navbar() {
           inset: 0,
           zIndex: 9998,
           background: 'rgba(0,0,0,0.45)',
-          backdropFilter: 'blur(4px)',
-          WebkitBackdropFilter: 'blur(4px)',
+          backdropFilter: menuOpen ? 'blur(4px)' : 'none',
+          WebkitBackdropFilter: menuOpen ? 'blur(4px)' : 'none',
           opacity: menuOpen ? 1 : 0,
           pointerEvents: menuOpen ? 'auto' : 'none',
           transition: 'opacity 0.3s ease',
@@ -141,12 +141,12 @@ export default function Navbar() {
       <nav
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
           scrolled
-            ? 'bg-night backdrop-blur-md shadow-lg shadow-black/30'
+            ? 'bg-night shadow-lg shadow-black/30'
             : 'bg-transparent'
         }`}
         style={{
           transform: navHidden && !menuOpen ? 'translateY(-100%)' : 'translateY(0)',
-          transition: 'transform 0.3s ease, background-color 0.3s ease',
+          transition: 'transform 0.3s ease, background-color 0.3s ease, box-shadow 0.3s ease',
         }}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

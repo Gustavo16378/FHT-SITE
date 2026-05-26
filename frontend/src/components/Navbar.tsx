@@ -212,7 +212,7 @@ export default function Navbar() {
       </div>
     </>,
     document.body
-  , document.body) : null
+  ) : null
 
   return (
     <>

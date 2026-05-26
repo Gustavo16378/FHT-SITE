@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Menu, X, LogIn } from 'lucide-react'
 import { useScrollDirection } from '../hooks/useScrollDirection'
+import logo from '../assets/logo.png'
 
 const navLinks = [
   { label: 'Competições', href: '#competicoes' },
@@ -152,9 +153,7 @@ export default function Navbar() {
           <div className="flex items-center justify-between h-16 lg:h-20">
             {/* Logo */}
             <a href="#hero" className="flex items-center gap-2 group">
-              <div className="w-10 h-10 bg-federation rounded-lg flex items-center justify-center border-2 border-gold/30 group-hover:border-gold transition-colors duration-250">
-                <span className="font-display text-gold text-xl leading-none">FHT</span>
-              </div>
+                <img src={logo} alt="Logo FHT" className="w-20 h-20 object-contain" style={{ filter: 'drop-shadow(0 0 6px rgba(255,255,255,0.35))' }} />
               <div className="hidden sm:block">
                 <p className="font-display text-fht-white text-lg leading-none tracking-wide">FEDERAÇÃO DE HANDEBOL</p>
                 <p className="font-body text-gray-soft text-xs tracking-widest uppercase">DO TOCANTINS</p>

@@ -23,33 +23,33 @@ export default function Clubs() {
           <div className="w-16 h-1 bg-gold" />
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-10">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
           {clubs.map((club, i) => (
             <div
               key={club.id}
-              className={`bg-gradient-to-br ${bgColors[i % bgColors.length]} border border-federation/20 rounded-lg p-5 hover:border-gold/50 hover:-translate-y-1 transition-all duration-250 group cursor-pointer`}
+              className={`bg-gradient-to-br ${bgColors[i % bgColors.length]} border border-federation/20 rounded-lg p-4 sm:p-5 hover:border-gold/50 hover:-translate-y-1 transition-all duration-250 group cursor-pointer overflow-hidden`}
             >
               {/* Escudo / Iniciais */}
-              <div className="w-14 h-14 bg-federation/40 border border-federation/50 rounded-lg flex items-center justify-center mb-4 group-hover:border-gold/50 transition-colors duration-250">
+              <div className="w-12 h-12 bg-federation/40 border border-federation/50 rounded-lg flex items-center justify-center mb-3 group-hover:border-gold/50 transition-colors duration-250 flex-shrink-0">
                 {club.logo ? (
-                  <img src={club.logo} alt={club.name} className="w-10 h-10 object-contain" />
+                  <img src={club.logo} alt={club.name} className="w-9 h-9 object-contain" />
                 ) : (
-                  <span className="font-display text-gold text-xl">{club.initials}</span>
+                  <span className="font-display text-gold text-lg">{club.initials}</span>
                 )}
               </div>
 
-              <h3 className="font-display text-fht-white text-xl leading-tight group-hover:text-gold transition-colors duration-250 mb-1">
+              <h3 className="font-display text-fht-white text-lg leading-tight group-hover:text-gold transition-colors duration-250 mb-1 line-clamp-2">
                 {club.name}
               </h3>
 
-              <div className="flex items-center gap-1.5 text-gray-soft text-xs mb-3">
-                <MapPin size={11} />
-                {club.city}
+              <div className="flex items-center gap-1 text-gray-soft text-xs mb-3 truncate">
+                <MapPin size={10} className="flex-shrink-0" />
+                <span className="truncate">{club.city}</span>
               </div>
 
-              <div className="flex flex-wrap gap-1.5">
-                {club.categories.map((cat) => (
-                  <span key={cat} className="font-body text-xs text-gray-soft border border-gray-soft/20 px-1.5 py-0.5 rounded-full">
+              <div className="flex flex-wrap gap-1">
+                {club.categories.slice(0, 3).map((cat) => (
+                  <span key={cat} className="font-body text-xs text-gray-soft border border-gray-soft/20 px-1.5 py-0.5 rounded-full whitespace-nowrap">
                     {cat}
                   </span>
                 ))}

@@ -22,11 +22,11 @@ export default function Navbar() {
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 40)
-    window.addEventListener('scroll', handleScroll)
+    window.addEventListener('scroll', handleScroll, { passive: true })
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
-  // Scroll lock compatível com iOS e Android
+  // Scroll lock compatível com iOS Safari (position: fixed + top: -scrollY)
   useEffect(() => {
     if (menuOpen) {
       scrollYRef.current = window.scrollY
@@ -49,21 +49,30 @@ export default function Navbar() {
     }
   }, [menuOpen])
 
-  const mobileMenu = (
+  function closeMenu() {
+    setMenuOpen(false)
+  }
+
+  // Portal sempre no DOM — overlay e painel controlados por opacity/transform (não removidos)
+  const mobilePortal = createPortal(
     <>
-      {/* Overlay — sem backdrop-filter para evitar camada GPU permanente */}
+      {/* Overlay com backdrop-blur — sempre no DOM, visibilidade via opacity */}
       <div
-        onClick={() => setMenuOpen(false)}
+        onClick={closeMenu}
         style={{
           position: 'fixed',
           inset: 0,
           zIndex: 9998,
-          background: 'rgba(0,0,0,0.55)',
-          animation: 'fadeIn 0.25s ease',
+          backgroundColor: 'rgba(0, 0, 0, 0.55)',
+          backdropFilter: 'blur(4px)',
+          WebkitBackdropFilter: 'blur(4px)',
+          opacity: menuOpen ? 1 : 0,
+          pointerEvents: menuOpen ? 'auto' : 'none',
+          transition: 'opacity 0.3s ease',
         }}
       />
 
-      {/* Painel lateral */}
+      {/* Painel lateral — desliza da direita via translateX */}
       <div
         style={{
           position: 'fixed',
@@ -71,33 +80,60 @@ export default function Navbar() {
           right: 0,
           height: '100%',
           width: '18rem',
+          maxWidth: '85vw',
           background: '#070D1E',
           borderLeft: '1px solid rgba(26,58,143,0.4)',
           zIndex: 9999,
-          animation: 'slideInFromRight 0.3s ease',
+          transform: menuOpen ? 'translateX(0)' : 'translateX(100%)',
+          transition: 'transform 0.3s ease',
           display: 'flex',
           flexDirection: 'column',
           paddingTop: '5rem',
           paddingBottom: '2rem',
           paddingLeft: '1.5rem',
           paddingRight: '1.5rem',
+          overflowY: 'auto',
         }}
       >
+        {/* Botão fechar */}
         <button
-          style={{ position: 'absolute', top: '1rem', right: '1rem', color: '#F8F9FC', background: 'none', border: 'none', cursor: 'pointer' }}
-          onClick={() => setMenuOpen(false)}
+          onClick={closeMenu}
           aria-label="Fechar menu"
+          style={{
+            position: 'absolute',
+            top: '1rem',
+            right: '1rem',
+            color: '#F8F9FC',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            padding: '0.375rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
         >
           <X size={24} />
         </button>
 
-        <ul style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1, listStyle: 'none' }}>
+        {/* Links de navegação */}
+        <ul style={{ display: 'flex', flexDirection: 'column', gap: 0, flex: 1, listStyle: 'none', padding: 0, margin: 0 }}>
           {navLinks.map((link) => (
             <li key={link.href}>
               <a
                 href={link.href}
-                onClick={() => setMenuOpen(false)}
-                style={{ display: 'block', padding: '0.5rem 0', color: '#F8F9FC', fontFamily: 'Barlow, sans-serif', fontSize: '1.125rem', fontWeight: 500, textDecoration: 'none', borderBottom: '1px solid rgba(26,58,143,0.25)', transition: 'color 0.2s' }}
+                onClick={closeMenu}
+                style={{
+                  display: 'block',
+                  padding: '0.75rem 0',
+                  color: '#F8F9FC',
+                  fontFamily: 'Barlow, sans-serif',
+                  fontSize: '1.125rem',
+                  fontWeight: 500,
+                  textDecoration: 'none',
+                  borderBottom: '1px solid rgba(26,58,143,0.25)',
+                  transition: 'color 0.2s ease',
+                }}
                 onMouseEnter={e => (e.currentTarget.style.color = '#F5C518')}
                 onMouseLeave={e => (e.currentTarget.style.color = '#F8F9FC')}
               >
@@ -107,11 +143,26 @@ export default function Navbar() {
           ))}
         </ul>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        {/* CTAs */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1.5rem' }}>
           <a
             href="/login"
-            onClick={() => setMenuOpen(false)}
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', padding: '0.65rem', background: 'transparent', color: '#A0A8C0', fontFamily: 'Barlow, sans-serif', fontSize: '0.95rem', border: '1px solid rgba(26,58,143,0.35)', borderRadius: '0.5rem', textDecoration: 'none', transition: 'color 0.2s, border-color 0.2s' }}
+            onClick={closeMenu}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.4rem',
+              padding: '0.65rem',
+              background: 'transparent',
+              color: '#A0A8C0',
+              fontFamily: 'Barlow, sans-serif',
+              fontSize: '0.95rem',
+              border: '1px solid rgba(26,58,143,0.35)',
+              borderRadius: '0.5rem',
+              textDecoration: 'none',
+              transition: 'color 0.2s ease, border-color 0.2s ease',
+            }}
             onMouseEnter={e => { e.currentTarget.style.color = '#F8F9FC'; e.currentTarget.style.borderColor = 'rgba(245,197,24,0.4)' }}
             onMouseLeave={e => { e.currentTarget.style.color = '#A0A8C0'; e.currentTarget.style.borderColor = 'rgba(26,58,143,0.35)' }}
           >
@@ -119,8 +170,20 @@ export default function Navbar() {
           </a>
           <a
             href="#cadastro"
-            onClick={() => setMenuOpen(false)}
-            style={{ display: 'block', textAlign: 'center', padding: '0.75rem', background: '#F5C518', color: '#070D1E', fontFamily: '"Bebas Neue", cursive', fontSize: '1rem', letterSpacing: '0.1em', borderRadius: '0.5rem', textDecoration: 'none', transition: 'background 0.2s' }}
+            onClick={closeMenu}
+            style={{
+              display: 'block',
+              textAlign: 'center',
+              padding: '0.75rem',
+              background: '#F5C518',
+              color: '#070D1E',
+              fontFamily: '"Bebas Neue", cursive',
+              fontSize: '1rem',
+              letterSpacing: '0.1em',
+              borderRadius: '0.5rem',
+              textDecoration: 'none',
+              transition: 'background 0.2s ease',
+            }}
             onMouseEnter={e => (e.currentTarget.style.background = '#FFD94A')}
             onMouseLeave={e => (e.currentTarget.style.background = '#F5C518')}
           >
@@ -128,34 +191,36 @@ export default function Navbar() {
           </a>
         </div>
       </div>
-    </>
+    </>,
+    document.body
   )
 
   return (
     <>
       <nav
-        className={`fixed left-0 right-0 z-50 ${
-          scrolled
-            ? 'bg-night shadow-lg shadow-black/30'
-            : 'bg-transparent'
-        }`}
+        className="fixed left-0 right-0 z-50"
         style={{
           top: navHidden && !menuOpen ? '-80px' : '0',
+          backgroundColor: scrolled ? 'rgba(7,13,30,0.92)' : 'transparent',
+          backdropFilter: scrolled ? 'blur(12px)' : 'none',
+          WebkitBackdropFilter: scrolled ? 'blur(12px)' : 'none',
+          boxShadow: scrolled ? '0 4px 24px rgba(0,0,0,0.4)' : 'none',
           transition: 'top 0.3s ease, background-color 0.3s ease, box-shadow 0.3s ease',
         }}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 lg:h-20">
+
             {/* Logo */}
-            <a href="#hero" className="flex items-center gap-2 group">
-                <img src={logo} alt="Logo FHT" className="w-20 h-20 object-contain" />
+            <a href="#hero" className="flex items-center gap-2">
+              <img src={logo} alt="Logo FHT" className="w-20 h-20 object-contain" />
               <div className="hidden sm:block">
                 <p className="font-display text-fht-white text-lg leading-none tracking-wide">FEDERAÇÃO DE HANDEBOL</p>
                 <p className="font-body text-gray-soft text-xs tracking-widest uppercase">DO TOCANTINS</p>
               </div>
             </a>
 
-            {/* Desktop links */}
+            {/* Links desktop — centralizados */}
             <ul className="hidden lg:flex items-center gap-6">
               {navLinks.map((link) => (
                 <li key={link.href}>
@@ -170,7 +235,7 @@ export default function Navbar() {
               ))}
             </ul>
 
-            {/* CTA + Hambúrguer */}
+            {/* CTA + hambúrguer */}
             <div className="flex items-center gap-3">
               <a
                 href="/login"
@@ -184,10 +249,12 @@ export default function Navbar() {
               >
                 CADASTRAR EQUIPE
               </a>
+
+              {/* Hambúrguer — apenas mobile */}
               <button
                 className="lg:hidden text-fht-white p-2"
-                onClick={() => setMenuOpen(!menuOpen)}
-                aria-label="Menu"
+                onClick={() => setMenuOpen((o) => !o)}
+                aria-label={menuOpen ? 'Fechar menu' : 'Abrir menu'}
               >
                 {menuOpen ? <X size={24} /> : <Menu size={24} />}
               </button>
@@ -196,8 +263,8 @@ export default function Navbar() {
         </div>
       </nav>
 
-      {/* Portal só existe no DOM quando o menu está aberto — zero camadas GPU quando fechado */}
-      {menuOpen && createPortal(mobileMenu, document.body)}
+      {/* Portal fora do <nav> — evita conflitos de z-index com seções que têm transform */}
+      {mobilePortal}
     </>
   )
 }

@@ -94,6 +94,7 @@ export default function Referees() {
                   key={course.id}
                   href={course.registrationLink}
                   className="bg-night/60 border border-federation/20 rounded-lg p-4 hover:border-gold/40 transition-colors duration-250 group block"
+                  style={{ filter: 'opacity(0.9999)', display: 'block' }}
                 >
                   <p className="font-display text-fht-white text-base leading-tight group-hover:text-gold transition-colors duration-250 mb-2">{course.title}</p>
                   <div className="flex flex-col gap-1 text-xs text-gray-soft font-body">

@@ -153,7 +153,7 @@ export default function Navbar() {
           <div className="flex items-center justify-between h-16 lg:h-20">
             {/* Logo */}
             <a href="#hero" className="flex items-center gap-2 group">
-                <img src={logo} alt="Logo FHT" className="w-20 h-20 object-contain" style={{ filter: 'drop-shadow(0 0 6px rgba(255,255,255,0.35))' }} />
+                <img src={logo} alt="Logo FHT" className="w-20 h-20 object-contain" />
               <div className="hidden sm:block">
                 <p className="font-display text-fht-white text-lg leading-none tracking-wide">FEDERAÇÃO DE HANDEBOL</p>
                 <p className="font-body text-gray-soft text-xs tracking-widest uppercase">DO TOCANTINS</p>

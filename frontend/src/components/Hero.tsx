@@ -26,9 +26,9 @@ export default function Hero() {
       id="hero"
       className="relative min-h-screen flex flex-col justify-center overflow-hidden bg-night"
     >
-      {/* Glows */}
-      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-federation/20 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-federation/10 rounded-full blur-[100px] pointer-events-none" />
+      {/* Glows — radial-gradient evita camada de GPU do blur */}
+      <div className="absolute top-0 right-0 w-[500px] h-[500px] rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(26,58,143,0.22) 0%, transparent 70%)' }} />
+      <div className="absolute bottom-0 left-0 w-[300px] h-[300px] rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(26,58,143,0.12) 0%, transparent 70%)' }} />
 
       {/* Linha amarela decorativa */}
       <div className="absolute left-0 top-1/3 w-1 h-24 sm:h-32 bg-gold" />

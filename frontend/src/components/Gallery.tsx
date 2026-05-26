@@ -29,8 +29,9 @@ export default function Gallery() {
                 src={photo.src}
                 alt={photo.event}
                 loading="lazy"
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 brightness-75"
+                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
               />
+              <div className="absolute inset-0 bg-night/30 group-hover:opacity-0 transition-opacity duration-300" />
               <div className="absolute inset-0 bg-gradient-to-t from-night/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               <div className="absolute bottom-0 left-0 right-0 p-4 translate-y-4 group-hover:translate-y-0 opacity-0 group-hover:opacity-100 transition-all duration-300">
                 <p className="font-display text-gold text-xl leading-tight">{photo.event}</p>
@@ -50,8 +51,9 @@ export default function Gallery() {
                 src={photo.src}
                 alt={photo.event}
                 loading="lazy"
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 brightness-75"
+                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
               />
+              <div className="absolute inset-0 bg-night/30 group-hover:opacity-0 transition-opacity duration-300" />
               <div className="absolute inset-0 bg-gradient-to-t from-night/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               <div className="absolute bottom-0 left-0 right-0 p-3 translate-y-2 group-hover:translate-y-0 opacity-0 group-hover:opacity-100 transition-all duration-300">
                 <p className="font-display text-fht-white text-base leading-tight">{photo.event}</p>
@@ -70,8 +72,9 @@ export default function Gallery() {
                 src={photo.src}
                 alt={photo.event}
                 loading="lazy"
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 brightness-75"
+                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
               />
+              <div className="absolute inset-0 bg-night/30 group-hover:opacity-0 transition-opacity duration-300" />
               <div className="absolute inset-0 bg-gradient-to-t from-night/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               <div className="absolute bottom-0 left-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                 <p className="font-display text-fht-white text-sm leading-tight">{photo.event} · {photo.year}</p>

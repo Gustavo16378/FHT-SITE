@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Shield, Users, Star, Trophy, Newspaper,
-  FileText, LogOut, Menu, X, CheckCircle, AlertCircle,
+  FileText, LogOut, Menu, X,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
@@ -399,13 +399,13 @@ function PlaceholderPage({ title }: { title: string }) {
 
 /* ── Sidebar nav ───────────────────────────────────────────── */
 const NAV = [
-  { id: 'dashboard',  label: 'Dashboard',    Icon: LayoutDashboard },
-  { id: 'clubes',     label: 'Clubes',        Icon: Shield },
-  { id: 'atletas',    label: 'Atletas',       Icon: Users },
-  { id: 'arbitros',   label: 'Árbitros',      Icon: Star },
-  { id: 'competicoes',label: 'Competições',   Icon: Trophy,     disabled: true },
-  { id: 'noticias',   label: 'Notícias',      Icon: Newspaper,  disabled: true },
-  { id: 'documentos', label: 'Documentos',    Icon: FileText,   disabled: true },
+  { id: 'dashboard',  label: 'Dashboard',    Icon: LayoutDashboard, disabled: false },
+  { id: 'clubes',     label: 'Clubes',        Icon: Shield,          disabled: false },
+  { id: 'atletas',    label: 'Atletas',       Icon: Users,           disabled: false },
+  { id: 'arbitros',   label: 'Árbitros',      Icon: Star,            disabled: false },
+  { id: 'competicoes',label: 'Competições',   Icon: Trophy,          disabled: true },
+  { id: 'noticias',   label: 'Notícias',      Icon: Newspaper,       disabled: true },
+  { id: 'documentos', label: 'Documentos',    Icon: FileText,        disabled: true },
 ] as const
 
 /* ── Main ──────────────────────────────────────────────────── */

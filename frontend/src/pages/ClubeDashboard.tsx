@@ -418,11 +418,11 @@ function CadastrarAtletaPage({ onSuccess }: { onSuccess: () => void }) {
 
 /* ── Sidebar ─────────────────────────────────────────────── */
 const NAV = [
-  { id: 'dashboard', label: 'Dashboard', Icon: Home },
-  { id: 'atletas', label: 'Meus Atletas', Icon: Users },
-  { id: 'cadastrar', label: 'Cadastrar Atleta', Icon: UserPlus },
-  { id: 'inscricoes', label: 'Inscrições', Icon: Trophy, disabled: true },
-  { id: 'dados', label: 'Meus Dados', Icon: Settings, disabled: true },
+  { id: 'dashboard', label: 'Dashboard',        Icon: Home,     disabled: false },
+  { id: 'atletas',   label: 'Meus Atletas',     Icon: Users,    disabled: false },
+  { id: 'cadastrar', label: 'Cadastrar Atleta', Icon: UserPlus, disabled: false },
+  { id: 'inscricoes',label: 'Inscrições',        Icon: Trophy,   disabled: true },
+  { id: 'dados',     label: 'Meus Dados',        Icon: Settings, disabled: true },
 ] as const
 
 /* ── Main ────────────────────────────────────────────────── */

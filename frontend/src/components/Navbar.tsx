@@ -51,19 +51,15 @@ export default function Navbar() {
 
   const mobileMenu = (
     <>
-      {/* Overlay com blur — renderizado via portal direto no body */}
+      {/* Overlay — sem backdrop-filter para evitar camada GPU permanente */}
       <div
         onClick={() => setMenuOpen(false)}
         style={{
           position: 'fixed',
           inset: 0,
           zIndex: 9998,
-          background: 'rgba(0,0,0,0.45)',
-          backdropFilter: menuOpen ? 'blur(4px)' : 'none',
-          WebkitBackdropFilter: menuOpen ? 'blur(4px)' : 'none',
-          opacity: menuOpen ? 1 : 0,
-          pointerEvents: menuOpen ? 'auto' : 'none',
-          transition: 'opacity 0.3s ease',
+          background: 'rgba(0,0,0,0.55)',
+          animation: 'fadeIn 0.25s ease',
         }}
       />
 
@@ -78,8 +74,7 @@ export default function Navbar() {
           background: '#070D1E',
           borderLeft: '1px solid rgba(26,58,143,0.4)',
           zIndex: 9999,
-          transform: menuOpen ? 'translateX(0)' : 'translateX(100%)',
-          transition: 'transform 0.3s ease',
+          animation: 'slideInFromRight 0.3s ease',
           display: 'flex',
           flexDirection: 'column',
           paddingTop: '5rem',
@@ -201,9 +196,8 @@ export default function Navbar() {
         </div>
       </nav>
 
-      {/* Portal renderiza overlay e painel direto no document.body,
-          sem interferência de nenhum stacking context da página */}
-      {createPortal(mobileMenu, document.body)}
+      {/* Portal só existe no DOM quando o menu está aberto — zero camadas GPU quando fechado */}
+      {menuOpen && createPortal(mobileMenu, document.body)}
     </>
   )
 }

@@ -88,7 +88,7 @@ export default function Referees() {
 
             {/* Próximos cursos */}
             <h4 className="font-display text-fht-white text-xl mb-3">PRÓXIMOS CURSOS</h4>
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3" style={{ filter: 'opacity(0.9999)' }}>
               {refereeCourses.map((course) => (
                 <a
                   key={course.id}

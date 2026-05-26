@@ -125,7 +125,7 @@ export default function Registration() {
 
   return (
     <>
-      <section id="cadastro" className="py-20 bg-section-alt diagonal-texture relative overflow-hidden">
+      <section id="cadastro" className="py-20 bg-section-alt relative overflow-hidden">
         <div className="absolute inset-0 bg-federation/5 pointer-events-none" />
         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-gold/30 to-transparent" />
 

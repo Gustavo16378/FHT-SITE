@@ -85,7 +85,7 @@ export default function Competitions() {
   })
 
   return (
-    <section id="competicoes" className="py-16 sm:py-20 bg-night diagonal-texture">
+    <section id="competicoes" className="py-16 sm:py-20 bg-night">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
         {/* Header */}

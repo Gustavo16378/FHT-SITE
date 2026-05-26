@@ -24,7 +24,7 @@ export default function News() {
   const rest = news.filter((n) => !n.featured).slice(2)
 
   return (
-    <section id="noticias" className="py-16 sm:py-20 bg-night diagonal-texture">
+    <section id="noticias" className="py-16 sm:py-20 bg-night">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
         <div ref={ref as React.RefObject<HTMLDivElement>} className="animate-ready mb-8 sm:mb-12">

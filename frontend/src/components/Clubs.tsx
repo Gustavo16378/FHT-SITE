@@ -12,7 +12,7 @@ export default function Clubs() {
   const ref = useInView()
 
   return (
-    <section id="clubes" className="py-20 bg-night diagonal-texture">
+    <section id="clubes" className="py-20 bg-night">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div ref={ref as React.RefObject<HTMLDivElement>} className="animate-ready mb-12">
           <p className="font-body text-gold text-sm font-semibold tracking-widest uppercase mb-2">Ecossistema</p>

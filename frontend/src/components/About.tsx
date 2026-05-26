@@ -31,7 +31,7 @@ export default function About() {
   const ref = useInView()
 
   return (
-    <section id="sobre" className="py-20 bg-section-alt diagonal-texture">
+    <section id="sobre" className="py-20 bg-section-alt">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div ref={ref as React.RefObject<HTMLDivElement>} className="animate-ready mb-14">

@@ -40,16 +40,6 @@
     display: none;
   }
 
-  .diagonal-texture {
-    background-image: repeating-linear-gradient(
-      45deg,
-      transparent,
-      transparent 10px,
-      rgba(255, 255, 255, 0.03) 10px,
-      rgba(255, 255, 255, 0.03) 11px
-    );
-  }
-
   .opacity-0 {
     opacity: 0;
   }

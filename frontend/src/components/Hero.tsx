@@ -24,7 +24,7 @@ export default function Hero() {
   return (
     <section
       id="hero"
-      className="relative min-h-screen flex flex-col justify-center overflow-hidden bg-night diagonal-texture"
+      className="relative min-h-screen flex flex-col justify-center overflow-hidden bg-night"
     >
       {/* Glows */}
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-federation/20 rounded-full blur-[120px] pointer-events-none" />

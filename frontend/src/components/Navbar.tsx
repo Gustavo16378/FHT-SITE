@@ -134,14 +134,14 @@ export default function Navbar() {
   return (
     <>
       <nav
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        className={`fixed left-0 right-0 z-50 ${
           scrolled
             ? 'bg-night shadow-lg shadow-black/30'
             : 'bg-transparent'
         }`}
         style={{
-          transform: navHidden && !menuOpen ? 'translateY(-100%)' : 'translateY(0)',
-          transition: 'transform 0.3s ease, background-color 0.3s ease, box-shadow 0.3s ease',
+          top: navHidden && !menuOpen ? '-80px' : '0',
+          transition: 'top 0.3s ease, background-color 0.3s ease, box-shadow 0.3s ease',
         }}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

@@ -23,7 +23,7 @@ function SitePrincipal() {
   return (
     <>
       <Navbar />
-      <main>
+      <main style={{ transform: 'translateZ(0)' }}>
         <Hero />
         <Competitions />
         <Registration />

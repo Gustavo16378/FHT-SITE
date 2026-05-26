@@ -2,7 +2,6 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { AuthProvider, ProtectedRoute } from './context/AuthContext'
 
 import Navbar from './components/Navbar'
-import ScrollProgress from './components/ScrollProgress'
 import Hero from './components/Hero'
 import Competitions from './components/Competitions'
 import Registration from './components/Registration'
@@ -24,7 +23,6 @@ function SitePrincipal() {
   return (
     <>
       <Navbar />
-      <ScrollProgress />
       <main>
         <Hero />
         <Competitions />

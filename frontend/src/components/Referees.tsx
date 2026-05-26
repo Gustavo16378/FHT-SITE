@@ -37,7 +37,7 @@ export default function Referees() {
               {referees.map((ref) => (
                 <div
                   key={ref.id}
-                  className="flex items-center gap-4 bg-night/50 border border-federation/20 rounded-lg p-4 hover:border-gold/40 transition-all duration-250 group"
+                  className="flex items-center gap-4 bg-night/50 border border-federation/20 rounded-lg p-4 hover:border-gold/40 transition-colors duration-250 group"
                 >
                   <div className="w-12 h-12 bg-federation/30 rounded-lg flex items-center justify-center flex-shrink-0 border border-federation/30 group-hover:border-gold/40 transition-colors duration-250">
                     {ref.photo ? (
@@ -93,7 +93,7 @@ export default function Referees() {
                 <a
                   key={course.id}
                   href={course.registrationLink}
-                  className="bg-night/60 border border-federation/20 rounded-lg p-4 hover:border-gold/40 transition-all duration-250 group block"
+                  className="bg-night/60 border border-federation/20 rounded-lg p-4 hover:border-gold/40 transition-colors duration-250 group block"
                 >
                   <p className="font-display text-fht-white text-base leading-tight group-hover:text-gold transition-colors duration-250 mb-2">{course.title}</p>
                   <div className="flex flex-col gap-1 text-xs text-gray-soft font-body">

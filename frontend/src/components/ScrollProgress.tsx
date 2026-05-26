@@ -16,21 +16,22 @@ export default function ScrollProgress() {
     <div
       style={{
         position: 'fixed',
-        right: 0,
         top: 0,
-        width: '3px',
-        height: '100vh',
+        left: 0,
+        width: '100%',
+        height: '2px',
         zIndex: 9990,
-        background: 'rgba(245,197,24,0.12)',
+        background: 'rgba(245,197,24,0.15)',
+        pointerEvents: 'none',
       }}
     >
       <div
         style={{
-          width: '100%',
           height: '100%',
+          width: '100%',
           background: '#F5C518',
-          transform: `scaleY(${progress / 100})`,
-          transformOrigin: 'top',
+          transform: `scaleX(${progress / 100})`,
+          transformOrigin: 'left',
           transition: 'transform 80ms linear',
         }}
       />

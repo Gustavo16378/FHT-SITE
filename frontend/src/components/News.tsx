@@ -40,7 +40,7 @@ export default function News() {
 
           {/* Destaque */}
           {featured && (
-            <div className="lg:col-span-2 relative rounded-lg overflow-hidden group cursor-pointer border border-federation/20 hover:border-gold/40 transition-all duration-250 min-h-[260px] sm:min-h-[340px]">
+            <div className="lg:col-span-2 relative rounded-lg overflow-hidden group cursor-pointer border border-federation/20 hover:border-gold/40 transition-colors duration-250 min-h-[260px] sm:min-h-[340px]">
               <img
                 src={featured.image}
                 alt={featured.title}
@@ -63,7 +63,7 @@ export default function News() {
                   {formatDate(featured.date)}
                 </div>
               </div>
-              <div className="absolute inset-0 border-2 border-gold/0 group-hover:border-gold/40 rounded-lg transition-all duration-250 pointer-events-none" />
+              <div className="absolute inset-0 border-2 border-gold/0 group-hover:border-gold/40 rounded-lg transition-colors duration-250 pointer-events-none" />
             </div>
           )}
 
@@ -72,7 +72,7 @@ export default function News() {
             {secondary.map((item) => (
               <div
                 key={item.id}
-                className="relative rounded-lg overflow-hidden group cursor-pointer border border-federation/20 hover:border-gold/40 transition-all duration-250 min-h-[160px] sm:min-h-[180px] lg:flex-1"
+                className="relative rounded-lg overflow-hidden group cursor-pointer border border-federation/20 hover:border-gold/40 transition-colors duration-250 min-h-[160px] sm:min-h-[180px] lg:flex-1"
               >
                 <img
                   src={item.image}
@@ -104,7 +104,7 @@ export default function News() {
             {rest.map((item) => (
               <div
                 key={item.id}
-                className="bg-section-alt/60 border border-federation/20 rounded-lg overflow-hidden hover:border-gold/40 transition-all duration-250 group cursor-pointer"
+                className="bg-section-alt/60 border border-federation/20 rounded-lg overflow-hidden hover:border-gold/40 transition-colors duration-250 group cursor-pointer"
               >
                 <div className="h-40 overflow-hidden">
                   <img src={item.image} alt={item.title} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
@@ -122,7 +122,7 @@ export default function News() {
         <div className="text-center mt-8">
           <a
             href="#"
-            className="inline-flex items-center gap-2 font-display text-fht-white border border-fht-white/20 hover:border-gold hover:text-gold px-8 py-3 rounded-lg text-lg tracking-wider transition-all duration-250"
+            className="inline-flex items-center gap-2 font-display text-fht-white border border-fht-white/20 hover:border-gold hover:text-gold px-8 py-3 rounded-lg text-lg tracking-wider transition-colors duration-250"
           >
             VER TODAS AS NOTÍCIAS <ArrowRight size={18} />
           </a>

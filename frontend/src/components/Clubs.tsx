@@ -27,7 +27,7 @@ export default function Clubs() {
           {clubs.map((club, i) => (
             <div
               key={club.id}
-              className={`bg-gradient-to-br ${bgColors[i % bgColors.length]} border border-federation/20 rounded-lg p-4 sm:p-5 hover:border-gold/50 hover:-translate-y-1 transition-all duration-250 group cursor-pointer overflow-hidden`}
+              className={`bg-gradient-to-br ${bgColors[i % bgColors.length]} border border-federation/20 rounded-lg p-4 sm:p-5 hover:border-gold/50 transition-colors duration-250 group cursor-pointer overflow-hidden`}
             >
               {/* Escudo / Iniciais */}
               <div className="w-12 h-12 bg-federation/40 border border-federation/50 rounded-lg flex items-center justify-center mb-3 group-hover:border-gold/50 transition-colors duration-250 flex-shrink-0">

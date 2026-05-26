@@ -60,7 +60,7 @@ export default function About() {
           {mvv.map((item) => (
             <div
               key={item.title}
-              className="bg-night/50 border border-federation/20 rounded-lg p-6 hover:border-gold/30 transition-all duration-250 group"
+              className="bg-night/50 border border-federation/20 rounded-lg p-6 hover:border-gold/30 transition-colors duration-250 group"
             >
               <div className="w-10 h-10 bg-gold/10 border border-gold/20 rounded-lg flex items-center justify-center mb-4 group-hover:border-gold/50 transition-colors duration-250">
                 <item.icon size={20} className="text-gold" />
@@ -78,7 +78,7 @@ export default function About() {
           <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
             {directors.map((dir) => (
               <div key={dir.id} className="group text-center">
-                <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto rounded-lg bg-federation/30 border border-federation/30 group-hover:border-gold/50 transition-all duration-250 flex items-center justify-center mb-2 overflow-hidden">
+                <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto rounded-lg bg-federation/30 border border-federation/30 group-hover:border-gold/50 transition-colors duration-250 flex items-center justify-center mb-2 overflow-hidden">
                   {dir.photo ? (
                     <img
                       src={dir.photo}
@@ -108,7 +108,7 @@ export default function About() {
                 href={doc.fileUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-4 bg-night/50 border border-federation/20 rounded-lg px-5 py-4 hover:border-gold/40 transition-all duration-250 group"
+                className="flex items-center gap-4 bg-night/50 border border-federation/20 rounded-lg px-5 py-4 hover:border-gold/40 transition-colors duration-250 group"
               >
                 <div className="w-10 h-10 bg-gold/10 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-gold/20 transition-colors duration-250">
                   <FileText size={18} className="text-gold" />

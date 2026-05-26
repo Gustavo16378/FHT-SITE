@@ -34,7 +34,7 @@ export default function Contact() {
             href="https://wa.me/556300000000"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-4 bg-green-500/10 border border-green-500/30 rounded-lg p-5 hover:border-green-500/60 hover:bg-green-500/20 transition-all duration-250 group"
+            className="flex items-center gap-4 bg-green-500/10 border border-green-500/30 rounded-lg p-5 hover:border-green-500/60 hover:bg-green-500/20 transition-colors duration-250 group"
           >
             <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
               <MessageCircle size={22} className="text-green-400" />
@@ -46,7 +46,7 @@ export default function Contact() {
           </a>
           <a
             href="mailto:imprensa@fht.org.br"
-            className="flex items-center gap-4 bg-federation/10 border border-federation/30 rounded-lg p-5 hover:border-federation/60 hover:bg-federation/20 transition-all duration-250 group"
+            className="flex items-center gap-4 bg-federation/10 border border-federation/30 rounded-lg p-5 hover:border-federation/60 hover:bg-federation/20 transition-colors duration-250 group"
           >
             <div className="w-12 h-12 bg-federation/20 rounded-lg flex items-center justify-center flex-shrink-0">
               <Mail size={22} className="text-blue-300" />
@@ -58,7 +58,7 @@ export default function Contact() {
           </a>
           <a
             href="#form-contato"
-            className="flex items-center gap-4 bg-gold/10 border border-gold/30 rounded-lg p-5 hover:border-gold/60 hover:bg-gold/20 transition-all duration-250 group"
+            className="flex items-center gap-4 bg-gold/10 border border-gold/30 rounded-lg p-5 hover:border-gold/60 hover:bg-gold/20 transition-colors duration-250 group"
           >
             <div className="w-12 h-12 bg-gold/20 rounded-lg flex items-center justify-center flex-shrink-0">
               <Send size={22} className="text-gold" />
@@ -169,7 +169,7 @@ export default function Contact() {
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label={label}
-                    className="w-12 h-12 bg-federation/20 border border-federation/30 rounded-lg flex items-center justify-center text-gray-soft hover:text-gold hover:border-gold/40 transition-all duration-250"
+                    className="w-12 h-12 bg-federation/20 border border-federation/30 rounded-lg flex items-center justify-center text-gray-soft hover:text-gold hover:border-gold/40 transition-colors duration-250"
                   >
                     <Icon size={20} />
                   </a>

@@ -52,7 +52,7 @@ export default function News() {
                 <span className={`font-body text-xs font-semibold px-2.5 py-1 rounded-full ${categoryColors[featured.category]}`}>
                   {featured.category}
                 </span>
-                <h3 className="font-display text-fht-white text-xl sm:text-2xl lg:text-3xl leading-tight mt-2 sm:mt-3 mb-2 group-hover:text-gold transition-colors duration-250">
+                <h3 className="font-display text-fht-white text-xl sm:text-2xl lg:text-3xl leading-tight mt-2 sm:mt-3 mb-2 group-hover:text-gold transition-colors duration-250 line-clamp-3">
                   {featured.title}
                 </h3>
                 <p className="font-body text-gray-soft text-xs sm:text-sm leading-relaxed line-clamp-2 mb-2 hidden sm:block">
@@ -85,7 +85,7 @@ export default function News() {
                   <span className={`font-body text-xs font-semibold px-2 py-0.5 rounded-full ${categoryColors[item.category]}`}>
                     {item.category}
                   </span>
-                  <h3 className="font-display text-fht-white text-base sm:text-lg leading-tight mt-1.5 group-hover:text-gold transition-colors duration-250">
+                  <h3 className="font-display text-fht-white text-base sm:text-lg leading-tight mt-1.5 group-hover:text-gold transition-colors duration-250 line-clamp-2">
                     {item.title}
                   </h3>
                   <div className="hidden sm:flex items-center gap-1.5 text-gray-soft text-xs mt-1">

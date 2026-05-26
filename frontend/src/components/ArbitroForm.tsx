@@ -159,7 +159,7 @@ export default function ArbitroForm({ onClose }: Props) {
                   <input required name="nomeCompleto" value={form.nomeCompleto} onChange={handleChange}
                     placeholder="Seu nome completo" className={inp} />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <span className={lbl}>Data de Nascimento *</span>
                     <input required type="date" name="dataNascimento" value={form.dataNascimento} onChange={handleChange}
@@ -174,7 +174,7 @@ export default function ArbitroForm({ onClose }: Props) {
                     </select>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <span className={lbl}>CPF *</span>
                     <input required name="cpf" value={form.cpf} onChange={handleChange}
@@ -198,7 +198,7 @@ export default function ArbitroForm({ onClose }: Props) {
               {/* Seção 2 — Contato */}
               <fieldset className="flex flex-col gap-4">
                 <p className="font-display text-gold text-sm tracking-widest uppercase border-b border-gold/20 pb-2">2. Contato</p>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <span className={lbl}>Telefone / WhatsApp *</span>
                     <input required name="telefone" value={form.telefone} onChange={handleChange}
@@ -210,7 +210,7 @@ export default function ArbitroForm({ onClose }: Props) {
                       placeholder="seu@email.com" className={inp} />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <span className={lbl}>Cidade *</span>
                     <input required name="cidade" value={form.cidade} onChange={handleChange}
@@ -232,7 +232,7 @@ export default function ArbitroForm({ onClose }: Props) {
                 <Toggle label="Já é árbitro?" value={form.jaArbitro}
                   onChange={v => setForm(p => ({ ...p, jaArbitro: v }))} />
                 {form.jaArbitro && (
-                  <div className="grid grid-cols-2 gap-4 pl-2 border-l-2 border-gold/30">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pl-2 border-l-2 border-gold/30">
                     <div>
                       <span className={lbl}>Nível atual</span>
                       <select name="nivelAtual" value={form.nivelAtual} onChange={handleChange} className={sel}>

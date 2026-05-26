@@ -75,10 +75,10 @@ export default function About() {
         <div className="mb-20">
           <h3 className="font-display text-fht-white text-4xl leading-none mb-2">DIRETORIA</h3>
           <div className="w-10 h-0.5 bg-gold mb-8" />
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
             {directors.map((dir) => (
               <div key={dir.id} className="group text-center">
-                <div className="w-20 h-20 mx-auto rounded-lg bg-federation/30 border border-federation/30 group-hover:border-gold/50 transition-all duration-250 flex items-center justify-center mb-3 overflow-hidden">
+                <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto rounded-lg bg-federation/30 border border-federation/30 group-hover:border-gold/50 transition-all duration-250 flex items-center justify-center mb-2 overflow-hidden">
                   {dir.photo ? (
                     <img
                       src={dir.photo}
@@ -87,11 +87,11 @@ export default function About() {
                       className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-300"
                     />
                   ) : (
-                    <span className="font-display text-gold text-2xl">{getInitials(dir.name)}</span>
+                    <span className="font-display text-gold text-xl sm:text-2xl">{getInitials(dir.name)}</span>
                   )}
                 </div>
-                <p className="font-display text-fht-white text-sm leading-tight uppercase">{dir.name}</p>
-                <p className="font-body text-gray-soft text-xs mt-1">{dir.role}</p>
+                <p className="font-display text-fht-white text-xs sm:text-sm leading-tight uppercase line-clamp-2">{dir.name}</p>
+                <p className="font-body text-gray-soft text-xs mt-1 truncate">{dir.role}</p>
               </div>
             ))}
           </div>

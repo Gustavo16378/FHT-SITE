@@ -219,7 +219,7 @@ export default function Registration() {
                       <input required name="nomeClube" value={form.nomeClube} onChange={handleChange}
                         placeholder="Ex: Associação Esportiva Palmas HC" className={inp} />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <span className={lbl}>Cidade *</span>
                         <input required name="cidade" value={form.cidade} onChange={handleChange}
@@ -232,7 +232,7 @@ export default function Registration() {
                         </select>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <span className={lbl}>CNPJ (opcional)</span>
                         <input name="cnpj" value={form.cnpj} onChange={handleChange}
@@ -256,7 +256,7 @@ export default function Registration() {
                       <input required name="nomeRepresentante" value={form.nomeRepresentante} onChange={handleChange}
                         placeholder="Nome do representante" className={inp} />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <span className={lbl}>CPF *</span>
                         <input required name="cpfRepresentante" value={form.cpfRepresentante} onChange={handleChange}
@@ -272,7 +272,7 @@ export default function Registration() {
                         </select>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <span className={lbl}>E-mail *</span>
                         <input required type="email" name="emailRepresentante" value={form.emailRepresentante}

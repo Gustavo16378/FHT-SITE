@@ -29,7 +29,7 @@ export default function Gallery() {
                 src={photo.src}
                 alt={photo.event}
                 loading="lazy"
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                className="w-full h-full object-cover"
               />
               <div className="absolute inset-0 bg-night/30 group-hover:opacity-0 transition-opacity duration-300" />
               <div className="absolute inset-0 bg-gradient-to-t from-night/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
@@ -51,7 +51,7 @@ export default function Gallery() {
                 src={photo.src}
                 alt={photo.event}
                 loading="lazy"
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                className="w-full h-full object-cover"
               />
               <div className="absolute inset-0 bg-night/30 group-hover:opacity-0 transition-opacity duration-300" />
               <div className="absolute inset-0 bg-gradient-to-t from-night/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
@@ -72,7 +72,7 @@ export default function Gallery() {
                 src={photo.src}
                 alt={photo.event}
                 loading="lazy"
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                className="w-full h-full object-cover"
               />
               <div className="absolute inset-0 bg-night/30 group-hover:opacity-0 transition-opacity duration-300" />
               <div className="absolute inset-0 bg-gradient-to-t from-night/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />

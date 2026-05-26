@@ -45,7 +45,7 @@ export default function News() {
                 src={featured.image}
                 alt={featured.title}
                 loading="lazy"
-                className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                className="absolute inset-0 w-full h-full object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-night via-night/60 to-transparent" />
               <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-6">
@@ -78,7 +78,7 @@ export default function News() {
                   src={item.image}
                   alt={item.title}
                   loading="lazy"
-                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  className="absolute inset-0 w-full h-full object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-night via-night/50 to-transparent" />
                 <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4">
@@ -107,7 +107,7 @@ export default function News() {
                 className="bg-section-alt/60 border border-federation/20 rounded-lg overflow-hidden hover:border-gold/40 transition-colors duration-250 group cursor-pointer"
               >
                 <div className="h-40 overflow-hidden">
-                  <img src={item.image} alt={item.title} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                  <img src={item.image} alt={item.title} loading="lazy" className="w-full h-full object-cover" />
                 </div>
                 <div className="p-4">
                   <span className={`font-body text-xs font-semibold px-2 py-0.5 rounded-full ${categoryColors[item.category]}`}>{item.category}</span>

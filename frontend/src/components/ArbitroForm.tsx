@@ -25,7 +25,7 @@ function Toggle({ label: l, value, onChange }: { label: string; value: boolean; 
       <span className="font-body text-fht-white text-sm">{l}</span>
       <button type="button" onClick={() => onChange(!value)}
         className={`w-12 h-6 rounded-full transition-colors duration-250 relative flex-shrink-0 ${value ? 'bg-gold' : 'bg-federation/40'}`}>
-        <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all duration-250 ${value ? 'left-7' : 'left-1'}`} />
+        <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-[left] duration-250 ${value ? 'left-7' : 'left-1'}`} />
       </button>
     </div>
   )
@@ -113,8 +113,8 @@ export default function ArbitroForm({ onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
-      style={{ backgroundColor: 'rgba(0,0,0,0.75)' }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ backgroundColor: 'rgba(0,0,0,0.88)' }}
       onClick={onClose}
     >
       <div

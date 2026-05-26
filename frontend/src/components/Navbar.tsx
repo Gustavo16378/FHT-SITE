@@ -164,7 +164,7 @@ export default function Navbar() {
                     className="font-body text-gray-soft hover:text-fht-white text-sm font-medium tracking-wide transition-colors duration-250 relative group"
                   >
                     {link.label}
-                    <span className="absolute -bottom-1 left-0 w-0 h-px bg-gold group-hover:w-full transition-all duration-250" />
+                    <span className="absolute -bottom-1 left-0 w-full h-px bg-gold opacity-0 group-hover:opacity-100 transition-opacity duration-250" />
                   </a>
                 </li>
               ))}

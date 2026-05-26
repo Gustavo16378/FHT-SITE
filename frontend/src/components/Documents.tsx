@@ -38,7 +38,7 @@ export default function Documents() {
             <button
               key={cat}
               onClick={() => setActive(cat)}
-              className={`font-body text-sm font-medium px-4 py-2 rounded-lg border transition-all duration-250 ${
+              className={`font-body text-sm font-medium px-4 py-2 rounded-lg border transition-colors duration-250 ${
                 active === cat
                   ? 'bg-federation border-federation text-white'
                   : 'bg-white border-gray-200 text-night hover:border-federation/40'
@@ -57,7 +57,7 @@ export default function Documents() {
               href={doc.fileUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-4 bg-white border border-gray-200 rounded-lg px-5 py-4 hover:border-federation/40 hover:shadow-md transition-all duration-250 group"
+              className="flex items-center gap-4 bg-white border border-gray-200 rounded-lg px-5 py-4 hover:border-federation/40 transition-colors duration-250 group"
             >
               <div className="w-10 h-10 bg-federation/10 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-federation/20 transition-colors duration-250">
                 <FileText size={18} className="text-federation" />

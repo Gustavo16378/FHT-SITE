@@ -139,7 +139,7 @@ export default function Registration() {
           </div>
 
           <div className="max-w-2xl mx-auto">
-            <div className="bg-night/60 border border-federation/30 rounded-lg p-8 hover:border-gold/40 transition-all duration-250 group flex flex-col">
+            <div className="bg-night/60 border border-federation/30 rounded-lg p-8 hover:border-gold/40 transition-colors duration-250 group flex flex-col">
               <div className="w-14 h-14 bg-federation/20 border border-federation/40 rounded-lg flex items-center justify-center mb-6 group-hover:border-gold/40 transition-colors duration-250">
                 <Shield size={28} className="text-gold" />
               </div>
@@ -173,8 +173,8 @@ export default function Registration() {
 
       {open && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
-          style={{ backgroundColor: 'rgba(0,0,0,0.75)' }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: 'rgba(0,0,0,0.88)' }}
           onClick={handleClose}
         >
           <div

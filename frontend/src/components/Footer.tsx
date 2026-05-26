@@ -51,7 +51,7 @@ export default function Footer() {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label={label}
-                  className="w-8 h-8 bg-federation/20 rounded-lg flex items-center justify-center text-gray-soft hover:text-gold hover:bg-federation/40 transition-all duration-250"
+                  className="w-8 h-8 bg-federation/20 rounded-lg flex items-center justify-center text-gray-soft hover:text-gold hover:bg-federation/40 transition-colors duration-250"
                 >
                   <Icon size={15} />
                 </a>

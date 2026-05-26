@@ -84,7 +84,7 @@ export default function About() {
                       src={dir.photo}
                       alt={dir.name}
                       loading="lazy"
-                      className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-300"
+                      className="w-full h-full object-cover"
                     />
                   ) : (
                     <span className="font-display text-gold text-xl sm:text-2xl">{getInitials(dir.name)}</span>

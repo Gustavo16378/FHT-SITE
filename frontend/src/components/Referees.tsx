@@ -41,7 +41,7 @@ export default function Referees() {
                 >
                   <div className="w-12 h-12 bg-federation/30 rounded-lg flex items-center justify-center flex-shrink-0 border border-federation/30 group-hover:border-gold/40 transition-colors duration-250">
                     {ref.photo ? (
-                      <img src={ref.photo} alt={ref.name} className="w-full h-full object-cover rounded-lg grayscale group-hover:grayscale-0 transition-all duration-300" />
+                      <img src={ref.photo} alt={ref.name} className="w-full h-full object-cover rounded-lg" />
                     ) : (
                       <span className="font-display text-gold text-lg">{getInitials(ref.name)}</span>
                     )}

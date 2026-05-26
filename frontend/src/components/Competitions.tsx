@@ -105,7 +105,7 @@ export default function Competitions() {
             <button
               key={f.value}
               onClick={() => setActiveStatus(f.value)}
-              className={`font-body text-xs sm:text-sm font-medium px-3 sm:px-4 py-2 rounded-lg whitespace-nowrap border transition-all duration-250 flex-shrink-0 ${
+              className={`font-body text-xs sm:text-sm font-medium px-3 sm:px-4 py-2 rounded-lg whitespace-nowrap border transition-colors duration-250 flex-shrink-0 ${
                 activeStatus === f.value
                   ? 'bg-federation border-federation text-fht-white'
                   : 'bg-transparent border-gray-soft/20 text-gray-soft hover:border-gray-soft/50'
@@ -122,7 +122,7 @@ export default function Competitions() {
             <button
               key={cat}
               onClick={() => setActiveCategory(cat)}
-              className={`font-body text-xs font-semibold px-3 py-1.5 rounded-full whitespace-nowrap border transition-all duration-250 flex-shrink-0 ${
+              className={`font-body text-xs font-semibold px-3 py-1.5 rounded-full whitespace-nowrap border transition-colors duration-250 flex-shrink-0 ${
                 activeCategory === cat
                   ? 'bg-gold border-gold text-night'
                   : 'bg-transparent border-gold/20 text-gray-soft hover:border-gold/50'
@@ -143,7 +143,7 @@ export default function Competitions() {
             filtered.map((comp) => (
               <div
                 key={comp.id}
-                className="bg-section-alt/70 border border-federation/20 rounded-lg overflow-hidden hover:border-federation/50 transition-all duration-250 group"
+                className="bg-section-alt/70 border border-federation/20 rounded-lg overflow-hidden hover:border-federation/50 transition-colors duration-250 group"
               >
                 {/* Barra colorida sempre à esquerda */}
                 <div className="flex">

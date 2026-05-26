@@ -17,6 +17,7 @@ const navLinks = [
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
   const scrollYRef = useRef(0)
   const navHidden = useScrollDirection()
 
@@ -24,6 +25,27 @@ export default function Navbar() {
     const handleScroll = () => setScrolled(window.scrollY > 40)
     window.addEventListener('scroll', handleScroll, { passive: true })
     return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 768px)')
+    const update = () => setIsMobile(media.matches)
+    const listener = () => update()
+
+    update()
+    if (media.addEventListener) {
+      media.addEventListener('change', listener)
+    } else {
+      media.addListener(listener)
+    }
+
+    return () => {
+      if (media.removeEventListener) {
+        media.removeEventListener('change', listener)
+      } else {
+        media.removeListener(listener)
+      }
+    }
   }, [])
 
   // Scroll lock compatível com iOS Safari (position: fixed + top: -scrollY)
@@ -53,10 +75,10 @@ export default function Navbar() {
     setMenuOpen(false)
   }
 
-  // Portal sempre no DOM — overlay e painel controlados por opacity/transform (não removidos)
-  const mobilePortal = createPortal(
+  // Portal so existe quando o menu esta aberto para evitar camadas GPU persistentes.
+  const mobilePortal = menuOpen ? createPortal(
     <>
-      {/* Overlay com backdrop-blur — sempre no DOM, visibilidade via opacity */}
+      {/* Overlay sem backdrop-filter para evitar glitches no Android */}
       <div
         onClick={closeMenu}
         style={{
@@ -64,11 +86,8 @@ export default function Navbar() {
           inset: 0,
           zIndex: 9998,
           backgroundColor: 'rgba(0, 0, 0, 0.55)',
-          backdropFilter: 'blur(4px)',
-          WebkitBackdropFilter: 'blur(4px)',
-          opacity: menuOpen ? 1 : 0,
-          pointerEvents: menuOpen ? 'auto' : 'none',
-          transition: 'opacity 0.3s ease',
+          opacity: 1,
+          pointerEvents: 'auto',
         }}
       />
 
@@ -84,7 +103,7 @@ export default function Navbar() {
           background: '#070D1E',
           borderLeft: '1px solid rgba(26,58,143,0.4)',
           zIndex: 9999,
-          transform: menuOpen ? 'translateX(0)' : 'translateX(100%)',
+          transform: 'translateX(0)',
           transition: 'transform 0.3s ease',
           display: 'flex',
           flexDirection: 'column',
@@ -193,19 +212,21 @@ export default function Navbar() {
       </div>
     </>,
     document.body
-  )
+  , document.body) : null
 
   return (
     <>
       <nav
         className="fixed left-0 right-0 z-50"
         style={{
-          top: navHidden && !menuOpen ? '-80px' : '0',
+          top: !isMobile && navHidden && !menuOpen ? '-80px' : '0',
           backgroundColor: scrolled ? 'rgba(7,13,30,0.92)' : 'transparent',
-          backdropFilter: scrolled ? 'blur(12px)' : 'none',
-          WebkitBackdropFilter: scrolled ? 'blur(12px)' : 'none',
-          boxShadow: scrolled ? '0 4px 24px rgba(0,0,0,0.4)' : 'none',
-          transition: 'top 0.3s ease, background-color 0.3s ease, box-shadow 0.3s ease',
+          backdropFilter: scrolled && !isMobile ? 'blur(12px)' : 'none',
+          WebkitBackdropFilter: scrolled && !isMobile ? 'blur(12px)' : 'none',
+          boxShadow: scrolled && !isMobile ? '0 4px 24px rgba(0,0,0,0.4)' : 'none',
+          transition: isMobile
+            ? 'background-color 0.3s ease'
+            : 'top 0.3s ease, background-color 0.3s ease, box-shadow 0.3s ease',
         }}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

@@ -27,10 +27,11 @@ export default function ScrollProgress() {
       <div
         style={{
           width: '100%',
-          height: `${progress}%`,
+          height: '100%',
           background: '#F5C518',
-          boxShadow: '0 0 10px rgba(245,197,24,0.6)',
-          transition: 'height 80ms linear',
+          transform: `scaleY(${progress / 100})`,
+          transformOrigin: 'top',
+          transition: 'transform 80ms linear',
         }}
       />
     </div>

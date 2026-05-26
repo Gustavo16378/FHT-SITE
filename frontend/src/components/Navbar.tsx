@@ -17,7 +17,6 @@ const navLinks = [
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
-  const [isMobile, setIsMobile] = useState(false)
   const scrollYRef = useRef(0)
   const navHidden = useScrollDirection()
 
@@ -27,28 +26,7 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
-  useEffect(() => {
-    const media = window.matchMedia('(max-width: 768px)')
-    const update = () => setIsMobile(media.matches)
-    const listener = () => update()
-
-    update()
-    if (media.addEventListener) {
-      media.addEventListener('change', listener)
-    } else {
-      media.addListener(listener)
-    }
-
-    return () => {
-      if (media.removeEventListener) {
-        media.removeEventListener('change', listener)
-      } else {
-        media.removeListener(listener)
-      }
-    }
-  }, [])
-
-  // Scroll lock compatível com iOS Safari (position: fixed + top: -scrollY)
+  // Scroll lock compatível com iOS Safari
   useEffect(() => {
     if (menuOpen) {
       scrollYRef.current = window.scrollY
@@ -75,19 +53,20 @@ export default function Navbar() {
     setMenuOpen(false)
   }
 
-  // Portal so existe quando o menu esta aberto para evitar camadas GPU persistentes.
-  const mobilePortal = menuOpen ? createPortal(
+  // Portal sempre no DOM — overlay e painel controlados por opacity/transform
+  const mobilePortal = createPortal(
     <>
-      {/* Overlay sem backdrop-filter para evitar glitches no Android */}
+      {/* Overlay escuro sem blur */}
       <div
         onClick={closeMenu}
         style={{
           position: 'fixed',
           inset: 0,
           zIndex: 9998,
-          backgroundColor: 'rgba(0, 0, 0, 0.55)',
-          opacity: 1,
-          pointerEvents: 'auto',
+          backgroundColor: 'rgba(0, 0, 0, 0.72)',
+          opacity: menuOpen ? 1 : 0,
+          pointerEvents: menuOpen ? 'auto' : 'none',
+          transition: 'opacity 0.3s ease',
         }}
       />
 
@@ -103,7 +82,7 @@ export default function Navbar() {
           background: '#070D1E',
           borderLeft: '1px solid rgba(26,58,143,0.4)',
           zIndex: 9999,
-          transform: 'translateX(0)',
+          transform: menuOpen ? 'translateX(0)' : 'translateX(100%)',
           transition: 'transform 0.3s ease',
           display: 'flex',
           flexDirection: 'column',
@@ -212,21 +191,17 @@ export default function Navbar() {
       </div>
     </>,
     document.body
-  ) : null
+  )
 
   return (
     <>
       <nav
         className="fixed left-0 right-0 z-50"
         style={{
-          top: !isMobile && navHidden && !menuOpen ? '-80px' : '0',
-          backgroundColor: scrolled ? 'rgba(7,13,30,0.92)' : 'transparent',
-          backdropFilter: scrolled && !isMobile ? 'blur(12px)' : 'none',
-          WebkitBackdropFilter: scrolled && !isMobile ? 'blur(12px)' : 'none',
-          boxShadow: scrolled && !isMobile ? '0 4px 24px rgba(0,0,0,0.4)' : 'none',
-          transition: isMobile
-            ? 'background-color 0.3s ease'
-            : 'top 0.3s ease, background-color 0.3s ease, box-shadow 0.3s ease',
+          top: navHidden && !menuOpen ? '-80px' : '0',
+          backgroundColor: scrolled ? 'rgba(7,13,30,0.95)' : 'transparent',
+          boxShadow: scrolled ? '0 4px 24px rgba(0,0,0,0.4)' : 'none',
+          transition: 'top 0.3s ease, background-color 0.3s ease, box-shadow 0.3s ease',
         }}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -241,7 +216,7 @@ export default function Navbar() {
               </div>
             </a>
 
-            {/* Links desktop — centralizados */}
+            {/* Links desktop */}
             <ul className="hidden lg:flex items-center gap-6">
               {navLinks.map((link) => (
                 <li key={link.href}>
@@ -271,7 +246,6 @@ export default function Navbar() {
                 CADASTRAR EQUIPE
               </a>
 
-              {/* Hambúrguer — apenas mobile */}
               <button
                 className="lg:hidden text-fht-white p-2"
                 onClick={() => setMenuOpen((o) => !o)}
@@ -284,7 +258,6 @@ export default function Navbar() {
         </div>
       </nav>
 
-      {/* Portal fora do <nav> — evita conflitos de z-index com seções que têm transform */}
       {mobilePortal}
     </>
   )

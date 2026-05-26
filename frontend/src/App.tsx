@@ -51,9 +51,10 @@ function SitePrincipal() {
           inset: 0,
           zIndex: 1,
           pointerEvents: 'none',
-          backdropFilter: 'blur(1px)',
-          WebkitBackdropFilter: 'blur(1px)',
-          opacity: 0.02,
+          backdropFilter: 'blur(0.5px)',
+          WebkitBackdropFilter: 'blur(0.5px)',
+          backgroundColor: 'rgba(0,0,0,0.012)',
+          willChange: 'opacity',
         }}
       />
     </>

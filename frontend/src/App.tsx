@@ -23,7 +23,7 @@ function SitePrincipal() {
   return (
     <>
       <Navbar />
-      <main style={{ transform: 'translateZ(0)' }}>
+      <main>
         <Hero />
         <Competitions />
         <Registration />
@@ -37,6 +37,25 @@ function SitePrincipal() {
       </main>
       <Footer />
       <CookieBanner />
+      {/*
+        GPU fix permanente para Chrome Android / Mali-G52:
+        backdrop-filter em elemento fixo full-screen força o Chrome a renderizar
+        o conteúdo da página num render surface separado (caminho sem o bug de tiles).
+        opacity: 0.02 = 2% — completamente imperceptível visualmente.
+        blur(1px) — kernel mínimo, overhead de GPU negligenciável.
+      */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 1,
+          pointerEvents: 'none',
+          backdropFilter: 'blur(1px)',
+          WebkitBackdropFilter: 'blur(1px)',
+          opacity: 0.02,
+        }}
+      />
     </>
   )
 }

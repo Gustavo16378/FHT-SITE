@@ -1,0 +1,16 @@
+target/
+.quarkus/
+*.class
+*.jar
+!mvnw.jar
+.env
+*.pem
+*.p12
+
+# IDE
+.idea/
+.vscode/
+*.iml
+.classpath
+.project
+.settings/

@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: fht_postgres
+    environment:
+      POSTGRES_DB: fht_db
+      POSTGRES_USER: fht_user
+      POSTGRES_PASSWORD: fht_pass
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fht_user -d fht_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    container_name: fht_backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: fht_db
+      DB_USER: fht_user
+      DB_PASS: fht_pass
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
+      R2_BUCKET: ${R2_BUCKET:-fht-documentos}
+      R2_PUBLIC_URL: ${R2_PUBLIC_URL:-}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_ENV: development
+    ports:
+      - "8080:8080"
+
+  frontend:
+    build: ./frontend
+    container_name: fht_frontend
+    depends_on:
+      - backend
+    environment:
+      VITE_API_URL: http://localhost:8080
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+
+volumes:
+  postgres_data:

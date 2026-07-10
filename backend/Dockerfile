@@ -1,14 +1,22 @@
-FROM eclipse-temurin:21-jre-alpine
-
+# Stage 1: build
+FROM maven:3.9-eclipse-temurin-21-alpine AS builder
 WORKDIR /app
 
-COPY target/quarkus-app/lib/ /app/lib/
-COPY target/quarkus-app/*.jar /app/
-COPY target/quarkus-app/app/ /app/app/
-COPY target/quarkus-app/quarkus/ /app/quarkus/
+COPY pom.xml ./
+RUN mvn dependency:go-offline -q
+
+COPY src/ src/
+RUN mvn package -DskipTests -q
+
+# Stage 2: runtime
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
+
+COPY --from=builder /app/target/quarkus-app/lib/ lib/
+COPY --from=builder /app/target/quarkus-app/*.jar ./
+COPY --from=builder /app/target/quarkus-app/app/ app/
+COPY --from=builder /app/target/quarkus-app/quarkus/ quarkus/
 
 EXPOSE 8080
 
-ENV JAVA_OPTS="-Dquarkus.http.host=0.0.0.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager"
-
-CMD ["java", "-jar", "-Dquarkus.http.host=0.0.0.0", "/app/quarkus-run.jar"]
+CMD ["java", "-Dquarkus.http.host=0.0.0.0", "-Djava.util.logging.manager=org.jboss.logmanager.LogManager", "-jar", "quarkus-run.jar"]

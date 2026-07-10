@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Home, Users, UserPlus, Trophy, Settings, LogOut, Menu, X,
@@ -7,30 +7,38 @@ import {
 import { useAuth } from '../context/AuthContext'
 import { maskCPF, maskPhone, maskCEP, validateCPF } from '../utils/masks'
 import { UFS } from '../utils/ufs'
+import { apiGet, apiPostForm, ApiError } from '../services/api'
+import type { AtletaDTO, AtletaStatus } from '../types/api'
 
 /* ── tipos ───────────────────────────────────────────────── */
 type Page = 'dashboard' | 'atletas' | 'cadastrar' | 'dados'
 
-interface AtletaMock {
-  id: number; nome: string; posicao: string; categoria: string
-  status: 'ATIVO' | 'AGUARDANDO_PAGAMENTO' | 'REJEITADO'
+interface AtletaRow {
+  id: string; nome: string; posicao: string; categoria: string
+  status: AtletaStatus
 }
 
-const atletasMock: AtletaMock[] = [
-  { id: 1, nome: 'João Pedro Silva', posicao: 'Armador Central', categoria: 'Sub-18', status: 'ATIVO' },
-  { id: 2, nome: 'Carlos Eduardo Lima', posicao: 'Goleiro', categoria: 'Adulto', status: 'AGUARDANDO_PAGAMENTO' },
-  { id: 3, nome: 'Lucas Ferreira Santos', posicao: 'Pivô', categoria: 'Sub-16', status: 'REJEITADO' },
-]
+function mapAtletaRow(d: AtletaDTO): AtletaRow {
+  return { id: d.id, nome: d.nomeCompleto, posicao: d.posicao, categoria: d.categoria, status: d.status }
+}
 
-const statusBadge: Record<AtletaMock['status'], string> = {
+function errMsg(e: unknown): string {
+  if (e instanceof ApiError) return e.message
+  if (e instanceof Error) return e.message
+  return 'Ocorreu um erro inesperado.'
+}
+
+const statusBadge: Record<AtletaStatus, string> = {
   ATIVO: 'text-green-400 bg-green-500/10 border-green-500/30',
   AGUARDANDO_PAGAMENTO: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30',
   REJEITADO: 'text-red-400 bg-red-500/10 border-red-500/30',
+  SUSPENSO: 'text-orange-400 bg-orange-500/10 border-orange-500/30',
 }
-const statusLabel: Record<AtletaMock['status'], string> = {
+const statusLabel: Record<AtletaStatus, string> = {
   ATIVO: 'Ativo',
   AGUARDANDO_PAGAMENTO: 'Aguardando pgto.',
   REJEITADO: 'Rejeitado',
+  SUSPENSO: 'Suspenso',
 }
 
 /* ── estilos ─────────────────────────────────────────────── */
@@ -87,12 +95,12 @@ function FileBtn({ file, onChange, label: lbl2, accept }: {
 }
 
 /* ── Dashboard Cards ─────────────────────────────────────── */
-function DashboardPage() {
+function DashboardPage({ atletas }: { atletas: AtletaRow[] }) {
   const cards = [
-    { label: 'Total de Atletas', value: 3, color: 'border-federation/30' },
-    { label: 'Atletas Ativos', value: 1, color: 'border-green-500/30' },
-    { label: 'Aguardando Aprovação', value: 1, color: 'border-yellow-500/30' },
-    { label: 'Rejeitados', value: 1, color: 'border-red-500/30' },
+    { label: 'Total de Atletas', value: atletas.length, color: 'border-federation/30' },
+    { label: 'Atletas Ativos', value: atletas.filter(a => a.status === 'ATIVO').length, color: 'border-green-500/30' },
+    { label: 'Aguardando Aprovação', value: atletas.filter(a => a.status === 'AGUARDANDO_PAGAMENTO').length, color: 'border-yellow-500/30' },
+    { label: 'Rejeitados', value: atletas.filter(a => a.status === 'REJEITADO').length, color: 'border-red-500/30' },
   ]
   return (
     <div>
@@ -110,7 +118,7 @@ function DashboardPage() {
 }
 
 /* ── Meus Atletas ────────────────────────────────────────── */
-function AtletasPage({ onCadastrar }: { onCadastrar: () => void }) {
+function AtletasPage({ atletas, onCadastrar }: { atletas: AtletaRow[]; onCadastrar: () => void }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -120,17 +128,19 @@ function AtletasPage({ onCadastrar }: { onCadastrar: () => void }) {
           + CADASTRAR
         </button>
       </div>
-      <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl overflow-hidden">
-        <table className="w-full">
+      <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl overflow-x-auto">
+        <table className="w-full min-w-[600px]">
           <thead>
             <tr className="border-b border-federation/20">
-              {['Nome','Posição','Categoria','Status','Ações'].map(h => (
+              {['Nome','Posição','Categoria','Status'].map(h => (
                 <th key={h} className="font-body text-gray-soft text-xs uppercase tracking-wider px-4 py-3 text-left">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {atletasMock.map(a => (
+            {atletas.length === 0 ? (
+              <tr><td colSpan={4} className="px-4 py-8 text-center font-body text-gray-soft text-sm">Nenhum atleta cadastrado ainda.</td></tr>
+            ) : atletas.map(a => (
               <tr key={a.id} className="border-b border-federation/10 hover:bg-federation/5 transition-colors duration-150">
                 <td className="px-4 py-3 font-body text-fht-white text-sm">{a.nome}</td>
                 <td className="px-4 py-3 font-body text-gray-soft text-sm">{a.posicao}</td>
@@ -139,9 +149,6 @@ function AtletasPage({ onCadastrar }: { onCadastrar: () => void }) {
                   <span className={`font-body text-xs px-2.5 py-1 rounded-full border ${statusBadge[a.status]}`}>
                     {statusLabel[a.status]}
                   </span>
-                </td>
-                <td className="px-4 py-3">
-                  <button className="font-body text-gold text-xs hover:underline">Ver detalhes</button>
                 </td>
               </tr>
             ))}
@@ -163,7 +170,7 @@ function CadastrarAtletaPage({ onSuccess }: { onSuccess: () => void }) {
   const [compRes, setCompRes] = useState<File | null>(null)
   const [compPix, setCompPix] = useState<File | null>(null)
   const [status, setStatus] = useState<'idle'|'loading'|'error'>('idle')
-  const [errMsg, setErrMsg] = useState('')
+  const [errMessage, setErrMessage] = useState('')
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
     const { name, value } = e.target
@@ -198,28 +205,38 @@ function CadastrarAtletaPage({ onSuccess }: { onSuccess: () => void }) {
 
   async function handleFinalSubmit() {
     setStatus('loading')
+    setErrMessage('')
     try {
       const data = new FormData()
-      Object.entries(form).forEach(([k, v]) => data.append(k, String(v)))
+      data.append('nomeCompleto', form.nomeCompleto)
+      data.append('dataNascimento', form.dataNascimento)
+      data.append('sexo', form.sexo === 'Masculino' ? 'M' : 'F')
+      data.append('cpf', form.cpf)
+      data.append('rg', form.rg)
+      data.append('rgOrgaoEmissor', form.orgaoEmissor)
+      data.append('naturalidadeCidade', form.naturalidadeCidade)
+      data.append('naturalidadeUf', form.naturalidadeUf)
+      data.append('telefone', form.telefone)
+      data.append('email', form.email)
+      data.append('cep', form.cep)
+      data.append('logradouro', form.logradouro)
+      data.append('numero', form.numero)
+      data.append('cidade', form.cidade)
+      data.append('ufResidencia', form.uf)
+      data.append('posicao', form.posicao)
+      data.append('categoria', form.categoria)
+      data.append('isTransferencia', String(form.transferencia))
+      if (form.transferencia) data.append('clubeAnterior', form.clubeAnterior)
       if (foto) data.append('foto', foto)
       if (rgDoc) data.append('rgDoc', rgDoc)
-      if (compRes) data.append('compResidencia', compRes)
-      if (compPix) data.append('compPix', compPix)
+      if (compRes) data.append('comprovanteResidencia', compRes)
+      if (compPix) data.append('comprovantePix', compPix)
 
-      const token = localStorage.getItem('fht_token')
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/atletas`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: data,
-      })
-      if (!res.ok) {
-        const payload = await res.json().catch(() => ({}))
-        throw new Error(payload.message || `Erro ${res.status}`)
-      }
+      await apiPostForm('/api/atletas', data)
       onSuccess()
     } catch (err) {
       setStatus('error')
-      setErrMsg(err instanceof Error ? err.message : 'Erro ao cadastrar. Tente novamente.')
+      setErrMessage(errMsg(err))
     }
   }
 
@@ -387,7 +404,7 @@ function CadastrarAtletaPage({ onSuccess }: { onSuccess: () => void }) {
             {status === 'error' && (
               <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3">
                 <AlertCircle size={16} className="text-red-400 flex-shrink-0" />
-                <p className="font-body text-red-400 text-sm">{errMsg}</p>
+                <p className="font-body text-red-400 text-sm">{errMessage}</p>
               </div>
             )}
           </div>
@@ -433,11 +450,32 @@ export default function ClubeDashboard() {
   const [sideOpen, setSideOpen] = useState(false)
   const [successMsg, setSuccessMsg] = useState('')
 
+  const [atletas, setAtletas] = useState<AtletaRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
+
+  const reload = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
+    try {
+      const dtos = await apiGet<AtletaDTO[]>('/api/atletas')
+      setAtletas(dtos.map(mapAtletaRow))
+      setLoadError('')
+    } catch (e) {
+      if (!silent) setLoadError(errMsg(e))
+      throw e
+    } finally {
+      if (!silent) setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { reload().catch(() => {}) }, [reload])
+
   function handleLogout() { logout(); navigate('/login', { replace: true }) }
 
   function handleAtletaSuccess() {
     setSuccessMsg('Atleta cadastrado com sucesso! Aguarde a validação da FHT.')
     setPage('atletas')
+    reload(true).catch(() => {})
   }
 
   return (
@@ -498,9 +536,28 @@ export default function ClubeDashboard() {
             </div>
           )}
 
-          {page === 'dashboard' && <DashboardPage />}
-          {page === 'atletas' && <AtletasPage onCadastrar={() => setPage('cadastrar')} />}
-          {page === 'cadastrar' && <CadastrarAtletaPage onSuccess={handleAtletaSuccess} />}
+          {loadError && page !== 'cadastrar' && (
+            <div className="flex items-center justify-between gap-3 bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 mb-6">
+              <div className="flex items-center gap-3">
+                <AlertCircle size={16} className="text-red-400 flex-shrink-0" />
+                <p className="font-body text-red-400 text-sm">{loadError}</p>
+              </div>
+              <button onClick={() => reload().catch(() => {})}
+                className="font-body text-red-400 text-xs underline hover:text-red-300">Tentar novamente</button>
+            </div>
+          )}
+
+          {loading && page !== 'cadastrar' ? (
+            <div className="flex items-center justify-center py-32">
+              <div className="w-8 h-8 border-2 border-gold border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : (
+            <>
+              {page === 'dashboard' && <DashboardPage atletas={atletas} />}
+              {page === 'atletas' && <AtletasPage atletas={atletas} onCadastrar={() => setPage('cadastrar')} />}
+              {page === 'cadastrar' && <CadastrarAtletaPage onSuccess={handleAtletaSuccess} />}
+            </>
+          )}
         </main>
       </div>
     </div>

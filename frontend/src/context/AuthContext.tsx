@@ -1,12 +1,14 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import type { ReactNode } from 'react'
 import { Navigate } from 'react-router-dom'
+import { API_URL, ApiError } from '../services/api'
 
 interface AuthUser {
   id: string
   name: string
   email: string
   role: 'ADMIN_FHT' | 'ADMIN_CLUBE'
+  clubeId?: string
 }
 
 interface AuthState {
@@ -17,15 +19,17 @@ interface AuthState {
 }
 
 interface AuthContextType extends AuthState {
-  login: (email: string, password: string) => Promise<void>
+  login: (email: string, password: string) => Promise<AuthUser>
   logout: () => void
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
 
+// Fallback APENAS para desenvolvimento offline (backend fora do ar).
+// Com o backend rodando, o login real sempre prevalece.
 const MOCK_USERS = [
-  { email: 'admin@fht.com.br', password: '123456', sub: '1', name: 'Administrador FHT', role: 'ADMIN_FHT' as const },
-  { email: 'clube@fht.com.br', password: '123456', sub: '2', name: 'Palmares Handebol Clube', role: 'ADMIN_CLUBE' as const },
+  { email: 'admin@fht.org.br', password: '123456', sub: '1', name: 'Administrador FHT', role: 'ADMIN_FHT' as const },
+  { email: 'clube@fht.org.br', password: '123456', sub: '2', name: 'Palmares Handebol Clube', role: 'ADMIN_CLUBE' as const },
 ]
 
 function makeMockToken(payload: object) {
@@ -34,10 +38,27 @@ function makeMockToken(payload: object) {
   return `${header}.${body}.mock`
 }
 
+// Decodifica o payload de um JWT (base64url + UTF-8). Funciona tanto para o
+// token real do backend quanto para o mock.
 function parseJwt(token: string): AuthUser | null {
   try {
-    const payload = JSON.parse(atob(token.split('.')[1]))
-    return { id: payload.sub, name: payload.name, email: payload.email, role: payload.role }
+    const part = token.split('.')[1]
+    const base64 = part.replace(/-/g, '+').replace(/_/g, '/')
+    const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4)
+    const json = decodeURIComponent(
+      atob(padded)
+        .split('')
+        .map(c => '%' + c.charCodeAt(0).toString(16).padStart(2, '0'))
+        .join(''),
+    )
+    const payload = JSON.parse(json)
+    return {
+      id: payload.sub,
+      name: payload.name,
+      email: payload.upn ?? payload.email,
+      role: payload.role,
+      clubeId: payload.clubeId,
+    }
   } catch {
     return null
   }
@@ -50,37 +71,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const token = localStorage.getItem('fht_token')
     if (token) {
       const user = parseJwt(token)
-      setState({ user, token, role: user?.role ?? null, loading: false })
+      if (user) setState({ user, token, role: user.role, loading: false })
+      else {
+        localStorage.removeItem('fht_token')
+        setState({ user: null, token: null, role: null, loading: false })
+      }
     } else {
       setState(p => ({ ...p, loading: false }))
     }
   }, [])
 
-  async function login(email: string, password: string) {
-    const mock = MOCK_USERS.find(u => u.email === email && u.password === password)
-    if (mock) {
-      const { password: _pw, ...payload } = mock
-      void _pw
-      const token = makeMockToken(payload)
-      localStorage.setItem('fht_token', token)
-      const user = parseJwt(token)
-      setState({ user, token, role: user?.role ?? null, loading: false })
-      return
-    }
-
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    })
-    if (!res.ok) {
-      const payload = await res.json().catch(() => ({}))
-      throw new Error(payload.message || 'Credenciais inválidas')
-    }
-    const { token } = await res.json()
-    localStorage.setItem('fht_token', token)
+  function applyToken(token: string): AuthUser {
     const user = parseJwt(token)
-    setState({ user, token, role: user?.role ?? null, loading: false })
+    if (!user) throw new ApiError('Token inválido recebido do servidor', 500)
+    localStorage.setItem('fht_token', token)
+    setState({ user, token, role: user.role, loading: false })
+    return user
+  }
+
+  function loginMock(email: string, password: string): AuthUser {
+    const mock = MOCK_USERS.find(u => u.email === email && u.password === password)
+    if (!mock) throw new Error('Servidor indisponível. Tente novamente em instantes.')
+    const { password: _pw, ...payload } = mock
+    void _pw
+    return applyToken(makeMockToken(payload))
+  }
+
+  async function login(email: string, password: string): Promise<AuthUser> {
+    try {
+      const res = await fetch(`${API_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, senha: password }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => null)
+        throw new ApiError(body?.message || 'Credenciais inválidas', res.status)
+      }
+      const body = await res.json()
+      const token: string | undefined = body?.data?.token
+      if (!token) throw new ApiError('Resposta de login inválida', 500)
+      return applyToken(token)
+    } catch (err) {
+      // Erro de credenciais/servidor (ApiError) → propaga.
+      // Erro de rede (backend fora do ar) → tenta o mock offline.
+      if (err instanceof ApiError) throw err
+      return loginMock(email, password)
+    }
   }
 
   function logout() {

@@ -17,12 +17,8 @@ export default function Login() {
     setError('')
     setLoading(true)
     try {
-      await login(email, password)
-      const token = localStorage.getItem('fht_token')
-      if (token) {
-        const payload = JSON.parse(atob(token.split('.')[1]))
-        navigate(payload.role === 'ADMIN_FHT' ? '/admin' : '/clube', { replace: true })
-      }
+      const user = await login(email, password)
+      navigate(user.role === 'ADMIN_FHT' ? '/admin' : '/clube', { replace: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Credenciais inválidas')
     } finally {

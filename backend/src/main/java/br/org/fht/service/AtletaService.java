@@ -19,5 +19,9 @@ public interface AtletaService {
 
     void rejeitar(UUID id, String motivo);
 
+    void suspender(UUID id);
+
+    void reativar(UUID id);
+
     void deletar(UUID id);
 }

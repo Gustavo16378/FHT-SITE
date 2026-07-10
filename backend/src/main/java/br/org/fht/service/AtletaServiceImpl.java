@@ -142,6 +142,32 @@ public class AtletaServiceImpl implements AtletaService {
 
     @Override
     @Transactional
+    public void suspender(UUID id) {
+        Atleta atleta = atletaRepository.findByIdOptional(id)
+                .orElseThrow(() -> new WebApplicationException("Atleta não encontrado", 404));
+
+        if (!"ATIVO".equals(atleta.getStatus())) {
+            throw new WebApplicationException("Apenas atletas ativos podem ser suspensos", 409);
+        }
+
+        atleta.setStatus("SUSPENSO");
+    }
+
+    @Override
+    @Transactional
+    public void reativar(UUID id) {
+        Atleta atleta = atletaRepository.findByIdOptional(id)
+                .orElseThrow(() -> new WebApplicationException("Atleta não encontrado", 404));
+
+        if (!"SUSPENSO".equals(atleta.getStatus())) {
+            throw new WebApplicationException("Apenas atletas suspensos podem ser reativados", 409);
+        }
+
+        atleta.setStatus("ATIVO");
+    }
+
+    @Override
+    @Transactional
     public void deletar(UUID id) {
         Atleta atleta = atletaRepository.findByIdOptional(id)
                 .orElseThrow(() -> new WebApplicationException("Atleta não encontrado", 404));

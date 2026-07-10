@@ -18,4 +18,8 @@ public interface ClubeService {
     void aprovar(UUID id);
 
     void rejeitar(UUID id, String motivo);
+
+    void suspender(UUID id);
+
+    void reativar(UUID id);
 }

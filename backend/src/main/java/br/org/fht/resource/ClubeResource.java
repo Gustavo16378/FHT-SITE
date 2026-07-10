@@ -116,6 +116,44 @@ public class ClubeResource {
         return Response.ok(ApiResponse.ok(null, "Clube rejeitado")).build();
     }
 
+    @PATCH
+    @Path("/{id}/suspender")
+    @RolesAllowed("ADMIN_FHT")
+    @SecurityRequirement(name = "BearerAuth")
+    @Operation(summary = "Suspender clube",
+            description = "Muda status de ATIVO para SUSPENSO.")
+    @APIResponses({
+            @APIResponse(responseCode = "200", description = "Clube suspenso"),
+            @APIResponse(responseCode = "401", description = "Token ausente ou inválido"),
+            @APIResponse(responseCode = "403", description = "Apenas ADMIN_FHT"),
+            @APIResponse(responseCode = "404", description = "Clube não encontrado"),
+            @APIResponse(responseCode = "409", description = "Clube não está ativo")
+    })
+    public Response suspender(
+            @Parameter(description = "UUID do clube", required = true) @PathParam("id") UUID id) {
+        clubeService.suspender(id);
+        return Response.ok(ApiResponse.ok(null, "Clube suspenso")).build();
+    }
+
+    @PATCH
+    @Path("/{id}/reativar")
+    @RolesAllowed("ADMIN_FHT")
+    @SecurityRequirement(name = "BearerAuth")
+    @Operation(summary = "Reativar clube",
+            description = "Muda status de SUSPENSO de volta para ATIVO.")
+    @APIResponses({
+            @APIResponse(responseCode = "200", description = "Clube reativado"),
+            @APIResponse(responseCode = "401", description = "Token ausente ou inválido"),
+            @APIResponse(responseCode = "403", description = "Apenas ADMIN_FHT"),
+            @APIResponse(responseCode = "404", description = "Clube não encontrado"),
+            @APIResponse(responseCode = "409", description = "Clube não está suspenso")
+    })
+    public Response reativar(
+            @Parameter(description = "UUID do clube", required = true) @PathParam("id") UUID id) {
+        clubeService.reativar(id);
+        return Response.ok(ApiResponse.ok(null, "Clube reativado")).build();
+    }
+
     @Schema(description = "Motivo da rejeição")
     public record MotivoRequest(
             @Schema(description = "Texto explicando o motivo", example = "Documentação incompleta")

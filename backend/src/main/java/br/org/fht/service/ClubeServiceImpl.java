@@ -111,4 +111,30 @@ public class ClubeServiceImpl implements ClubeService {
         clube.setStatus("REJEITADO");
         clube.setMotivoRejeicao(motivo);
     }
+
+    @Override
+    @Transactional
+    public void suspender(UUID id) {
+        Clube clube = clubeRepository.findByIdOptional(id)
+                .orElseThrow(() -> new WebApplicationException("Clube não encontrado", 404));
+
+        if (!"ATIVO".equals(clube.getStatus())) {
+            throw new WebApplicationException("Apenas clubes ativos podem ser suspensos", 409);
+        }
+
+        clube.setStatus("SUSPENSO");
+    }
+
+    @Override
+    @Transactional
+    public void reativar(UUID id) {
+        Clube clube = clubeRepository.findByIdOptional(id)
+                .orElseThrow(() -> new WebApplicationException("Clube não encontrado", 404));
+
+        if (!"SUSPENSO".equals(clube.getStatus())) {
+            throw new WebApplicationException("Apenas clubes suspensos podem ser reativados", 409);
+        }
+
+        clube.setStatus("ATIVO");
+    }
 }

@@ -68,7 +68,7 @@ public class AtletaForm {
     @Schema(description = "Foto 3x4 (JPG/PNG, máx. 2 MB)", required = true)
     public FileUpload foto;
 
-    @RestForm("rg")
+    @RestForm("rgDoc")
     @Schema(description = "Documento RG digitalizado (PDF/JPG, máx. 5 MB)", required = true)
     public FileUpload rgDoc;
 

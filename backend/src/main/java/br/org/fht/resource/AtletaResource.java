@@ -114,6 +114,42 @@ public class AtletaResource {
         return Response.ok(ApiResponse.ok(null, "Atleta rejeitado")).build();
     }
 
+    @PATCH
+    @Path("/{id}/suspender")
+    @RolesAllowed("ADMIN_FHT")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Operation(summary = "Suspender atleta", description = "Muda status de ATIVO para SUSPENSO.")
+    @APIResponses({
+            @APIResponse(responseCode = "200", description = "Atleta suspenso"),
+            @APIResponse(responseCode = "401", description = "Token ausente ou inválido"),
+            @APIResponse(responseCode = "403", description = "Apenas ADMIN_FHT"),
+            @APIResponse(responseCode = "404", description = "Atleta não encontrado"),
+            @APIResponse(responseCode = "409", description = "Atleta não está ativo")
+    })
+    public Response suspender(
+            @Parameter(description = "UUID do atleta", required = true) @PathParam("id") UUID id) {
+        atletaService.suspender(id);
+        return Response.ok(ApiResponse.ok(null, "Atleta suspenso")).build();
+    }
+
+    @PATCH
+    @Path("/{id}/reativar")
+    @RolesAllowed("ADMIN_FHT")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Operation(summary = "Reativar atleta", description = "Muda status de SUSPENSO de volta para ATIVO.")
+    @APIResponses({
+            @APIResponse(responseCode = "200", description = "Atleta reativado"),
+            @APIResponse(responseCode = "401", description = "Token ausente ou inválido"),
+            @APIResponse(responseCode = "403", description = "Apenas ADMIN_FHT"),
+            @APIResponse(responseCode = "404", description = "Atleta não encontrado"),
+            @APIResponse(responseCode = "409", description = "Atleta não está suspenso")
+    })
+    public Response reativar(
+            @Parameter(description = "UUID do atleta", required = true) @PathParam("id") UUID id) {
+        atletaService.reativar(id);
+        return Response.ok(ApiResponse.ok(null, "Atleta reativado")).build();
+    }
+
     @DELETE
     @Path("/{id}")
     @RolesAllowed("ADMIN_FHT")

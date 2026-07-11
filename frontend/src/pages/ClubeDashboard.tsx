@@ -7,19 +7,16 @@ import {
 import { useAuth } from '../context/AuthContext'
 import { maskCPF, maskPhone, maskCEP, validateCPF } from '../utils/masks'
 import { UFS } from '../utils/ufs'
-import { apiGet, apiPostForm, ApiError } from '../services/api'
+import { apiGet, apiPostForm, apiPut, ApiError } from '../services/api'
 import type { AtletaDTO, AtletaStatus } from '../types/api'
 
 /* ── tipos ───────────────────────────────────────────────── */
 type Page = 'dashboard' | 'atletas' | 'cadastrar' | 'dados'
 
-interface AtletaRow {
-  id: string; nome: string; posicao: string; categoria: string
-  status: AtletaStatus
-}
-
-function mapAtletaRow(d: AtletaDTO): AtletaRow {
-  return { id: d.id, nome: d.nomeCompleto, posicao: d.posicao, categoria: d.categoria, status: d.status }
+function fmtDate(iso: string | null): string {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('pt-BR')
 }
 
 function errMsg(e: unknown): string {
@@ -94,14 +91,58 @@ function FileBtn({ file, onChange, label: lbl2, accept }: {
   )
 }
 
-/* ── Dashboard Cards ─────────────────────────────────────── */
-function DashboardPage({ atletas }: { atletas: AtletaRow[] }) {
+/* ── mini-gráficos (SVG/CSS puro, sem lib) ───────────────── */
+function BarRow({ label, value, max, color }: { label: string; value: number; max: number; color: string }) {
+  const pct = max > 0 ? Math.round((value / max) * 100) : 0
+  return (
+    <div className="flex items-center gap-3">
+      <span className="font-body text-gray-soft text-xs w-16 flex-shrink-0">{label}</span>
+      <div className="flex-1 h-2.5 bg-federation/10 rounded-full overflow-hidden">
+        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, backgroundColor: color }} />
+      </div>
+      <span className="font-body text-fht-white text-xs w-5 text-right">{value}</span>
+    </div>
+  )
+}
+
+function Donut({ pct, center, sub }: { pct: number; center: string; sub: string }) {
+  const r = 42
+  const circ = 2 * Math.PI * r
+  const off = circ - (Math.max(0, Math.min(100, pct)) / 100) * circ
+  return (
+    <div className="relative w-32 h-32 flex-shrink-0">
+      <svg viewBox="0 0 100 100" className="w-full h-full" style={{ transform: 'rotate(-90deg)' }}>
+        <circle cx="50" cy="50" r={r} fill="none" stroke="rgba(26,58,143,0.25)" strokeWidth="9" />
+        <circle cx="50" cy="50" r={r} fill="none" stroke="#F5C518" strokeWidth="9" strokeLinecap="round"
+          strokeDasharray={circ} strokeDashoffset={off} />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="font-display text-fht-white text-2xl leading-none">{center}</span>
+        <span className="font-body text-gray-soft text-[10px] uppercase tracking-wider">{sub}</span>
+      </div>
+    </div>
+  )
+}
+
+/* ── Dashboard Cards + gráficos ──────────────────────────── */
+function DashboardPage({ atletas }: { atletas: AtletaDTO[] }) {
   const cards = [
     { label: 'Total de Atletas', value: atletas.length, color: 'border-federation/30' },
     { label: 'Atletas Ativos', value: atletas.filter(a => a.status === 'ATIVO').length, color: 'border-green-500/30' },
     { label: 'Aguardando Aprovação', value: atletas.filter(a => a.status === 'AGUARDANDO_PAGAMENTO').length, color: 'border-yellow-500/30' },
     { label: 'Rejeitados', value: atletas.filter(a => a.status === 'REJEITADO').length, color: 'border-red-500/30' },
   ]
+
+  // Elenco por categoria — dados REAIS dos atletas do clube
+  const porCategoria = CATEGORIAS.map(c => ({ label: c, value: atletas.filter(a => a.categoria === c).length }))
+  const maxCat = Math.max(1, ...porCategoria.map(x => x.value))
+
+  // Desempenho em competições — MOCK (módulo de Competições ainda não existe)
+  const desemp = { vitorias: 12, empates: 3, derrotas: 5, competicoes: 3 }
+  const jogos = desemp.vitorias + desemp.empates + desemp.derrotas
+  const aproveitamento = jogos ? Math.round(((desemp.vitorias * 3 + desemp.empates) / (jogos * 3)) * 100) : 0
+  const mediaVit = (desemp.vitorias / desemp.competicoes).toFixed(1)
+
   return (
     <div>
       <h2 className="font-display text-fht-white text-3xl mb-6">DASHBOARD</h2>
@@ -113,12 +154,55 @@ function DashboardPage({ atletas }: { atletas: AtletaRow[] }) {
           </div>
         ))}
       </div>
+
+      <div className="grid lg:grid-cols-2 gap-4 mt-4">
+        {/* Elenco por categoria (real) */}
+        <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-6">
+          <p className="font-display text-gold text-xs tracking-widest mb-5">ELENCO POR CATEGORIA</p>
+          <div className="flex flex-col gap-3">
+            {porCategoria.map(c => (
+              <BarRow key={c.label} label={c.label} value={c.value} max={maxCat} color="#1E4DB7" />
+            ))}
+          </div>
+        </div>
+
+        {/* Desempenho em competições (mock) */}
+        <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-6">
+          <div className="flex items-center justify-between mb-5">
+            <p className="font-display text-gold text-xs tracking-widest">DESEMPENHO EM COMPETIÇÕES</p>
+            <span className="font-body text-[10px] text-gray-soft/60 border border-federation/20 rounded-full px-2 py-0.5">demonstração</span>
+          </div>
+          <div className="flex items-center gap-6">
+            <Donut pct={aproveitamento} center={`${aproveitamento}%`} sub="aproveit." />
+            <div className="flex-1 grid grid-cols-3 gap-2 text-center">
+              <div className="bg-green-500/10 border border-green-500/20 rounded-lg py-2">
+                <p className="font-display text-green-400 text-2xl">{desemp.vitorias}</p>
+                <p className="font-body text-gray-soft text-[10px] uppercase">Vitórias</p>
+              </div>
+              <div className="bg-federation/10 border border-federation/20 rounded-lg py-2">
+                <p className="font-display text-fht-white text-2xl">{desemp.empates}</p>
+                <p className="font-body text-gray-soft text-[10px] uppercase">Empates</p>
+              </div>
+              <div className="bg-red-500/10 border border-red-500/20 rounded-lg py-2">
+                <p className="font-display text-red-400 text-2xl">{desemp.derrotas}</p>
+                <p className="font-body text-gray-soft text-[10px] uppercase">Derrotas</p>
+              </div>
+              <div className="col-span-3 flex items-center justify-between bg-gold/5 border border-gold/20 rounded-lg px-3 py-2 mt-1">
+                <span className="font-body text-gray-soft text-xs">Média de vitórias / competição</span>
+                <span className="font-display text-gold text-lg">{mediaVit}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
 
 /* ── Meus Atletas ────────────────────────────────────────── */
-function AtletasPage({ atletas, onCadastrar }: { atletas: AtletaRow[]; onCadastrar: () => void }) {
+function AtletasPage({ atletas, onCadastrar, onVer }: {
+  atletas: AtletaDTO[]; onCadastrar: () => void; onVer: (a: AtletaDTO) => void
+}) {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -132,17 +216,17 @@ function AtletasPage({ atletas, onCadastrar }: { atletas: AtletaRow[]; onCadastr
         <table className="w-full min-w-[600px]">
           <thead>
             <tr className="border-b border-federation/20">
-              {['Nome','Posição','Categoria','Status'].map(h => (
+              {['Nome','Posição','Categoria','Status','Ações'].map(h => (
                 <th key={h} className="font-body text-gray-soft text-xs uppercase tracking-wider px-4 py-3 text-left">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {atletas.length === 0 ? (
-              <tr><td colSpan={4} className="px-4 py-8 text-center font-body text-gray-soft text-sm">Nenhum atleta cadastrado ainda.</td></tr>
+              <tr><td colSpan={5} className="px-4 py-8 text-center font-body text-gray-soft text-sm">Nenhum atleta cadastrado ainda.</td></tr>
             ) : atletas.map(a => (
               <tr key={a.id} className="border-b border-federation/10 hover:bg-federation/5 transition-colors duration-150">
-                <td className="px-4 py-3 font-body text-fht-white text-sm">{a.nome}</td>
+                <td className="px-4 py-3 font-body text-fht-white text-sm">{a.nomeCompleto}</td>
                 <td className="px-4 py-3 font-body text-gray-soft text-sm">{a.posicao}</td>
                 <td className="px-4 py-3 font-body text-gray-soft text-sm">{a.categoria}</td>
                 <td className="px-4 py-3">
@@ -150,10 +234,221 @@ function AtletasPage({ atletas, onCadastrar }: { atletas: AtletaRow[]; onCadastr
                     {statusLabel[a.status]}
                   </span>
                 </td>
+                <td className="px-4 py-3">
+                  <button onClick={() => onVer(a)} className="font-body text-gold text-xs hover:underline">Ver / editar →</button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
+      </div>
+    </div>
+  )
+}
+
+/* ── Detalhe + edição do atleta (clube edita os próprios) ─── */
+function AtletaDetailPanel({ atleta, onClose, onSaved }: {
+  atleta: AtletaDTO; onClose: () => void; onSaved: () => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [form, setForm] = useState({
+    nomeCompleto: atleta.nomeCompleto,
+    dataNascimento: (atleta.dataNascimento ?? '').slice(0, 10),
+    sexo: atleta.sexo,
+    rg: atleta.rg,
+    telefone: atleta.telefone ?? '',
+    email: atleta.email ?? '',
+    cidade: atleta.cidade ?? '',
+    ufResidencia: atleta.ufResidencia ?? 'TO',
+    posicao: atleta.posicao,
+    categoria: atleta.categoria,
+    transferencia: atleta.transferencia,
+    clubeAnterior: atleta.clubeAnterior ?? '',
+  })
+  const [saving, setSaving] = useState(false)
+  const [erro, setErro] = useState('')
+
+  function change(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
+    const { name, value } = e.target
+    setForm(p => ({ ...p, [name]: value }))
+  }
+
+  async function salvar() {
+    setSaving(true); setErro('')
+    try {
+      await apiPut(`/api/atletas/${atleta.id}`, form)
+      onSaved()
+      onClose()
+    } catch (e) {
+      setErro(errMsg(e)); setSaving(false)
+    }
+  }
+
+  const Info = ({ label, value }: { label: string; value: string }) => (
+    <div>
+      <p className="font-body text-gray-soft text-xs uppercase tracking-wider mb-0.5">{label}</p>
+      <p className="font-body text-fht-white text-sm">{value || '—'}</p>
+    </div>
+  )
+
+  const docs = [
+    { label: 'Foto 3x4', url: atleta.fotoUrl },
+    { label: 'RG digitalizado', url: atleta.rgUrl },
+    { label: 'Comprovante de residência', url: atleta.comprovanteResidenciaUrl },
+    { label: 'Comprovante de pagamento Pix', url: atleta.comprovantePagamentoUrl },
+  ]
+
+  return (
+    <div className="fixed inset-0 z-50 flex" onClick={onClose}>
+      <div className="flex-1 backdrop-blur-sm" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }} />
+      <div className="w-full max-w-2xl h-full bg-[#0a1628] border-l border-federation/20 overflow-y-auto flex flex-col"
+        onClick={e => e.stopPropagation()}>
+
+        <div className="flex items-start justify-between p-6 border-b border-federation/20 sticky top-0 bg-[#0a1628] z-10">
+          <div className="flex gap-4 items-center">
+            <div className="w-14 h-14 rounded-xl bg-federation/20 border border-federation/30 flex items-center justify-center flex-shrink-0 overflow-hidden">
+              {atleta.fotoUrl
+                ? <img src={atleta.fotoUrl} alt={atleta.nomeCompleto} className="w-full h-full object-cover" />
+                : <Users size={24} className="text-gray-soft" />}
+            </div>
+            <div>
+              <span className={`font-body text-xs px-2.5 py-0.5 rounded-full border ${statusBadge[atleta.status]}`}>
+                {statusLabel[atleta.status]}
+              </span>
+              <h2 className="font-display text-fht-white text-xl leading-tight mt-1">{atleta.nomeCompleto}</h2>
+              <p className="font-body text-gray-soft text-sm">{atleta.posicao} · {atleta.categoria}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-gray-soft hover:text-gold transition-colors duration-250 mt-1">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="flex-1 p-6 flex flex-col gap-6">
+          {erro && (
+            <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3">
+              <AlertCircle size={16} className="text-red-400 flex-shrink-0" />
+              <p className="font-body text-red-400 text-sm">{erro}</p>
+            </div>
+          )}
+
+          {editing ? (
+            <div className="flex flex-col gap-4">
+              <div>
+                <span className={lbl}>Nome completo</span>
+                <input name="nomeCompleto" value={form.nomeCompleto} onChange={change} className={inp} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <span className={lbl}>Nascimento</span>
+                  <input type="date" name="dataNascimento" value={form.dataNascimento} onChange={change} className={inp} />
+                </div>
+                <div>
+                  <span className={lbl}>Sexo</span>
+                  <select name="sexo" value={form.sexo} onChange={change} className={sel}>
+                    <option value="M">Masculino</option><option value="F">Feminino</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><span className={lbl}>RG</span><input name="rg" value={form.rg} onChange={change} className={inp} /></div>
+                <div><span className={lbl}>Telefone</span><input name="telefone" value={form.telefone} onChange={change} className={inp} /></div>
+              </div>
+              <div><span className={lbl}>E-mail</span><input name="email" value={form.email} onChange={change} className={inp} /></div>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="col-span-2"><span className={lbl}>Cidade</span><input name="cidade" value={form.cidade} onChange={change} className={inp} /></div>
+                <div>
+                  <span className={lbl}>UF</span>
+                  <select name="ufResidencia" value={form.ufResidencia} onChange={change} className={sel}>
+                    {UFS.map(u => <option key={u} value={u}>{u}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <span className={lbl}>Posição</span>
+                  <select name="posicao" value={form.posicao} onChange={change} className={sel}>
+                    {POSICOES.map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <span className={lbl}>Categoria</span>
+                  <select name="categoria" value={form.categoria} onChange={change} className={sel}>
+                    {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+              </div>
+              <p className="font-body text-gray-soft/60 text-xs">CPF, documentos e status não são editáveis aqui.</p>
+            </div>
+          ) : (
+            <>
+              <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-5">
+                <p className="font-display text-gold text-xs tracking-widest mb-4">DADOS PESSOAIS</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <Info label="CPF" value={atleta.cpf} />
+                  <Info label="RG" value={atleta.rg} />
+                  <Info label="Nascimento" value={fmtDate(atleta.dataNascimento)} />
+                  <Info label="Sexo" value={atleta.sexo === 'M' ? 'Masculino' : 'Feminino'} />
+                  <Info label="Telefone" value={atleta.telefone ?? ''} />
+                  <Info label="E-mail" value={atleta.email ?? ''} />
+                  <Info label="Cidade / UF" value={`${atleta.cidade ?? '—'} / ${atleta.ufResidencia ?? '—'}`} />
+                </div>
+              </div>
+              <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-5">
+                <p className="font-display text-gold text-xs tracking-widest mb-4">DADOS ESPORTIVOS</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <Info label="Posição" value={atleta.posicao} />
+                  <Info label="Categoria" value={atleta.categoria} />
+                  {atleta.transferencia && <Info label="Transferência de" value={atleta.clubeAnterior ?? '—'} />}
+                  {atleta.taxaValor != null && <Info label="Taxa" value={`R$ ${Number(atleta.taxaValor).toFixed(2)} — ${atleta.taxaAno ?? ''}`} />}
+                </div>
+              </div>
+              <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-5">
+                <p className="font-display text-gold text-xs tracking-widest mb-4">DOCUMENTOS</p>
+                <div className="flex flex-col gap-2">
+                  {docs.map(({ label, url }) => url ? (
+                    <a key={label} href={url} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center justify-between px-4 py-3 bg-federation/10 border border-federation/20 rounded-lg hover:border-gold/40 transition-colors duration-200">
+                      <span className="font-body text-fht-white text-sm">{label}</span>
+                      <span className="font-body text-gray-soft text-xs">Abrir →</span>
+                    </a>
+                  ) : (
+                    <div key={label} className="flex items-center justify-between px-4 py-3 bg-federation/5 border border-federation/10 rounded-lg opacity-60">
+                      <span className="font-body text-gray-soft text-sm">{label}</span>
+                      <span className="font-body text-gray-soft text-xs">não enviado</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="sticky bottom-0 bg-[#0a1628] border-t border-federation/20 p-5 flex flex-wrap gap-3">
+          {editing ? (
+            <>
+              <button onClick={salvar} disabled={saving}
+                className="flex-1 font-display text-night bg-gold hover:bg-gold-light py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250 disabled:opacity-50">
+                {saving ? 'SALVANDO...' : 'SALVAR'}
+              </button>
+              <button onClick={() => setEditing(false)} disabled={saving}
+                className="font-display text-gray-soft border border-federation/30 hover:border-federation/60 px-6 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250">
+                CANCELAR
+              </button>
+            </>
+          ) : (
+            <>
+              <button onClick={() => setEditing(true)}
+                className="flex-1 font-display text-night bg-gold hover:bg-gold-light py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250">
+                EDITAR DADOS
+              </button>
+              <button onClick={onClose}
+                className="font-display text-gray-soft border border-federation/30 hover:border-federation/60 px-6 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250">
+                FECHAR
+              </button>
+            </>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -450,7 +745,8 @@ export default function ClubeDashboard() {
   const [sideOpen, setSideOpen] = useState(false)
   const [successMsg, setSuccessMsg] = useState('')
 
-  const [atletas, setAtletas] = useState<AtletaRow[]>([])
+  const [atletas, setAtletas] = useState<AtletaDTO[]>([])
+  const [atletaDetalhe, setAtletaDetalhe] = useState<AtletaDTO | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
 
@@ -458,7 +754,7 @@ export default function ClubeDashboard() {
     if (!silent) setLoading(true)
     try {
       const dtos = await apiGet<AtletaDTO[]>('/api/atletas')
-      setAtletas(dtos.map(mapAtletaRow))
+      setAtletas(dtos)
       setLoadError('')
     } catch (e) {
       if (!silent) setLoadError(errMsg(e))
@@ -505,7 +801,11 @@ export default function ClubeDashboard() {
             </button>
           ))}
         </nav>
-        <div className="p-4 border-t border-federation/20">
+        <div className="p-4 border-t border-federation/20 flex flex-col gap-1">
+          <button onClick={() => navigate('/')}
+            className="w-full flex items-center gap-3 px-4 py-2.5 font-body text-sm text-gray-soft hover:text-gold transition-colors duration-200 rounded-lg hover:bg-federation/10">
+            <Home size={18} /> Ver site
+          </button>
           <button onClick={handleLogout}
             className="w-full flex items-center gap-3 px-4 py-2.5 font-body text-sm text-gray-soft hover:text-red-400 transition-colors duration-200 rounded-lg hover:bg-red-500/10">
             <LogOut size={18} /> Sair
@@ -554,9 +854,17 @@ export default function ClubeDashboard() {
           ) : (
             <>
               {page === 'dashboard' && <DashboardPage atletas={atletas} />}
-              {page === 'atletas' && <AtletasPage atletas={atletas} onCadastrar={() => setPage('cadastrar')} />}
+              {page === 'atletas' && <AtletasPage atletas={atletas} onCadastrar={() => setPage('cadastrar')} onVer={setAtletaDetalhe} />}
               {page === 'cadastrar' && <CadastrarAtletaPage onSuccess={handleAtletaSuccess} />}
             </>
+          )}
+
+          {atletaDetalhe && (
+            <AtletaDetailPanel
+              atleta={atletaDetalhe}
+              onClose={() => setAtletaDetalhe(null)}
+              onSaved={() => reload(true).catch(() => {})}
+            />
           )}
         </main>
       </div>

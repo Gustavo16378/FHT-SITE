@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Menu, X, LogIn } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Menu, X, LogIn, LayoutDashboard, LogOut } from 'lucide-react'
 import { useScrollDirection } from '../hooks/useScrollDirection'
+import { useAuth } from '../context/AuthContext'
 import logo from '../assets/logo.png'
 
 const navLinks = [
@@ -19,6 +21,15 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false)
   const scrollYRef = useRef(0)
   const navHidden = useScrollDirection()
+  const navigate = useNavigate()
+  const { user, logout } = useAuth()
+  const dashboardPath = user?.role === 'ADMIN_FHT' ? '/admin' : '/clube'
+
+  function handleSair() {
+    logout()
+    setMenuOpen(false)
+    navigate('/', { replace: true })
+  }
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 40)
@@ -143,50 +154,96 @@ export default function Navbar() {
 
         {/* CTAs */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1.5rem' }}>
-          <a
-            href="/login"
-            onClick={closeMenu}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.4rem',
-              padding: '0.65rem',
-              background: 'transparent',
-              color: '#A0A8C0',
-              fontFamily: 'Barlow, sans-serif',
-              fontSize: '0.95rem',
-              border: '1px solid rgba(26,58,143,0.35)',
-              borderRadius: '0.5rem',
-              textDecoration: 'none',
-              transition: 'color 0.2s ease, border-color 0.2s ease',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.color = '#F8F9FC'; e.currentTarget.style.borderColor = 'rgba(245,197,24,0.4)' }}
-            onMouseLeave={e => { e.currentTarget.style.color = '#A0A8C0'; e.currentTarget.style.borderColor = 'rgba(26,58,143,0.35)' }}
-          >
-            Entrar
-          </a>
-          <a
-            href="#cadastro"
-            onClick={closeMenu}
-            style={{
-              display: 'block',
-              textAlign: 'center',
-              padding: '0.75rem',
-              background: '#F5C518',
-              color: '#070D1E',
-              fontFamily: '"Bebas Neue", cursive',
-              fontSize: '1rem',
-              letterSpacing: '0.1em',
-              borderRadius: '0.5rem',
-              textDecoration: 'none',
-              transition: 'background 0.2s ease',
-            }}
-            onMouseEnter={e => (e.currentTarget.style.background = '#FFD94A')}
-            onMouseLeave={e => (e.currentTarget.style.background = '#F5C518')}
-          >
-            CADASTRAR EQUIPE
-          </a>
+          {user ? (
+            <>
+              <Link
+                to={dashboardPath}
+                onClick={closeMenu}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.4rem',
+                  padding: '0.75rem',
+                  background: '#F5C518',
+                  color: '#070D1E',
+                  fontFamily: '"Bebas Neue", cursive',
+                  fontSize: '1rem',
+                  letterSpacing: '0.1em',
+                  borderRadius: '0.5rem',
+                  textDecoration: 'none',
+                }}
+              >
+                MEU PAINEL
+              </Link>
+              <button
+                onClick={handleSair}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.4rem',
+                  padding: '0.65rem',
+                  background: 'transparent',
+                  color: '#A0A8C0',
+                  fontFamily: 'Barlow, sans-serif',
+                  fontSize: '0.95rem',
+                  border: '1px solid rgba(26,58,143,0.35)',
+                  borderRadius: '0.5rem',
+                  cursor: 'pointer',
+                }}
+              >
+                Sair
+              </button>
+            </>
+          ) : (
+            <>
+              <a
+                href="/login"
+                onClick={closeMenu}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.4rem',
+                  padding: '0.65rem',
+                  background: 'transparent',
+                  color: '#A0A8C0',
+                  fontFamily: 'Barlow, sans-serif',
+                  fontSize: '0.95rem',
+                  border: '1px solid rgba(26,58,143,0.35)',
+                  borderRadius: '0.5rem',
+                  textDecoration: 'none',
+                  transition: 'color 0.2s ease, border-color 0.2s ease',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.color = '#F8F9FC'; e.currentTarget.style.borderColor = 'rgba(245,197,24,0.4)' }}
+                onMouseLeave={e => { e.currentTarget.style.color = '#A0A8C0'; e.currentTarget.style.borderColor = 'rgba(26,58,143,0.35)' }}
+              >
+                Entrar
+              </a>
+              <a
+                href="#cadastro"
+                onClick={closeMenu}
+                style={{
+                  display: 'block',
+                  textAlign: 'center',
+                  padding: '0.75rem',
+                  background: '#F5C518',
+                  color: '#070D1E',
+                  fontFamily: '"Bebas Neue", cursive',
+                  fontSize: '1rem',
+                  letterSpacing: '0.1em',
+                  borderRadius: '0.5rem',
+                  textDecoration: 'none',
+                  transition: 'background 0.2s ease',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#FFD94A')}
+                onMouseLeave={e => (e.currentTarget.style.background = '#F5C518')}
+              >
+                CADASTRAR EQUIPE
+              </a>
+            </>
+          )}
         </div>
       </div>
     </>,
@@ -233,18 +290,37 @@ export default function Navbar() {
 
             {/* CTA + hambúrguer */}
             <div className="flex items-center gap-3">
-              <a
-                href="/login"
-                className="hidden md:flex items-center gap-1.5 font-body text-gray-soft hover:text-fht-white border border-federation/30 hover:border-gold/40 px-3 py-2 rounded-lg text-sm transition-colors duration-250"
-              >
-                <LogIn size={15} /> Entrar
-              </a>
-              <a
-                href="#cadastro"
-                className="hidden md:block font-display text-night bg-gold hover:bg-gold-light px-5 py-2 rounded-lg text-sm tracking-wider transition-colors duration-250"
-              >
-                CADASTRAR EQUIPE
-              </a>
+              {user ? (
+                <>
+                  <Link
+                    to={dashboardPath}
+                    className="hidden md:flex items-center gap-1.5 font-display text-night bg-gold hover:bg-gold-light px-4 py-2 rounded-lg text-sm tracking-wider transition-colors duration-250"
+                  >
+                    <LayoutDashboard size={15} /> MEU PAINEL
+                  </Link>
+                  <button
+                    onClick={handleSair}
+                    className="hidden md:flex items-center gap-1.5 font-body text-gray-soft hover:text-red-400 border border-federation/30 hover:border-red-400/40 px-3 py-2 rounded-lg text-sm transition-colors duration-250"
+                  >
+                    <LogOut size={15} /> Sair
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    to="/login"
+                    className="hidden md:flex items-center gap-1.5 font-body text-gray-soft hover:text-fht-white border border-federation/30 hover:border-gold/40 px-3 py-2 rounded-lg text-sm transition-colors duration-250"
+                  >
+                    <LogIn size={15} /> Entrar
+                  </Link>
+                  <a
+                    href="#cadastro"
+                    className="hidden md:block font-display text-night bg-gold hover:bg-gold-light px-5 py-2 rounded-lg text-sm tracking-wider transition-colors duration-250"
+                  >
+                    CADASTRAR EQUIPE
+                  </a>
+                </>
+              )}
 
               <button
                 className="lg:hidden text-fht-white p-2"

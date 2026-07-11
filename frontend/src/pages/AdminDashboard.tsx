@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Shield, Users, Star, Trophy, Newspaper,
   FileText, LogOut, Menu, X, AlertCircle, Search,
-  Image as ImageIcon, Contact, UserCog, Wallet,
+  Image as ImageIcon, Contact, UserCog, Wallet, Home,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { apiGet, apiPatch, ApiError } from '../services/api'
@@ -1255,7 +1255,11 @@ export default function AdminDashboard() {
             </div>
           ))}
         </nav>
-        <div className="p-4 border-t border-federation/20">
+        <div className="p-4 border-t border-federation/20 flex flex-col gap-1">
+          <button onClick={() => navigate('/')}
+            className="w-full flex items-center gap-3 px-4 py-2.5 font-body text-sm text-gray-soft hover:text-gold transition-colors duration-200 rounded-lg hover:bg-federation/10">
+            <Home size={18} /> Ver site
+          </button>
           <button onClick={handleLogout}
             className="w-full flex items-center gap-3 px-4 py-2.5 font-body text-sm text-gray-soft hover:text-red-400 transition-colors duration-200 rounded-lg hover:bg-red-500/10">
             <LogOut size={18} /> Sair

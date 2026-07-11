@@ -3,6 +3,7 @@ package br.org.fht.resource;
 import br.org.fht.common.ApiResponse;
 import br.org.fht.dto.atleta.AtletaForm;
 import br.org.fht.dto.atleta.AtletaResponseDTO;
+import br.org.fht.dto.atleta.AtletaUpdateForm;
 import br.org.fht.service.AtletaService;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
@@ -60,6 +61,25 @@ public class AtletaResource {
     public Response listar() {
         List<AtletaResponseDTO> atletas = atletaService.listar(jwt);
         return Response.ok(ApiResponse.ok(atletas, "OK")).build();
+    }
+
+    @PUT
+    @Path("/{id}")
+    @RolesAllowed({"ADMIN_FHT", "ADMIN_CLUBE"})
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Operation(summary = "Atualizar dados do atleta",
+            description = "ADMIN_FHT edita qualquer atleta; ADMIN_CLUBE só os do próprio clube. Não altera documentos, status nem CPF.")
+    @APIResponses({
+            @APIResponse(responseCode = "200", description = "Atleta atualizado"),
+            @APIResponse(responseCode = "401", description = "Token ausente ou inválido"),
+            @APIResponse(responseCode = "403", description = "Sem permissão"),
+            @APIResponse(responseCode = "404", description = "Atleta não encontrado")
+    })
+    public Response atualizar(
+            @Parameter(description = "UUID do atleta", required = true) @PathParam("id") UUID id,
+            AtletaUpdateForm form) {
+        AtletaResponseDTO atleta = atletaService.atualizar(id, form, jwt);
+        return Response.ok(ApiResponse.ok(atleta, "Atleta atualizado")).build();
     }
 
     @GET

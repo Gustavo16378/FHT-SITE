@@ -2,6 +2,7 @@ package br.org.fht.service;
 
 import br.org.fht.dto.atleta.AtletaForm;
 import br.org.fht.dto.atleta.AtletaResponseDTO;
+import br.org.fht.dto.atleta.AtletaUpdateForm;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 
 import java.util.List;
@@ -14,6 +15,8 @@ public interface AtletaService {
     List<AtletaResponseDTO> listar(JsonWebToken jwt);
 
     AtletaResponseDTO buscarPorId(UUID id, JsonWebToken jwt);
+
+    AtletaResponseDTO atualizar(UUID id, AtletaUpdateForm form, JsonWebToken jwt);
 
     void aprovar(UUID id);
 

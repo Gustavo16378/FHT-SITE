@@ -3,6 +3,7 @@ package br.org.fht.service;
 import br.org.fht.common.CPFValidator;
 import br.org.fht.dto.atleta.AtletaForm;
 import br.org.fht.dto.atleta.AtletaResponseDTO;
+import br.org.fht.dto.atleta.AtletaUpdateForm;
 import br.org.fht.exception.ValidationException;
 import br.org.fht.mapper.AtletaMapper;
 import br.org.fht.model.Atleta;
@@ -100,6 +101,39 @@ public class AtletaServiceImpl implements AtletaService {
         }
         return atletaRepository.listAllOrdered()
                 .stream().map(AtletaMapper::toResponse).toList();
+    }
+
+    @Override
+    @Transactional
+    public AtletaResponseDTO atualizar(UUID id, AtletaUpdateForm form, JsonWebToken jwt) {
+        // Escopo: ADMIN_CLUBE só edita atleta do próprio clube; ADMIN_FHT edita qualquer um.
+        Atleta atleta;
+        if ("ADMIN_CLUBE".equals((String) jwt.getClaim("role"))) {
+            UUID clubeId = UUID.fromString((String) jwt.getClaim("clubeId"));
+            atleta = atletaRepository.findByClubeIdAndId(clubeId, id)
+                    .orElseThrow(() -> new WebApplicationException("Atleta não encontrado", 404));
+        } else {
+            atleta = atletaRepository.findByIdOptional(id)
+                    .orElseThrow(() -> new WebApplicationException("Atleta não encontrado", 404));
+        }
+
+        // Atualização parcial: só aplica campos não nulos. Não mexe em CPF, documentos nem status.
+        if (form.nomeCompleto() != null) atleta.setNomeCompleto(form.nomeCompleto());
+        if (form.dataNascimento() != null && !form.dataNascimento().isBlank())
+            atleta.setDataNascimento(LocalDate.parse(form.dataNascimento()));
+        if (form.sexo() != null) atleta.setSexo(form.sexo());
+        if (form.rg() != null) atleta.setRg(form.rg());
+        if (form.telefone() != null) atleta.setTelefone(form.telefone());
+        if (form.email() != null) atleta.setEmail(form.email());
+        if (form.cidade() != null) atleta.setCidade(form.cidade());
+        if (form.ufResidencia() != null) atleta.setUfResidencia(form.ufResidencia());
+        if (form.posicao() != null) atleta.setPosicao(form.posicao());
+        if (form.categoria() != null) atleta.setCategoria(form.categoria());
+        if (form.transferencia() != null) atleta.setTransferencia(form.transferencia());
+        if (form.clubeAnterior() != null) atleta.setClubeAnterior(form.clubeAnterior());
+
+        // entidade managed + @Transactional → dirty checking persiste no commit
+        return AtletaMapper.toResponse(atleta);
     }
 
     @Override

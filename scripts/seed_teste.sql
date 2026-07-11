@@ -25,3 +25,9 @@ VALUES
  ('11111111-1111-1111-1111-111111111111', 'Gabriel Oliveira Melo',  '1999-01-22', 'M', '111.222.333-06', '6234567', 'SSP-GO', 'Goiânia', 'GO', '(63) 98111-0006', 'gabriel@email.com', '77000-000', 'Quadra 208 Sul', '30', 'Palmas', 'TO', 'Central', 'Adulto', true, 'Goiânia Handebol', 'https://i.pravatar.cc/150?img=33', 'https://www.africau.edu/images/default/sample.pdf', 'https://www.africau.edu/images/default/sample.pdf', 'https://www.africau.edu/images/default/sample.pdf', 'ATIVO', 35.00, 2026),
  ('22222222-2222-2222-2222-222222222222', 'Juliana Martins Prado',  '2001-04-14', 'F', '111.222.333-07', '7234567', 'SSP-TO', 'Araguaína', 'TO', '(63) 98222-0007', 'juliana@email.com', '77800-000', 'Rua das Mangueiras', '100', 'Araguaína', 'TO', 'Armadora Esquerda', 'Adulto', false, NULL, 'https://i.pravatar.cc/150?img=49', NULL, NULL, NULL, 'AGUARDANDO_PAGAMENTO', 35.00, 2026)
 ON CONFLICT (cpf) DO NOTHING;
+
+-- ── Usuário ADMIN_CLUBE de teste (senha: 123456) — vinculado ao Palmas HC ──
+-- (o admin admin@fht.org.br já vem no seed V4). Hash bcrypt de "123456".
+INSERT INTO usuarios (nome, email, senha_hash, role, clube_id, ativo)
+VALUES ('Palmas Handebol Clube', 'clube@fht.org.br', '$2a$10$OCUw.OlNjbQtqBxK0QUo3O2fXD98b7jcO2YE6xyssv56z00pgG0ze', 'ADMIN_CLUBE', '11111111-1111-1111-1111-111111111111', true)
+ON CONFLICT (email) DO NOTHING;

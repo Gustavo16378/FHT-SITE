@@ -101,6 +101,7 @@ public class AuthResource {
     @jakarta.annotation.security.RolesAllowed("ADMIN_FHT")
     @SecurityRequirement(name = "BearerAuth")
     @Operation(summary = "Criar usuário ADMIN_CLUBE")
+    @jakarta.transaction.Transactional
     @APIResponses({
             @APIResponse(responseCode = "201", description = "Usuário criado"),
             @APIResponse(responseCode = "401", description = "Token ausente ou inválido"),

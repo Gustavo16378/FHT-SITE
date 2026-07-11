@@ -12,7 +12,7 @@ import java.util.UUID;
 public class AtletaRepository implements PanacheRepositoryBase<Atleta, UUID> {
 
     public List<Atleta> findByClubeId(UUID clubeId) {
-        return list("clubeId ORDER BY createdAt DESC", clubeId);
+        return list("clubeId = ?1 ORDER BY createdAt DESC", clubeId);
     }
 
     public List<Atleta> listAllOrdered() {

@@ -3,17 +3,18 @@ import { useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Shield, Users, Star, Trophy, Newspaper,
   FileText, LogOut, Menu, X, AlertCircle, Search,
+  Image as ImageIcon, Contact, UserCog, Wallet,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { apiGet, apiPatch, ApiError } from '../services/api'
 import type { ClubeDTO, AtletaDTO, AdminDashboardDTO } from '../types/api'
 
 /* ── tipos (view-model) ───────────────────────────────────────── */
-type Page = 'dashboard' | 'clubes' | 'atletas' | 'arbitros' | 'competicoes' | 'noticias' | 'documentos'
+type Page = 'dashboard' | 'clubes' | 'atletas' | 'arbitros' | 'competicoes' | 'financeiro' | 'noticias' | 'galeria' | 'diretoria' | 'documentos' | 'usuarios'
 
 type StatusClube = 'PENDENTE' | 'ATIVO' | 'REJEITADO' | 'SUSPENSO'
 type StatusAtleta = 'AGUARDANDO_PAGAMENTO' | 'ATIVO' | 'REJEITADO' | 'SUSPENSO'
-type StatusArbitro = 'PENDENTE' | 'CREDENCIADO' | 'REJEITADO'
+type StatusArbitro = 'PENDENTE' | 'CREDENCIADO' | 'REJEITADO' | 'SUSPENSO'
 
 interface Clube {
   id: string; nome: string; sigla: string; cidade: string; uf: string; cnpj: string
@@ -24,13 +25,16 @@ interface Clube {
 interface Atleta {
   id: string; nome: string; cpf: string; rg: string
   dataNascimento: string; sexo: 'M' | 'F'; telefone: string; email: string
-  cidade: string; uf: string; clube: string; posicao: string; categoria: string
+  cidade: string; uf: string; clube: string; clubeStatus?: StatusClube; posicao: string; categoria: string
   status: StatusAtleta; transferencia: boolean; clubeAnterior?: string
   fotoUrl: string; rgUrl: string; comprovanteResidenciaUrl: string; comprovanteUrl: string
   motivoRejeicao?: string; taxaValor?: number; taxaAno?: number
 }
 interface Arbitro {
-  id: number; nome: string; cidade: string; nivel: string; status: StatusArbitro
+  id: number; nome: string; cpf: string; dataNascimento: string; foto: string
+  cidade: string; uf: string; telefone: string; email: string
+  nivel: string; registro: string; inicioArbitragem: string; formacao: string
+  status: StatusArbitro; motivoRejeicao?: string
 }
 
 /* ── mapeadores DTO → view-model ──────────────────────────────── */
@@ -59,7 +63,7 @@ function mapClube(d: ClubeDTO): Clube {
   }
 }
 
-function mapAtleta(d: AtletaDTO, clubeNome: string): Atleta {
+function mapAtleta(d: AtletaDTO, clubeNome: string, clubeStatus?: StatusClube): Atleta {
   const sexo: 'M' | 'F' = (d.sexo ?? '').toUpperCase().startsWith('M') ? 'M' : 'F'
   return {
     id: d.id,
@@ -73,6 +77,7 @@ function mapAtleta(d: AtletaDTO, clubeNome: string): Atleta {
     cidade: d.cidade ?? '',
     uf: d.ufResidencia ?? '',
     clube: clubeNome,
+    clubeStatus,
     posicao: d.posicao,
     categoria: d.categoria,
     status: d.status,
@@ -94,10 +99,12 @@ function errMsg(e: unknown): string {
   return 'Ocorreu um erro inesperado.'
 }
 
-/* ── árbitros: ainda sem backend (estático / V2) ──────────────── */
+/* ── árbitros: ainda sem backend (mock local até criar o módulo) ─ */
 const arbitrosMock: Arbitro[] = [
-  { id: 1, nome: 'Fábio Martins', cidade: 'Palmas/TO', nivel: '', status: 'PENDENTE' },
-  { id: 2, nome: 'Renata Alves', cidade: 'Porto Nacional/TO', nivel: 'Estadual B', status: 'CREDENCIADO' },
+  { id: 1, nome: 'Fábio Martins Rocha', cpf: '222.333.444-01', dataNascimento: '1988-06-15', foto: 'https://i.pravatar.cc/150?img=12', cidade: 'Palmas', uf: 'TO', telefone: '(63) 98333-1001', email: 'fabio.arb@email.com', nivel: '', registro: '', inicioArbitragem: '2015', formacao: 'Curso de Formação de Árbitros CBHb 2015', status: 'PENDENTE' },
+  { id: 2, nome: 'Renata Alves Souza', cpf: '222.333.444-02', dataNascimento: '1992-02-20', foto: 'https://i.pravatar.cc/150?img=48', cidade: 'Porto Nacional', uf: 'TO', telefone: '(63) 98333-1002', email: 'renata.arb@email.com', nivel: 'Estadual B', registro: 'ARB-TO-0042', inicioArbitragem: '2013', formacao: 'Curso CBHb 2013 + Reciclagem 2020', status: 'CREDENCIADO' },
+  { id: 3, nome: 'Carlos Eduardo Nunes', cpf: '222.333.444-03', dataNascimento: '1985-10-08', foto: 'https://i.pravatar.cc/150?img=14', cidade: 'Gurupi', uf: 'TO', telefone: '(63) 98333-1003', email: 'carlos.arb@email.com', nivel: 'Nacional', registro: 'ARB-TO-0007', inicioArbitragem: '2008', formacao: 'Curso CBHb + Arbitragem Nacional 2018', status: 'CREDENCIADO' },
+  { id: 4, nome: 'Patrícia Gomes Lima', cpf: '222.333.444-04', dataNascimento: '1990-12-01', foto: 'https://i.pravatar.cc/150?img=44', cidade: 'Araguaína', uf: 'TO', telefone: '(63) 98333-1004', email: 'patricia.arb@email.com', nivel: 'Regional', registro: 'ARB-TO-0055', inicioArbitragem: '2019', formacao: 'Curso de Formação CBHb 2019', status: 'SUSPENSO' },
 ]
 
 /* ── badge helpers ────────────────────────────────────────────── */
@@ -117,6 +124,7 @@ const arbitroBadge: Record<StatusArbitro, string> = {
   PENDENTE: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30',
   CREDENCIADO: 'text-green-400 bg-green-500/10 border-green-500/30',
   REJEITADO: 'text-red-400 bg-red-500/10 border-red-500/30',
+  SUSPENSO: 'text-orange-400 bg-orange-500/10 border-orange-500/30',
 }
 
 /* ── helpers estilo ───────────────────────────────────────────── */
@@ -243,6 +251,17 @@ function AtletaDetailPanel({
 
         <div className="flex-1 p-6 flex flex-col gap-6">
 
+          {/* clube suspenso */}
+          {atleta.clubeStatus === 'SUSPENSO' && (
+            <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl p-4 flex gap-3">
+              <AlertCircle size={16} className="text-orange-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-body text-orange-400 text-xs uppercase tracking-wider mb-0.5">Clube suspenso</p>
+                <p className="font-body text-orange-300 text-sm">O clube <span className="font-semibold">{atleta.clube}</span> está suspenso — o atleta fica impossibilitado de competir até a regularização.</p>
+              </div>
+            </div>
+          )}
+
           {/* motivo rejeição */}
           {atleta.status === 'REJEITADO' && atleta.motivoRejeicao && (
             <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 flex gap-3">
@@ -358,9 +377,15 @@ function AtletaDetailPanel({
   )
 }
 
+/* ── competições do clube: mock até o módulo existir ──────────── */
+const competicoesClubeMock = [
+  { id: 'cmp1', nome: 'Campeonato Tocantinense 2025', jogos: 8, vitorias: 5, empates: 1, derrotas: 2, posicao: '2º lugar', atletas: ['Rafael Souza Lima', 'Gabriel Oliveira Melo', 'Mariana Costa Alves', 'Beatriz Santos Rocha'] },
+  { id: 'cmp2', nome: 'Copa FHT 2024', jogos: 5, vitorias: 4, empates: 0, derrotas: 1, posicao: 'Campeão', atletas: ['Beatriz Santos Rocha', 'Mariana Costa Alves', 'Rafael Souza Lima'] },
+]
+
 /* ── Clube Detail Panel ───────────────────────────────────────── */
 function ClubeDetailPanel({
-  clube, atletas, onClose, onAprovar, onRejeitar, onSuspender, onReativar,
+  clube, atletas, onClose, onAprovar, onRejeitar, onSuspender, onReativar, onVerAtleta,
 }: {
   clube: Clube
   atletas: Atleta[]
@@ -369,8 +394,10 @@ function ClubeDetailPanel({
   onRejeitar: (id: string) => void
   onSuspender: (id: string) => void
   onReativar: (id: string) => void
+  onVerAtleta: (a: Atleta) => void
 }) {
   const atletasDoClube = atletas.filter(a => a.clube === clube.nome)
+  const [compAberta, setCompAberta] = useState<string | null>(null)
 
   const Info = ({ label, value }: { label: string; value: string }) => (
     <div>
@@ -471,22 +498,34 @@ function ClubeDetailPanel({
             </div>
           </div>
 
-          {/* estatísticas (mock até ter competições no backend) */}
+          {/* competições disputadas (mock até o módulo de Competições existir) */}
           <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-5">
-            <p className="font-display text-gold text-xs tracking-widest mb-4">ESTATÍSTICAS</p>
-            <div className="grid grid-cols-4 gap-3 text-center">
-              {[
-                { label: 'Jogos', v: 0 },
-                { label: 'Vitórias', v: 0 },
-                { label: 'Empates', v: 0 },
-                { label: 'Derrotas', v: 0 },
-              ].map(({ label, v }) => (
-                <div key={label} className="bg-federation/10 border border-federation/20 rounded-lg py-3">
-                  <p className="font-display text-fht-white text-2xl">{v}</p>
-                  <p className="font-body text-gray-soft text-xs">{label}</p>
+            <p className="font-display text-gold text-xs tracking-widest mb-4">COMPETIÇÕES DISPUTADAS</p>
+            <div className="flex flex-col gap-2">
+              {competicoesClubeMock.map(c => (
+                <div key={c.id} className="bg-federation/5 border border-federation/10 rounded-lg overflow-hidden">
+                  <button onClick={() => setCompAberta(compAberta === c.id ? null : c.id)}
+                    className="w-full flex items-center justify-between px-4 py-3 hover:bg-federation/10 transition-colors duration-200 text-left">
+                    <div>
+                      <p className="font-body text-fht-white text-sm">{c.nome}</p>
+                      <p className="font-body text-gray-soft text-xs">{c.jogos}J · {c.vitorias}V {c.empates}E {c.derrotas}D · {c.posicao}</p>
+                    </div>
+                    <span className="font-body text-gold text-xs flex-shrink-0">{compAberta === c.id ? 'Fechar' : 'Ver jogos ›'}</span>
+                  </button>
+                  {compAberta === c.id && (
+                    <div className="px-4 pb-3 pt-2 border-t border-federation/10">
+                      <p className="font-body text-gray-soft text-xs uppercase tracking-wider mb-2">Atletas que jogaram</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {c.atletas.map(nome => (
+                          <span key={nome} className="font-body text-fht-white text-xs bg-federation/10 border border-federation/20 rounded-full px-2.5 py-1">{nome}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
+            <p className="font-body text-gray-soft/50 text-[10px] mt-3">Dados de demonstração — módulo de Competições ainda não existe.</p>
           </div>
 
           {/* atletas */}
@@ -499,15 +538,19 @@ function ClubeDetailPanel({
             ) : (
               <div className="flex flex-col gap-2">
                 {atletasDoClube.map(a => (
-                  <div key={a.id} className="flex items-center justify-between px-4 py-2.5 bg-federation/5 border border-federation/10 rounded-lg">
+                  <button key={a.id} onClick={() => onVerAtleta(a)}
+                    className="w-full flex items-center justify-between px-4 py-2.5 bg-federation/5 border border-federation/10 rounded-lg hover:border-gold/40 hover:bg-federation/10 transition-colors duration-200 text-left group">
                     <div>
                       <p className="font-body text-fht-white text-sm">{a.nome}</p>
                       <p className="font-body text-gray-soft text-xs">{a.posicao} · {a.categoria}</p>
                     </div>
-                    <span className={`font-body text-xs px-2 py-0.5 rounded-full border ${atletaBadge[a.status]}`}>
-                      {a.status === 'AGUARDANDO_PAGAMENTO' ? 'AG. PGTO' : a.status}
-                    </span>
-                  </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`font-body text-xs px-2 py-0.5 rounded-full border ${atletaBadge[a.status]}`}>
+                        {a.status === 'AGUARDANDO_PAGAMENTO' ? 'AG. PGTO' : a.status}
+                      </span>
+                      <span className="font-body text-gray-soft text-xs group-hover:text-gold transition-colors duration-200">›</span>
+                    </div>
+                  </button>
                 ))}
               </div>
             )}
@@ -607,6 +650,9 @@ function ClubesPage({ clubes, atletas, reload }: {
   const [modal, setModal] = useState<{ type: 'rejeitar'; id: string } | null>(null)
   const [motivo, setMotivo] = useState('')
   const [erro, setErro] = useState('')
+  const [atletaDetalhe, setAtletaDetalhe] = useState<Atleta | null>(null)
+  const [atletaRejeitarId, setAtletaRejeitarId] = useState<string | null>(null)
+  const [atletaMotivo, setAtletaMotivo] = useState('')
   const clubesFiltrados = clubes.filter(c =>
     c.nome.toLowerCase().includes(busca.toLowerCase()) ||
     c.representante.toLowerCase().includes(busca.toLowerCase()) ||
@@ -643,6 +689,37 @@ function ClubesPage({ clubes, atletas, reload }: {
     } catch (e) {
       setErro(errMsg(e))
       setModal(null)
+    }
+  }
+
+  // ações do atleta acessado por dentro do painel do clube
+  async function acaoAtleta(fn: () => Promise<void>) {
+    setErro('')
+    try {
+      await fn()
+      setAtletaDetalhe(null)
+      await reload(true)
+    } catch (e) {
+      setErro(errMsg(e))
+    }
+  }
+  const atletaAprovar = (id: string) => acaoAtleta(() => apiPatch(`/api/atletas/${id}/aprovar`))
+  const atletaSuspender = (id: string) => acaoAtleta(() => apiPatch(`/api/atletas/${id}/suspender`))
+  const atletaReativar = (id: string) => acaoAtleta(() => apiPatch(`/api/atletas/${id}/reativar`))
+  function atletaAbrirRejeitar(id: string) {
+    setAtletaDetalhe(null)
+    setAtletaRejeitarId(id)
+  }
+  async function atletaHandleRejeitar(id: string) {
+    setErro('')
+    try {
+      await apiPatch(`/api/atletas/${id}/rejeitar`, { motivo: atletaMotivo })
+      setAtletaMotivo('')
+      setAtletaRejeitarId(null)
+      await reload(true)
+    } catch (e) {
+      setErro(errMsg(e))
+      setAtletaRejeitarId(null)
     }
   }
 
@@ -693,6 +770,18 @@ function ClubesPage({ clubes, atletas, reload }: {
           onRejeitar={abrirRejeitar}
           onSuspender={handleSuspender}
           onReativar={handleReativar}
+          onVerAtleta={setAtletaDetalhe}
+        />
+      )}
+
+      {atletaDetalhe && (
+        <AtletaDetailPanel
+          atleta={atletaDetalhe}
+          onClose={() => setAtletaDetalhe(null)}
+          onAprovar={atletaAprovar}
+          onRejeitar={atletaAbrirRejeitar}
+          onSuspender={atletaSuspender}
+          onReativar={atletaReativar}
         />
       )}
 
@@ -701,6 +790,15 @@ function ClubesPage({ clubes, atletas, reload }: {
           confirmLabel="REJEITAR" confirmClass="text-fht-white bg-red-500 hover:bg-red-400"
           onConfirm={() => handleRejeitar(modal.id)} onClose={() => setModal(null)}>
           <textarea value={motivo} onChange={e => setMotivo(e.target.value)} rows={3} placeholder="Motivo..."
+            className={`${inp} resize-none`} />
+        </ConfirmModal>
+      )}
+
+      {atletaRejeitarId && (
+        <ConfirmModal title="REJEITAR ATLETA" message="Informe o motivo da rejeição:"
+          confirmLabel="REJEITAR" confirmClass="text-fht-white bg-red-500 hover:bg-red-400"
+          onConfirm={() => atletaHandleRejeitar(atletaRejeitarId)} onClose={() => setAtletaRejeitarId(null)}>
+          <textarea value={atletaMotivo} onChange={e => setAtletaMotivo(e.target.value)} rows={3} placeholder="Motivo..."
             className={`${inp} resize-none`} />
         </ConfirmModal>
       )}
@@ -819,12 +917,138 @@ function AtletasPage({ atletas, reload }: {
   )
 }
 
-/* ── Árbitros Page (ainda sem backend — estado local) ─────────── */
+/* ── Árbitro Detail Panel ─────────────────────────────────────── */
+function ArbitroDetailPanel({
+  arbitro, onClose, onCredenciar, onRejeitar, onSuspender, onReativar,
+}: {
+  arbitro: Arbitro
+  onClose: () => void
+  onCredenciar: (id: number) => void
+  onRejeitar: (id: number) => void
+  onSuspender: (id: number) => void
+  onReativar: (id: number) => void
+}) {
+  const Info = ({ label, value }: { label: string; value: string }) => (
+    <div>
+      <p className="font-body text-gray-soft text-xs uppercase tracking-wider mb-0.5">{label}</p>
+      <p className="font-body text-fht-white text-sm">{value || '—'}</p>
+    </div>
+  )
+  const idade = arbitro.dataNascimento
+    ? Math.floor((Date.now() - new Date(arbitro.dataNascimento).getTime()) / (1000 * 60 * 60 * 24 * 365.25))
+    : null
+
+  return (
+    <div className="fixed inset-0 z-50 flex" onClick={onClose}>
+      <div className="flex-1 backdrop-blur-sm" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }} />
+      <div className="w-full max-w-2xl h-full bg-[#0a1628] border-l border-federation/20 overflow-y-auto flex flex-col"
+        onClick={e => e.stopPropagation()}>
+
+        {/* header */}
+        <div className="flex items-start justify-between p-6 border-b border-federation/20 sticky top-0 bg-[#0a1628] z-10">
+          <div className="flex gap-4 items-center">
+            <div className="w-14 h-14 rounded-xl bg-federation/20 border border-federation/30 flex items-center justify-center flex-shrink-0 overflow-hidden">
+              {arbitro.foto
+                ? <img src={arbitro.foto} alt={arbitro.nome} className="w-full h-full object-cover" />
+                : <Star size={24} className="text-gray-soft" />}
+            </div>
+            <div>
+              <div className="flex items-center gap-2 mb-0.5">
+                <span className={`font-body text-xs px-2.5 py-0.5 rounded-full border ${arbitroBadge[arbitro.status]}`}>
+                  {arbitro.status}
+                </span>
+                {arbitro.nivel && (
+                  <span className="font-body text-xs px-2 py-0.5 rounded-full border text-gold bg-gold/10 border-gold/30">{arbitro.nivel}</span>
+                )}
+              </div>
+              <h2 className="font-display text-fht-white text-xl leading-tight">{arbitro.nome}</h2>
+              <p className="font-body text-gray-soft text-sm">Árbitro · {arbitro.cidade}/{arbitro.uf}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-gray-soft hover:text-gold transition-colors duration-250 mt-1">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="flex-1 p-6 flex flex-col gap-6">
+          {/* motivo rejeição */}
+          {arbitro.status === 'REJEITADO' && arbitro.motivoRejeicao && (
+            <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 flex gap-3">
+              <AlertCircle size={16} className="text-red-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-body text-red-400 text-xs uppercase tracking-wider mb-0.5">Motivo da rejeição</p>
+                <p className="font-body text-red-300 text-sm">{arbitro.motivoRejeicao}</p>
+              </div>
+            </div>
+          )}
+
+          {/* dados pessoais */}
+          <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-5">
+            <p className="font-display text-gold text-xs tracking-widest mb-4">DADOS PESSOAIS</p>
+            <div className="grid grid-cols-2 gap-4">
+              <Info label="CPF" value={arbitro.cpf} />
+              <Info label="Nascimento" value={arbitro.dataNascimento ? `${new Date(arbitro.dataNascimento).toLocaleDateString('pt-BR')} ${idade ? `(${idade} anos)` : ''}` : '—'} />
+              <Info label="Telefone" value={arbitro.telefone} />
+              <Info label="E-mail" value={arbitro.email} />
+              <Info label="Cidade / UF" value={`${arbitro.cidade} / ${arbitro.uf}`} />
+            </div>
+          </div>
+
+          {/* dados de arbitragem */}
+          <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-5">
+            <p className="font-display text-gold text-xs tracking-widest mb-4">ARBITRAGEM</p>
+            <div className="grid grid-cols-2 gap-4">
+              <Info label="Nível / Categoria" value={arbitro.nivel} />
+              <Info label="Nº de registro" value={arbitro.registro} />
+              <Info label="Início na arbitragem" value={arbitro.inicioArbitragem} />
+              <Info label="Formação" value={arbitro.formacao} />
+            </div>
+          </div>
+        </div>
+
+        {/* ações fixas no rodapé */}
+        <div className="sticky bottom-0 bg-[#0a1628] border-t border-federation/20 p-5 flex flex-wrap gap-3">
+          {arbitro.status === 'PENDENTE' && (
+            <>
+              <button onClick={() => onCredenciar(arbitro.id)}
+                className="flex-1 font-display text-night bg-green-500 hover:bg-green-400 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250">
+                CREDENCIAR
+              </button>
+              <button onClick={() => onRejeitar(arbitro.id)}
+                className="flex-1 font-display text-fht-white bg-red-500/20 border border-red-500/40 hover:bg-red-500/30 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250">
+                REJEITAR
+              </button>
+            </>
+          )}
+          {arbitro.status === 'CREDENCIADO' && (
+            <button onClick={() => onSuspender(arbitro.id)}
+              className="flex-1 font-display text-orange-400 bg-orange-500/10 border border-orange-500/30 hover:bg-orange-500/20 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250">
+              DESATIVAR ÁRBITRO
+            </button>
+          )}
+          {arbitro.status === 'SUSPENSO' && (
+            <button onClick={() => onReativar(arbitro.id)}
+              className="flex-1 font-display text-green-400 bg-green-500/10 border border-green-500/30 hover:bg-green-500/20 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250">
+              REATIVAR ÁRBITRO
+            </button>
+          )}
+          <button onClick={onClose}
+            className="font-display text-gray-soft border border-federation/30 hover:border-federation/60 px-6 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250">
+            FECHAR
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ── Árbitros Page (mock local — backend do módulo ainda não existe) ─ */
 const NIVEIS_APROVACAO = ['Regional', 'Estadual B', 'Estadual A', 'Nacional']
 
 function ArbitrosPage() {
   const [arbitros, setArbitros] = useState<Arbitro[]>(arbitrosMock)
   const [busca, setBusca] = useState('')
+  const [detalhe, setDetalhe] = useState<Arbitro | null>(null)
   const [modal, setModal] = useState<{ type: 'aprovar' | 'rejeitar'; id: number } | null>(null)
   const [nivel, setNivel] = useState('')
   const [motivo, setMotivo] = useState('')
@@ -834,17 +1058,24 @@ function ArbitrosPage() {
   )
 
   // Sem endpoint de árbitros no backend ainda — muda só o estado local.
-  function handleAprovar(id: number) {
-    setArbitros(p => p.map(a => a.id === id ? { ...a, status: 'CREDENCIADO', nivel } : a))
-    setNivel('')
-    setModal(null)
+  function handleCredenciar(id: number) {
+    setArbitros(p => p.map(a => a.id === id ? { ...a, status: 'CREDENCIADO', nivel: nivel || a.nivel } : a))
+    setNivel(''); setModal(null); setDetalhe(null)
   }
-
   function handleRejeitar(id: number) {
-    setArbitros(p => p.map(a => a.id === id ? { ...a, status: 'REJEITADO' } : a))
-    setMotivo('')
-    setModal(null)
+    setArbitros(p => p.map(a => a.id === id ? { ...a, status: 'REJEITADO', motivoRejeicao: motivo } : a))
+    setMotivo(''); setModal(null); setDetalhe(null)
   }
+  function handleSuspender(id: number) {
+    setArbitros(p => p.map(a => a.id === id ? { ...a, status: 'SUSPENSO' } : a))
+    setDetalhe(null)
+  }
+  function handleReativar(id: number) {
+    setArbitros(p => p.map(a => a.id === id ? { ...a, status: 'CREDENCIADO' } : a))
+    setDetalhe(null)
+  }
+  function abrirCredenciar(id: number) { setDetalhe(null); setModal({ type: 'aprovar', id }) }
+  function abrirRejeitar(id: number) { setDetalhe(null); setModal({ type: 'rejeitar', id }) }
 
   return (
     <div>
@@ -869,20 +1100,14 @@ function ArbitrosPage() {
             ) : arbitrosFiltrados.map(a => (
               <tr key={a.id} className="border-b border-federation/10 hover:bg-federation/5 transition-colors duration-150">
                 <td className="px-4 py-3 font-body text-fht-white text-sm">{a.nome}</td>
-                <td className="px-4 py-3 font-body text-gray-soft text-sm">{a.cidade}</td>
+                <td className="px-4 py-3 font-body text-gray-soft text-sm">{a.cidade}/{a.uf}</td>
                 <td className="px-4 py-3 font-body text-gray-soft text-sm">{a.nivel || '—'}</td>
                 <td className="px-4 py-3">
                   <span className={`font-body text-xs px-2.5 py-1 rounded-full border ${arbitroBadge[a.status]}`}>{a.status}</span>
                 </td>
                 <td className="px-4 py-3">
-                  {a.status === 'PENDENTE' && (
-                    <div className="flex gap-2">
-                      <button onClick={() => setModal({ type: 'aprovar', id: a.id })}
-                        className="font-body text-green-400 text-xs hover:underline">Aprovar</button>
-                      <button onClick={() => setModal({ type: 'rejeitar', id: a.id })}
-                        className="font-body text-red-400 text-xs hover:underline">Rejeitar</button>
-                    </div>
-                  )}
+                  <button onClick={() => setDetalhe(a)}
+                    className="font-body text-gold text-xs hover:underline">Ver mais →</button>
                 </td>
               </tr>
             ))}
@@ -890,10 +1115,21 @@ function ArbitrosPage() {
         </table>
       </div>
 
+      {detalhe && (
+        <ArbitroDetailPanel
+          arbitro={detalhe}
+          onClose={() => setDetalhe(null)}
+          onCredenciar={abrirCredenciar}
+          onRejeitar={abrirRejeitar}
+          onSuspender={handleSuspender}
+          onReativar={handleReativar}
+        />
+      )}
+
       {modal?.type === 'aprovar' && (
         <ConfirmModal title="CREDENCIAR ÁRBITRO" message="Selecione o nível do árbitro:"
           confirmLabel="CREDENCIAR" confirmClass="text-night bg-green-500 hover:bg-green-400"
-          onConfirm={() => handleAprovar(modal.id)} onClose={() => setModal(null)}>
+          onConfirm={() => handleCredenciar(modal.id)} onClose={() => setModal(null)}>
           <select value={nivel} onChange={e => setNivel(e.target.value)} required className={sel}>
             <option value="" disabled>Selecione o nível</option>
             {NIVEIS_APROVACAO.map(n => <option key={n} value={n}>{n}</option>)}
@@ -920,21 +1156,34 @@ function PlaceholderPage({ title }: { title: string }) {
         <Trophy size={28} className="text-gold/50" />
       </div>
       <p className="font-display text-fht-white text-2xl mb-2">{title}</p>
-      <p className="font-body text-gray-soft text-sm">Disponível na versão 2.0</p>
+      <p className="font-body text-gray-soft text-sm">Seção em construção — vamos montar esta parte. 🚧</p>
     </div>
   )
 }
 
-/* ── Sidebar nav ──────────────────────────────────────────────── */
-const NAV = [
-  { id: 'dashboard',  label: 'Dashboard',    Icon: LayoutDashboard, disabled: false },
-  { id: 'clubes',     label: 'Clubes',        Icon: Shield,          disabled: false },
-  { id: 'atletas',    label: 'Atletas',       Icon: Users,           disabled: false },
-  { id: 'arbitros',   label: 'Árbitros',      Icon: Star,            disabled: false },
-  { id: 'competicoes',label: 'Competições',   Icon: Trophy,          disabled: true },
-  { id: 'noticias',   label: 'Notícias',      Icon: Newspaper,       disabled: true },
-  { id: 'documentos', label: 'Documentos',    Icon: FileText,        disabled: true },
-] as const
+/* ── Sidebar nav (agrupada por área) ──────────────────────────── */
+type NavItem = { id: Page; label: string; Icon: typeof LayoutDashboard }
+const NAV_GROUPS: { group: string | null; items: NavItem[] }[] = [
+  { group: null, items: [
+    { id: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard },
+  ] },
+  { group: 'Gestão', items: [
+    { id: 'clubes',      label: 'Clubes',      Icon: Shield },
+    { id: 'atletas',     label: 'Atletas',     Icon: Users },
+    { id: 'arbitros',    label: 'Árbitros',    Icon: Star },
+    { id: 'competicoes', label: 'Competições', Icon: Trophy },
+    { id: 'financeiro',  label: 'Financeiro',  Icon: Wallet },
+  ] },
+  { group: 'Conteúdo do site', items: [
+    { id: 'noticias',   label: 'Notícias',   Icon: Newspaper },
+    { id: 'galeria',    label: 'Galeria',    Icon: ImageIcon },
+    { id: 'diretoria',  label: 'Diretoria',  Icon: Contact },
+    { id: 'documentos', label: 'Documentos', Icon: FileText },
+  ] },
+  { group: 'Sistema', items: [
+    { id: 'usuarios', label: 'Usuários & Admins', Icon: UserCog },
+  ] },
+]
 
 /* ── Main ─────────────────────────────────────────────────────── */
 export default function AdminDashboard() {
@@ -958,8 +1207,9 @@ export default function AdminDashboard() {
         apiGet<AdminDashboardDTO>('/api/admin/dashboard'),
       ])
       const nomePorId = new Map(clubesDTO.map(c => [c.id, c.nome]))
+      const statusPorId = new Map<string, StatusClube>(clubesDTO.map(c => [c.id, c.status]))
       setClubes(clubesDTO.map(mapClube))
-      setAtletas(atletasDTO.map(a => mapAtleta(a, nomePorId.get(a.clubeId) ?? '—')))
+      setAtletas(atletasDTO.map(a => mapAtleta(a, nomePorId.get(a.clubeId) ?? '—', statusPorId.get(a.clubeId))))
       setDashboard(dash)
       setLoadError('')
     } catch (e) {
@@ -985,19 +1235,24 @@ export default function AdminDashboard() {
           <p className="font-body text-gold text-xs uppercase tracking-widest mb-0.5">Admin FHT</p>
           <p className="font-display text-fht-white text-xl leading-tight truncate">{user?.name ?? 'Administrador'}</p>
         </div>
-        <nav className="flex-1 py-4 overflow-y-auto no-scrollbar">
-          {NAV.map(({ id, label, Icon, disabled }) => (
-            <button key={id}
-              disabled={disabled}
-              onClick={() => { setPage(id as Page); setSideOpen(false) }}
-              className={`w-full flex items-center gap-3 px-6 py-3 font-body text-sm transition-colors duration-200 text-left
-                ${disabled ? 'text-gray-soft/40 cursor-not-allowed' : page === id
-                  ? 'bg-gold/10 text-gold border-r-2 border-gold'
-                  : 'text-gray-soft hover:text-fht-white hover:bg-federation/10'}`}>
-              <Icon size={18} className="flex-shrink-0" />
-              {label}
-              {disabled && <span className="ml-auto text-xs text-gray-soft/40">V2</span>}
-            </button>
+        <nav className="flex-1 py-2 overflow-y-auto no-scrollbar">
+          {NAV_GROUPS.map(({ group, items }) => (
+            <div key={group ?? 'geral'} className="mb-1">
+              {group && (
+                <p className="px-6 pt-4 pb-1 font-body text-gray-soft/50 text-[10px] uppercase tracking-widest">{group}</p>
+              )}
+              {items.map(({ id, label, Icon }) => (
+                <button key={id}
+                  onClick={() => { setPage(id); setSideOpen(false) }}
+                  className={`w-full flex items-center gap-3 px-6 py-3 font-body text-sm transition-colors duration-200 text-left
+                    ${page === id
+                      ? 'bg-gold/10 text-gold border-r-2 border-gold'
+                      : 'text-gray-soft hover:text-fht-white hover:bg-federation/10'}`}>
+                  <Icon size={18} className="flex-shrink-0" />
+                  {label}
+                </button>
+              ))}
+            </div>
           ))}
         </nav>
         <div className="p-4 border-t border-federation/20">
@@ -1022,7 +1277,7 @@ export default function AdminDashboard() {
             <div className="flex items-center justify-center py-32">
               <div className="w-8 h-8 border-2 border-gold border-t-transparent rounded-full animate-spin" />
             </div>
-          ) : loadError && page !== 'arbitros' ? (
+          ) : loadError && (page === 'dashboard' || page === 'clubes' || page === 'atletas') ? (
             <div className="flex flex-col items-center justify-center py-24 text-center">
               <AlertCircle size={40} className="text-red-400 mb-4" />
               <p className="font-display text-fht-white text-xl mb-2">Não foi possível carregar os dados</p>
@@ -1039,8 +1294,12 @@ export default function AdminDashboard() {
               {page === 'atletas'     && <AtletasPage atletas={atletas} reload={reload} />}
               {page === 'arbitros'    && <ArbitrosPage />}
               {page === 'competicoes' && <PlaceholderPage title="COMPETIÇÕES" />}
+              {page === 'financeiro'  && <PlaceholderPage title="FINANCEIRO" />}
               {page === 'noticias'    && <PlaceholderPage title="NOTÍCIAS" />}
+              {page === 'galeria'     && <PlaceholderPage title="GALERIA" />}
+              {page === 'diretoria'   && <PlaceholderPage title="DIRETORIA" />}
               {page === 'documentos'  && <PlaceholderPage title="DOCUMENTOS" />}
+              {page === 'usuarios'    && <PlaceholderPage title="USUÁRIOS & ADMINS" />}
             </>
           )}
         </main>

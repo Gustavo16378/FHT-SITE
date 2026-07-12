@@ -737,7 +737,7 @@ function ChaveamentoTab({ bracket }: { bracket: Bracket }) {
 // ABA 2 — Equipes & atletas (clubes expansíveis)
 // ————————————————————————————————————————————————————————————
 function EquipesTab({ elencos }: { elencos: Elenco[] }) {
-  const [aberto, setAberto] = useState<string | null>(null);
+  const [abertos, setAbertos] = useState<Set<string>>(new Set());
 
   if (elencos.length === 0) {
     return (
@@ -750,11 +750,18 @@ function EquipesTab({ elencos }: { elencos: Elenco[] }) {
       <SecaoTitulo icon={<Users size={14} />}>{`EQUIPES PARTICIPANTES (${elencos.length})`}</SecaoTitulo>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         {elencos.map((e) => {
-          const open = aberto === e.sigla;
+          const open = abertos.has(e.sigla);
           return (
             <div key={e.sigla} className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl overflow-hidden self-start">
               <button
-                onClick={() => setAberto(open ? null : e.sigla)}
+                onClick={() =>
+                  setAbertos((prev) => {
+                    const proximo = new Set(prev);
+                    if (proximo.has(e.sigla)) proximo.delete(e.sigla);
+                    else proximo.add(e.sigla);
+                    return proximo;
+                  })
+                }
                 className="w-full flex items-center justify-between gap-3 p-4 hover:bg-federation/5 transition-colors duration-150"
               >
                 <div className="flex items-center gap-3 min-w-0">

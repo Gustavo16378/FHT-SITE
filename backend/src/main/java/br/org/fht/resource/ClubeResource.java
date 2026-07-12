@@ -3,6 +3,7 @@ package br.org.fht.resource;
 import br.org.fht.common.ApiResponse;
 import br.org.fht.dto.clube.ClubeForm;
 import br.org.fht.dto.clube.ClubeResponseDTO;
+import br.org.fht.dto.clube.ClubeUpdateForm;
 import br.org.fht.service.ClubeService;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
@@ -75,6 +76,25 @@ public class ClubeResource {
     public Response buscarPorId(
             @Parameter(description = "UUID do clube", required = true) @PathParam("id") UUID id) {
         return Response.ok(ApiResponse.ok(clubeService.buscarPorId(id, jwt), "OK")).build();
+    }
+
+    @PUT
+    @Path("/{id}")
+    @RolesAllowed({"ADMIN_FHT", "ADMIN_CLUBE"})
+    @Consumes(MediaType.APPLICATION_JSON)
+    @SecurityRequirement(name = "BearerAuth")
+    @Operation(summary = "Atualizar dados do clube",
+            description = "ADMIN_FHT edita qualquer clube; ADMIN_CLUBE só o próprio. Não altera status nem documentos.")
+    @APIResponses({
+            @APIResponse(responseCode = "200", description = "Clube atualizado"),
+            @APIResponse(responseCode = "401", description = "Token ausente ou inválido"),
+            @APIResponse(responseCode = "403", description = "Sem permissão para este clube"),
+            @APIResponse(responseCode = "404", description = "Clube não encontrado")
+    })
+    public Response atualizar(
+            @Parameter(description = "UUID do clube", required = true) @PathParam("id") UUID id,
+            ClubeUpdateForm form) {
+        return Response.ok(ApiResponse.ok(clubeService.atualizar(id, form, jwt), "Clube atualizado")).build();
     }
 
     @PATCH

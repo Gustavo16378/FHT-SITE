@@ -2,6 +2,7 @@ package br.org.fht.service;
 
 import br.org.fht.dto.clube.ClubeForm;
 import br.org.fht.dto.clube.ClubeResponseDTO;
+import br.org.fht.dto.clube.ClubeUpdateForm;
 import br.org.fht.mapper.ClubeMapper;
 import br.org.fht.model.Clube;
 import br.org.fht.model.Role;
@@ -73,6 +74,34 @@ public class ClubeServiceImpl implements ClubeService {
                 throw new WebApplicationException("Acesso negado", 403);
             }
         }
+
+        return ClubeMapper.toResponse(clube);
+    }
+
+    @Override
+    @Transactional
+    public ClubeResponseDTO atualizar(UUID id, ClubeUpdateForm form, JsonWebToken jwt) {
+        Clube clube = clubeRepository.findByIdOptional(id)
+                .orElseThrow(() -> new WebApplicationException("Clube não encontrado", 404));
+
+        // Escopo: ADMIN_CLUBE só edita o próprio clube; ADMIN_FHT edita qualquer um.
+        if ("ADMIN_CLUBE".equals((String) jwt.getClaim("role"))) {
+            String clubeIdJwt = jwt.getClaim("clubeId");
+            if (!id.toString().equals(clubeIdJwt)) {
+                throw new WebApplicationException("Acesso negado", 403);
+            }
+        }
+
+        // Atualização parcial — não mexe em status, documentos nem filiação.
+        if (form.nome() != null) clube.setNome(form.nome());
+        if (form.cidade() != null) clube.setCidade(form.cidade());
+        if (form.uf() != null) clube.setUf(form.uf());
+        if (form.sigla() != null) clube.setSigla(form.sigla());
+        if (form.cnpj() != null) clube.setCnpj(form.cnpj());
+        if (form.representanteNome() != null) clube.setRepresentanteNome(form.representanteNome());
+        if (form.representanteEmail() != null) clube.setRepresentanteEmail(form.representanteEmail());
+        if (form.representanteTelefone() != null) clube.setRepresentanteTelefone(form.representanteTelefone());
+        if (form.representanteCargo() != null) clube.setRepresentanteCargo(form.representanteCargo());
 
         return ClubeMapper.toResponse(clube);
     }

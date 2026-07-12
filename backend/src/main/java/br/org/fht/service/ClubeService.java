@@ -2,6 +2,7 @@ package br.org.fht.service;
 
 import br.org.fht.dto.clube.ClubeForm;
 import br.org.fht.dto.clube.ClubeResponseDTO;
+import br.org.fht.dto.clube.ClubeUpdateForm;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 
 import java.util.List;
@@ -14,6 +15,8 @@ public interface ClubeService {
     List<ClubeResponseDTO> listar();
 
     ClubeResponseDTO buscarPorId(UUID id, JsonWebToken jwt);
+
+    ClubeResponseDTO atualizar(UUID id, ClubeUpdateForm form, JsonWebToken jwt);
 
     void aprovar(UUID id);
 

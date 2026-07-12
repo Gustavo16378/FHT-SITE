@@ -3,15 +3,16 @@ import { useNavigate } from 'react-router-dom'
 import {
   Home, Users, UserPlus, Trophy, Settings, LogOut, Menu, X,
   CheckCircle, AlertCircle, Upload, ChevronRight, ChevronLeft,
+  Building2, FileText, Edit3, Save, Calendar, MapPin, Check,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { maskCPF, maskPhone, maskCEP, validateCPF } from '../utils/masks'
+import { maskCPF, maskCNPJ, maskPhone, maskCEP, validateCPF } from '../utils/masks'
 import { UFS } from '../utils/ufs'
 import { apiGet, apiPostForm, apiPut, ApiError } from '../services/api'
-import type { AtletaDTO, AtletaStatus } from '../types/api'
+import type { AtletaDTO, AtletaStatus, ClubeDTO, ClubeStatus } from '../types/api'
 
 /* ── tipos ───────────────────────────────────────────────── */
-type Page = 'dashboard' | 'atletas' | 'cadastrar' | 'dados'
+type Page = 'dashboard' | 'atletas' | 'cadastrar' | 'inscricoes' | 'dados'
 
 function fmtDate(iso: string | null): string {
   if (!iso) return '—'
@@ -34,6 +35,19 @@ const statusBadge: Record<AtletaStatus, string> = {
 const statusLabel: Record<AtletaStatus, string> = {
   ATIVO: 'Ativo',
   AGUARDANDO_PAGAMENTO: 'Aguardando pgto.',
+  REJEITADO: 'Rejeitado',
+  SUSPENSO: 'Suspenso',
+}
+
+const clubeStatusBadge: Record<ClubeStatus, string> = {
+  ATIVO: 'text-green-400 bg-green-500/10 border-green-500/30',
+  PENDENTE: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30',
+  REJEITADO: 'text-red-400 bg-red-500/10 border-red-500/30',
+  SUSPENSO: 'text-orange-400 bg-orange-500/10 border-orange-500/30',
+}
+const clubeStatusLabel: Record<ClubeStatus, string> = {
+  ATIVO: 'Ativo',
+  PENDENTE: 'Pendente',
   REJEITADO: 'Rejeitado',
   SUSPENSO: 'Suspenso',
 }
@@ -728,13 +742,420 @@ function CadastrarAtletaPage({ onSuccess }: { onSuccess: () => void }) {
   )
 }
 
+/* ── Meus Dados (dados do clube — REAL, liga na API) ─────── */
+function MeusDadosPage() {
+  const { user } = useAuth()
+  const clubeId = user?.clubeId
+
+  const [clube, setClube] = useState<ClubeDTO | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [erro, setErro] = useState('')
+  const [editing, setEditing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState({
+    nome: '', cidade: '', uf: 'TO', sigla: '', cnpj: '',
+    representanteNome: '', representanteEmail: '', representanteTelefone: '',
+  })
+
+  const fillForm = useCallback((dto: ClubeDTO) => setForm({
+    nome: dto.nome,
+    cidade: dto.cidade,
+    uf: dto.uf,
+    sigla: dto.sigla ?? '',
+    cnpj: dto.cnpj ?? '',
+    representanteNome: dto.representanteNome,
+    representanteEmail: dto.representanteEmail,
+    representanteTelefone: dto.representanteTelefone,
+  }), [])
+
+  const carregar = useCallback(async () => {
+    if (!clubeId) { setLoading(false); return }
+    setLoading(true); setErro('')
+    try {
+      const dto = await apiGet<ClubeDTO>(`/api/clubes/${clubeId}`)
+      setClube(dto)
+      fillForm(dto)
+    } catch (e) {
+      setErro(errMsg(e))
+    } finally {
+      setLoading(false)
+    }
+  }, [clubeId, fillForm])
+
+  useEffect(() => { carregar() }, [carregar])
+
+  function change(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
+    const { name, value } = e.target
+    if (name === 'cnpj') { setForm(p => ({ ...p, cnpj: maskCNPJ(value) })); return }
+    if (name === 'representanteTelefone') { setForm(p => ({ ...p, representanteTelefone: maskPhone(value) })); return }
+    setForm(p => ({ ...p, [name]: value }))
+  }
+
+  async function salvar() {
+    if (!clubeId) return
+    setSaving(true); setErro('')
+    try {
+      await apiPut(`/api/clubes/${clubeId}`, form)
+      setEditing(false)
+      await carregar()
+    } catch (e) {
+      setErro(errMsg(e))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function cancelar() {
+    if (clube) fillForm(clube)
+    setEditing(false); setErro('')
+  }
+
+  const Info = ({ label, value }: { label: string; value: string }) => (
+    <div>
+      <p className="font-body text-gray-soft text-xs uppercase tracking-wider mb-0.5">{label}</p>
+      <p className="font-body text-fht-white text-sm">{value || '—'}</p>
+    </div>
+  )
+
+  if (!clubeId) {
+    return (
+      <div>
+        <h2 className="font-display text-fht-white text-3xl mb-6">MEUS DADOS</h2>
+        <div className="flex items-center gap-3 bg-yellow-500/10 border border-yellow-500/30 rounded-xl px-5 py-4">
+          <AlertCircle size={18} className="text-yellow-400 flex-shrink-0" />
+          <p className="font-body text-yellow-400 text-sm">Sua conta não está vinculada a nenhum clube. Contate a FHT.</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div>
+        <h2 className="font-display text-fht-white text-3xl mb-6">MEUS DADOS</h2>
+        <div className="flex items-center justify-center py-32">
+          <div className="w-8 h-8 border-2 border-gold border-t-transparent rounded-full animate-spin" />
+        </div>
+      </div>
+    )
+  }
+
+  const hasUrl = (u: string | null | undefined): u is string => !!u && u !== '#'
+  const docs = [
+    { label: 'Ata de fundação', url: clube?.ataFundacaoUrl },
+    { label: 'Estatuto social', url: clube?.estatutoUrl },
+  ]
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="font-display text-fht-white text-3xl">MEUS DADOS</h2>
+        {clube && (
+          <span className={`font-body text-xs px-2.5 py-1 rounded-full border ${clubeStatusBadge[clube.status]}`}>
+            {clubeStatusLabel[clube.status]}
+          </span>
+        )}
+      </div>
+
+      {erro && (
+        <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 mb-6">
+          <AlertCircle size={16} className="text-red-400 flex-shrink-0" />
+          <p className="font-body text-red-400 text-sm">{erro}</p>
+        </div>
+      )}
+
+      {editing ? (
+        <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-6 flex flex-col gap-4">
+          <div>
+            <span className={lbl}>Nome do clube</span>
+            <input name="nome" value={form.nome} onChange={change} className={inp} />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div><span className={lbl}>Sigla</span><input name="sigla" value={form.sigla} onChange={change} placeholder="PHC" className={inp} /></div>
+            <div><span className={lbl}>CNPJ</span><input name="cnpj" value={form.cnpj} onChange={change} placeholder="00.000.000/0000-00" className={inp} /></div>
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="col-span-2"><span className={lbl}>Cidade</span><input name="cidade" value={form.cidade} onChange={change} className={inp} /></div>
+            <div>
+              <span className={lbl}>UF</span>
+              <select name="uf" value={form.uf} onChange={change} className={sel}>
+                {UFS.map(u => <option key={u} value={u}>{u}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div className="h-px bg-federation/20 my-1" />
+          <p className="font-display text-gold text-xs tracking-widest">REPRESENTANTE LEGAL</p>
+          <div><span className={lbl}>Nome do representante</span><input name="representanteNome" value={form.representanteNome} onChange={change} className={inp} /></div>
+          <div className="grid grid-cols-2 gap-4">
+            <div><span className={lbl}>E-mail</span><input name="representanteEmail" value={form.representanteEmail} onChange={change} className={inp} /></div>
+            <div><span className={lbl}>Telefone</span><input name="representanteTelefone" value={form.representanteTelefone} onChange={change} placeholder="(63) 99999-9999" className={inp} /></div>
+          </div>
+          <p className="font-body text-gray-soft/60 text-xs">Status e documentos não são editáveis aqui — fale com a FHT.</p>
+
+          <div className="flex flex-wrap gap-3 pt-2">
+            <button onClick={salvar} disabled={saving}
+              className="flex items-center gap-2 font-display text-night bg-gold hover:bg-gold-light px-6 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250 disabled:opacity-50">
+              <Save size={16} /> {saving ? 'SALVANDO...' : 'SALVAR'}
+            </button>
+            <button onClick={cancelar} disabled={saving}
+              className="font-display text-gray-soft border border-federation/30 hover:border-federation/60 px-6 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250">
+              CANCELAR
+            </button>
+          </div>
+        </div>
+      ) : clube && (
+        <div className="flex flex-col gap-4">
+          <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Building2 size={16} className="text-gold" />
+              <p className="font-display text-gold text-xs tracking-widest">IDENTIFICAÇÃO</p>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <Info label="Nome" value={clube.nome} />
+              <Info label="Sigla" value={clube.sigla ?? ''} />
+              <Info label="CNPJ" value={clube.cnpj ?? ''} />
+              <Info label="Cidade / UF" value={`${clube.cidade} / ${clube.uf}`} />
+            </div>
+          </div>
+
+          <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Users size={16} className="text-gold" />
+              <p className="font-display text-gold text-xs tracking-widest">REPRESENTANTE LEGAL</p>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <Info label="Nome" value={clube.representanteNome} />
+              <Info label="E-mail" value={clube.representanteEmail} />
+              <Info label="Telefone" value={clube.representanteTelefone} />
+            </div>
+          </div>
+
+          <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <FileText size={16} className="text-gold" />
+              <p className="font-display text-gold text-xs tracking-widest">DOCUMENTOS</p>
+            </div>
+            <div className="flex flex-col gap-2">
+              {docs.map(({ label, url }) => hasUrl(url) ? (
+                <a key={label} href={url} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center justify-between px-4 py-3 bg-federation/10 border border-federation/20 rounded-lg hover:border-gold/40 transition-colors duration-200">
+                  <span className="font-body text-fht-white text-sm">{label}</span>
+                  <span className="font-body text-gray-soft text-xs">Abrir →</span>
+                </a>
+              ) : (
+                <div key={label} className="flex items-center justify-between px-4 py-3 bg-federation/5 border border-federation/10 rounded-lg opacity-60">
+                  <span className="font-body text-gray-soft text-sm">{label}</span>
+                  <span className="font-body text-gray-soft text-xs">não enviado</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <button onClick={() => setEditing(true)}
+            className="self-start flex items-center gap-2 font-display text-night bg-gold hover:bg-gold-light px-6 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250">
+            <Edit3 size={16} /> EDITAR DADOS
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ── Inscrições (MOCK navegável — escala atletas REAIS) ──── */
+interface CompeticaoMock {
+  id: string
+  nome: string
+  categorias: string
+  periodo: string
+  local: string
+  vagas: number
+}
+
+const COMPETICOES_MOCK: CompeticaoMock[] = [
+  { id: 'c1', nome: 'Campeonato Tocantinense de Handebol', categorias: 'Adulto Masc./Fem.', periodo: '10 – 24 de agosto de 2026', local: 'Palmas — TO', vagas: 16 },
+  { id: 'c2', nome: 'Copa TO Sub-18', categorias: 'Sub-18', periodo: '05 – 12 de setembro de 2026', local: 'Araguaína — TO', vagas: 14 },
+  { id: 'c3', nome: 'Taça das Categorias de Base', categorias: 'Sub-14 / Sub-16', periodo: '01 – 15 de outubro de 2026', local: 'Gurupi — TO', vagas: 20 },
+  { id: 'c4', nome: 'Liga Escolar de Handebol', categorias: 'Sub-12 / Sub-14', periodo: '20/out – 03/nov de 2026', local: 'Porto Nacional — TO', vagas: 14 },
+]
+
+function EscalacaoModal({ competicao, ativos, onClose, onConfirm }: {
+  competicao: CompeticaoMock
+  ativos: AtletaDTO[]
+  onClose: () => void
+  onConfirm: (compId: string, ids: string[]) => void
+}) {
+  const [selected, setSelected] = useState<string[]>([])
+
+  function toggle(id: string) {
+    setSelected(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id])
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex" onClick={onClose}>
+      <div className="flex-1 backdrop-blur-sm" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }} />
+      <div className="w-full max-w-lg h-full bg-[#0a1628] border-l border-federation/20 overflow-y-auto flex flex-col"
+        onClick={e => e.stopPropagation()}>
+
+        <div className="flex items-start justify-between p-6 border-b border-federation/20 sticky top-0 bg-[#0a1628] z-10">
+          <div>
+            <p className="font-display text-gold text-xs tracking-widest mb-1">ESCALAR EQUIPE</p>
+            <h2 className="font-display text-fht-white text-xl leading-tight">{competicao.nome}</h2>
+            <p className="font-body text-gray-soft text-sm">{competicao.categorias}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-soft hover:text-gold transition-colors duration-250 mt-1">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="flex-1 p-6">
+          {ativos.length === 0 ? (
+            <div className="flex items-center gap-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg px-4 py-3">
+              <AlertCircle size={16} className="text-yellow-400 flex-shrink-0" />
+              <p className="font-body text-yellow-400 text-sm">Cadastre e ative atletas antes de escalar sua equipe.</p>
+            </div>
+          ) : (
+            <>
+              <p className="font-body text-gray-soft text-xs mb-3">Selecione os atletas que vão representar o clube.</p>
+              <div className="flex flex-col gap-2">
+                {ativos.map(a => {
+                  const on = selected.includes(a.id)
+                  return (
+                    <button key={a.id} type="button" onClick={() => toggle(a.id)}
+                      className={`flex items-center justify-between gap-3 px-4 py-3 rounded-lg border text-left transition-colors duration-200 ${
+                        on ? 'border-gold/50 bg-gold/10' : 'border-federation/20 bg-federation/5 hover:border-federation/40'
+                      }`}>
+                      <div>
+                        <p className="font-body text-fht-white text-sm">{a.nomeCompleto}</p>
+                        <p className="font-body text-gray-soft text-xs">{a.posicao} · {a.categoria}</p>
+                      </div>
+                      <span className={`w-5 h-5 rounded-md border flex items-center justify-center flex-shrink-0 ${
+                        on ? 'bg-gold border-gold' : 'border-federation/40'
+                      }`}>
+                        {on && <Check size={14} className="text-night" />}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="sticky bottom-0 bg-[#0a1628] border-t border-federation/20 p-5 flex items-center gap-3">
+          <span className="font-body text-gray-soft text-sm mr-auto">{selected.length} selecionado(s)</span>
+          <button onClick={onClose}
+            className="font-display text-gray-soft border border-federation/30 hover:border-federation/60 px-5 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250">
+            CANCELAR
+          </button>
+          <button onClick={() => onConfirm(competicao.id, selected)} disabled={selected.length === 0}
+            className="font-display text-night bg-gold hover:bg-gold-light px-6 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250 disabled:opacity-40 disabled:cursor-not-allowed">
+            CONFIRMAR INSCRIÇÃO
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function InscricoesPage({ atletas }: { atletas: AtletaDTO[] }) {
+  const ativos = atletas.filter(a => a.status === 'ATIVO')
+  const [inscricoes, setInscricoes] = useState<Record<string, string[]>>({})
+  const [escalando, setEscalando] = useState<CompeticaoMock | null>(null)
+
+  const abertas = COMPETICOES_MOCK.filter(c => !inscricoes[c.id])
+  const minhas = COMPETICOES_MOCK.filter(c => inscricoes[c.id])
+  const semAtivos = ativos.length === 0
+
+  function confirmar(compId: string, ids: string[]) {
+    setInscricoes(p => ({ ...p, [compId]: ids }))
+    setEscalando(null)
+  }
+
+  return (
+    <div>
+      <div className="flex items-center gap-3 mb-6">
+        <h2 className="font-display text-fht-white text-3xl">INSCRIÇÕES</h2>
+        <span className="font-body text-[10px] text-gray-soft/60 border border-federation/20 rounded-full px-2 py-0.5">demonstração</span>
+      </div>
+
+      {semAtivos && (
+        <div className="flex items-center gap-3 bg-yellow-500/10 border border-yellow-500/30 rounded-xl px-5 py-4 mb-6">
+          <AlertCircle size={18} className="text-yellow-400 flex-shrink-0" />
+          <p className="font-body text-yellow-400 text-sm">Cadastre e ative atletas antes de escalar sua equipe nas competições.</p>
+        </div>
+      )}
+
+      <p className="font-display text-gold text-xs tracking-widest mb-4">COMPETIÇÕES COM INSCRIÇÕES ABERTAS</p>
+      {abertas.length === 0 ? (
+        <p className="font-body text-gray-soft text-sm mb-10">Você já se inscreveu em todas as competições disponíveis.</p>
+      ) : (
+        <div className="grid md:grid-cols-2 gap-4 mb-10">
+          {abertas.map(c => (
+            <div key={c.id} className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-5 flex flex-col">
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div className="flex items-center gap-2">
+                  <Trophy size={18} className="text-gold flex-shrink-0" />
+                  <h3 className="font-display text-fht-white text-lg leading-tight">{c.nome}</h3>
+                </div>
+                <span className="font-body text-[10px] text-gray-soft/60 border border-federation/20 rounded-full px-2 py-0.5 flex-shrink-0">demonstração</span>
+              </div>
+              <div className="flex flex-col gap-2 mb-5">
+                <div className="flex items-center gap-2 font-body text-gray-soft text-sm"><Users size={14} className="text-federation flex-shrink-0" /> {c.categorias}</div>
+                <div className="flex items-center gap-2 font-body text-gray-soft text-sm"><Calendar size={14} className="text-federation flex-shrink-0" /> {c.periodo}</div>
+                <div className="flex items-center gap-2 font-body text-gray-soft text-sm"><MapPin size={14} className="text-federation flex-shrink-0" /> {c.local}</div>
+                <div className="flex items-center gap-2 font-body text-gray-soft text-sm"><Trophy size={14} className="text-federation flex-shrink-0" /> {c.vagas} vagas por equipe</div>
+              </div>
+              <button onClick={() => setEscalando(c)} disabled={semAtivos}
+                className="mt-auto font-display text-night bg-gold hover:bg-gold-light px-5 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250 disabled:opacity-40 disabled:cursor-not-allowed">
+                INSCREVER EQUIPE
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <p className="font-display text-gold text-xs tracking-widest mb-4">MINHAS INSCRIÇÕES</p>
+      {minhas.length === 0 ? (
+        <div className="bg-[#0d1b2a]/40 border border-federation/20 rounded-xl px-5 py-8 text-center">
+          <p className="font-body text-gray-soft text-sm">Nenhuma inscrição ainda. Inscreva sua equipe nas competições acima.</p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {minhas.map(c => (
+            <div key={c.id} className="bg-[#0d1b2a]/60 border border-green-500/20 rounded-xl p-5 flex items-center justify-between gap-4">
+              <div>
+                <h3 className="font-display text-fht-white text-lg leading-tight">{c.nome}</h3>
+                <p className="font-body text-gray-soft text-sm mt-1">{c.periodo} · {c.local}</p>
+                <p className="font-body text-gray-soft text-xs mt-1">{inscricoes[c.id].length} atleta(s) escalado(s)</p>
+              </div>
+              <span className="flex items-center gap-1.5 font-body text-xs px-2.5 py-1 rounded-full border text-green-400 bg-green-500/10 border-green-500/30 flex-shrink-0">
+                <Check size={13} /> Inscrito
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {escalando && (
+        <EscalacaoModal
+          competicao={escalando}
+          ativos={ativos}
+          onClose={() => setEscalando(null)}
+          onConfirm={confirmar}
+        />
+      )}
+    </div>
+  )
+}
+
 /* ── Sidebar ─────────────────────────────────────────────── */
 const NAV = [
   { id: 'dashboard', label: 'Dashboard',        Icon: Home,     disabled: false },
   { id: 'atletas',   label: 'Meus Atletas',     Icon: Users,    disabled: false },
   { id: 'cadastrar', label: 'Cadastrar Atleta', Icon: UserPlus, disabled: false },
-  { id: 'inscricoes',label: 'Inscrições',        Icon: Trophy,   disabled: true },
-  { id: 'dados',     label: 'Meus Dados',        Icon: Settings, disabled: true },
+  { id: 'inscricoes',label: 'Inscrições',        Icon: Trophy,   disabled: false },
+  { id: 'dados',     label: 'Meus Dados',        Icon: Settings, disabled: false },
 ] as const
 
 /* ── Main ────────────────────────────────────────────────── */
@@ -856,6 +1277,8 @@ export default function ClubeDashboard() {
               {page === 'dashboard' && <DashboardPage atletas={atletas} />}
               {page === 'atletas' && <AtletasPage atletas={atletas} onCadastrar={() => setPage('cadastrar')} onVer={setAtletaDetalhe} />}
               {page === 'cadastrar' && <CadastrarAtletaPage onSuccess={handleAtletaSuccess} />}
+              {page === 'inscricoes' && <InscricoesPage atletas={atletas} />}
+              {page === 'dados' && <MeusDadosPage />}
             </>
           )}
 

@@ -539,10 +539,35 @@ function ColunaFase({ titulo, confrontos }: { titulo: string; confrontos: Confro
   );
 }
 
-function SetaFase() {
+function Conector({ nEsquerda }: { nEsquerda: number }) {
+  // Final → Campeão: uma haste reta, centralizada verticalmente.
+  if (nEsquerda <= 1) {
+    return (
+      <div className="flex items-center px-1">
+        <span className="h-0.5 w-8 bg-federation/40" />
+      </div>
+    );
+  }
+
+  // Cada par de confrontos da fase da esquerda vira 1 colchete ")".
+  const colchetes = Math.floor(nEsquerda / 2);
   return (
-    <div className="flex items-center px-1">
-      <ChevronRight size={22} className="text-federation/40" />
+    <div className="flex flex-col px-1">
+      {/* espaçador com a mesma altura do título das colunas, pra alinhar com o 1º confronto */}
+      <p className="font-display text-xs tracking-widest mb-4 invisible" aria-hidden="true">
+        .
+      </p>
+      <div className="flex-1 flex flex-col justify-around gap-5">
+        {Array.from({ length: colchetes }, (_, i) => (
+          <div key={i} className="flex-1 flex items-center">
+            <span className="w-6 self-stretch flex flex-col">
+              <span className="flex-1 border-r-2 border-b-2 border-federation/35 rounded-br-xl" />
+              <span className="flex-1 border-r-2 border-t-2 border-federation/35 rounded-tr-xl" />
+            </span>
+            <span className="h-0.5 w-3 bg-federation/35" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -582,11 +607,11 @@ function ChaveamentoTab({ bracket }: { bracket: Bracket }) {
       <div className="overflow-x-auto pb-4">
         <div className="flex items-stretch gap-3 min-w-max min-h-[540px]">
           <ColunaFase titulo="QUARTAS DE FINAL" confrontos={bracket.quartas} />
-          <SetaFase />
+          <Conector nEsquerda={bracket.quartas.length} />
           <ColunaFase titulo="SEMIFINAIS" confrontos={bracket.semis} />
-          <SetaFase />
+          <Conector nEsquerda={bracket.semis.length} />
           <ColunaFase titulo="FINAL" confrontos={[bracket.final]} />
-          <SetaFase />
+          <Conector nEsquerda={1} />
           <CampeaoCard sigla={bracket.campeao} />
         </div>
       </div>

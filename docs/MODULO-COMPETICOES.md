@@ -116,6 +116,11 @@ Organizado em **abas**:
   artilheiros** de cada time, de forma organizada (não só uma linha solta).
 - ⚙️ **UX pra diretores (público mais velho):** o painel todo deve ser **grande, claro e organizado** —
   tipografia legível, bom espaçamento, botões óbvios, pouca densidade. Priorizar clareza sobre "denso".
+- **Ações de ciclo de vida (no header do painel, sem precisar editar):** transições de estado da
+  competição direto no painel, conforme o status atual — **Abrir inscrições** (em-breve →
+  inscrições-abertas), **Encerrar inscrições e iniciar campeonato** (inscrições-abertas → em-andamento),
+  **Encerrar campeonato** (em-andamento → encerrado) e **Adiar** (→ adiado, com opção de **Retomar**).
+  Encerrar pede confirmação. Amarra com §7 (status pode ser mudado manualmente por essas ações).
 - **Progressão:** marcar quem **avançou / foi eliminado** → reflete no chaveamento.
 
 É a estrela do módulo — atualização manual, sensação de tempo real (§3.2).

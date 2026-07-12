@@ -19,12 +19,15 @@ import {
   Play,
   Eye,
   IdCard,
+  Flag,
+  RotateCcw,
+  TriangleAlert,
 } from 'lucide-react';
 
 // ————————————————————————————————————————————————————————————
 // Tipos
 // ————————————————————————————————————————————————————————————
-type CompStatus = 'em-andamento' | 'inscricoes-abertas' | 'em-breve' | 'encerrado';
+type CompStatus = 'em-andamento' | 'inscricoes-abertas' | 'em-breve' | 'encerrado' | 'adiado';
 type FiltroStatus = CompStatus | 'todos';
 type PainelAba = 'chaveamento' | 'equipes' | 'checkin' | 'jogos';
 type Posicao = 'Goleiro' | 'Ponta' | 'Armador' | 'Pivô' | 'Central';
@@ -120,6 +123,7 @@ const STATUS_META: Record<CompStatus, { label: string; badge: string }> = {
   'inscricoes-abertas': { label: 'Inscrições abertas', badge: 'text-gold bg-gold/10 border-gold/30' },
   'em-breve': { label: 'Em breve', badge: 'text-blue-300 bg-blue-mid/10 border-blue-400/30' },
   encerrado: { label: 'Encerrado', badge: 'text-gray-soft bg-gray-soft/10 border-gray-soft/30' },
+  adiado: { label: 'Adiado', badge: 'text-orange-400 bg-orange-500/10 border-orange-500/30' },
 };
 
 const FILTROS: { valor: FiltroStatus; label: string }[] = [
@@ -127,6 +131,7 @@ const FILTROS: { valor: FiltroStatus; label: string }[] = [
   { valor: 'em-andamento', label: 'Em andamento' },
   { valor: 'inscricoes-abertas', label: 'Inscrições abertas' },
   { valor: 'em-breve', label: 'Em breve' },
+  { valor: 'adiado', label: 'Adiado' },
   { valor: 'encerrado', label: 'Encerrado' },
 ];
 
@@ -1330,8 +1335,15 @@ function PainelFullscreen({
   onEditar: () => void;
 }) {
   const [aba, setAba] = useState<PainelAba>('chaveamento');
+  const [status, setStatus] = useState<CompStatus>(comp.status);
+  const [confirmarEncerrar, setConfirmarEncerrar] = useState<boolean>(false);
   const dados = comp.dados ?? null;
   const elencos: Elenco[] = dados ? dados.elencos : comp.equipes.map((e) => ({ ...e, atletas: [] }));
+
+  const btnPrimario =
+    'font-display text-night bg-gold hover:bg-gold-light px-5 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250 flex items-center gap-2';
+  const btnSecundario =
+    'font-display text-gray-soft border border-federation/30 hover:border-federation/60 px-5 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250 flex items-center gap-2';
 
   const abas: { valor: PainelAba; label: string; icon: ReactNode }[] = [
     { valor: 'chaveamento', label: 'CHAVEAMENTO', icon: <Trophy size={15} /> },
@@ -1347,7 +1359,7 @@ function PainelFullscreen({
         <div className="flex flex-col gap-2 min-w-0">
           <div className="flex items-center gap-3 flex-wrap">
             <Trophy size={20} className="text-gold shrink-0" />
-            <StatusBadge status={comp.status} />
+            <StatusBadge status={status} />
             {SELO_DEMO}
           </div>
           <h2 className="font-display text-fht-white text-2xl lg:text-3xl tracking-wide leading-none">{comp.nome}</h2>
@@ -1362,7 +1374,39 @@ function PainelFullscreen({
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+          {/* Ações de ciclo de vida — variam conforme o status atual */}
+          {status === 'em-breve' && (
+            <button onClick={() => setStatus('inscricoes-abertas')} className={btnPrimario}>
+              <Flag size={16} />
+              Abrir inscrições
+            </button>
+          )}
+          {status === 'inscricoes-abertas' && (
+            <button onClick={() => setStatus('em-andamento')} className={btnPrimario}>
+              <Play size={16} />
+              Encerrar inscrições e iniciar campeonato
+            </button>
+          )}
+          {status === 'em-andamento' && (
+            <button onClick={() => setConfirmarEncerrar(true)} className={btnPrimario}>
+              <CircleCheck size={16} />
+              Encerrar campeonato
+            </button>
+          )}
+          {status === 'adiado' && (
+            <button onClick={() => setStatus('em-andamento')} className={btnPrimario}>
+              <RotateCcw size={16} />
+              Retomar
+            </button>
+          )}
+          {status !== 'encerrado' && status !== 'adiado' && (
+            <button onClick={() => setStatus('adiado')} className={btnSecundario}>
+              <Clock size={16} />
+              Adiar
+            </button>
+          )}
+
           <button
             onClick={onEditar}
             className="font-display text-night bg-gold hover:bg-gold-light px-5 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250 hidden sm:flex items-center gap-2"
@@ -1417,6 +1461,47 @@ function PainelFullscreen({
         )}
         {aba === 'jogos' && <JogosTab jogosIniciais={dados ? dados.jogos : []} />}
       </div>
+
+      {/* Confirmação — encerrar campeonato */}
+      {confirmarEncerrar && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+          style={{ backgroundColor: 'rgba(0,0,0,0.78)' }}
+          onClick={() => setConfirmarEncerrar(false)}
+        >
+          <div
+            className="bg-[#0a1628] border border-federation/30 rounded-2xl w-full max-w-sm shadow-2xl p-6 flex flex-col gap-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3">
+              <span className="w-11 h-11 rounded-xl bg-orange-500/10 border border-orange-500/30 flex items-center justify-center shrink-0">
+                <TriangleAlert size={20} className="text-orange-400" />
+              </span>
+              <h3 className="font-display text-fht-white text-xl tracking-wide leading-tight">
+                ENCERRAR O CAMPEONATO?
+              </h3>
+            </div>
+            <p className="font-body text-gray-soft text-sm">
+              Esta ação finaliza a competição. O campeonato passa a “Encerrado” e os resultados ficam registrados.
+            </p>
+            <div className="flex justify-end gap-3 pt-1">
+              <button onClick={() => setConfirmarEncerrar(false)} className={btnSecundario}>
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  setStatus('encerrado');
+                  setConfirmarEncerrar(false);
+                }}
+                className={btnPrimario}
+              >
+                <CircleCheck size={16} />
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

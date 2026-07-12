@@ -17,6 +17,8 @@ import {
   UserCheck,
   CircleCheck,
   Play,
+  Eye,
+  IdCard,
 } from 'lucide-react';
 
 // ————————————————————————————————————————————————————————————
@@ -65,18 +67,29 @@ interface CheckinAtleta {
   nome: string;
   sigla: string;
   posicao: Posicao;
+  categoria: string;
+  cpf: string;
+  rg: string;
+  nascimento: string;
   presente: boolean;
+}
+
+interface Goleador {
+  nome: string;
+  gols: number;
 }
 
 interface Jogo {
   id: number;
+  fase: string;
   mandante: string;
   visitante: string;
   placarM: number | null;
   placarV: number | null;
   horario: string;
   status: JogoStatus;
-  destaque?: string;
+  golsMandante: Goleador[];
+  golsVisitante: Goleador[];
 }
 
 interface DadosOperacionais {
@@ -84,6 +97,7 @@ interface DadosOperacionais {
   elencos: Elenco[];
   checkin: CheckinAtleta[];
   jogos: Jogo[];
+  dataDia: string;
 }
 
 interface Competicao {
@@ -183,13 +197,41 @@ const ELENCOS: Elenco[] = [
   montarElenco('PAR', 45, 5),
 ];
 
+// Documentos fictícios determinísticos (sem random) para as credenciais
+function pad(num: number, len: number): string {
+  return String(Math.abs(num)).padStart(len, '0').slice(-len);
+}
+
+function credencialMock(seed: number): { cpf: string; rg: string; nascimento: string } {
+  const cpf = `${pad(seed * 3 + 137, 3)}.${pad(seed * 7 + 241, 3)}.${pad(seed * 11 + 356, 3)}-${pad(
+    seed * 13 + 10,
+    2,
+  )}`;
+  const rgN = pad(seed * 17 + 10234567, 8);
+  const rg = `${rgN.slice(0, 2)}.${rgN.slice(2, 5)}.${rgN.slice(5, 8)}-${pad(seed % 10, 1)}`;
+  const nascimento = `${pad(((seed * 5) % 27) + 1, 2)}/${pad(((seed * 3) % 12) + 1, 2)}/${1990 + (seed % 15)}`;
+  return { cpf, rg, nascimento };
+}
+
+// Check-in do DIA: todos os atletas escalados de todos os clubes participantes.
 function montarCheckin(siglas: string[]): CheckinAtleta[] {
   const lista: CheckinAtleta[] = [];
   let n = 0;
   ELENCOS.filter((e) => siglas.includes(e.sigla)).forEach((e) => {
     e.atletas.forEach((a) => {
       n += 1;
-      lista.push({ id: a.id, nome: a.nome, sigla: e.sigla, posicao: a.posicao, presente: n % 3 === 0 });
+      const cred = credencialMock(n);
+      lista.push({
+        id: a.id,
+        nome: a.nome,
+        sigla: e.sigla,
+        posicao: a.posicao,
+        categoria: a.categoria,
+        cpf: cred.cpf,
+        rg: cred.rg,
+        nascimento: cred.nascimento,
+        presente: n % 3 === 0,
+      });
     });
   });
   return lista;
@@ -224,56 +266,128 @@ const BRACKET_ENCERRADO: Bracket = {
 
 const JOGOS_ESTADUAL: Jogo[] = [
   {
-    id: 1, mandante: 'PLM', visitante: 'GUR', placarM: 29, placarV: 26,
-    horario: 'Semifinal — ontem, 19h00', status: 'Encerrado',
-    destaque: 'Artilheiro: Lucas Andrade (PLM) · 9 gols',
+    id: 1, fase: 'Semifinal', mandante: 'PLM', visitante: 'GUR', placarM: 29, placarV: 26,
+    horario: 'Ontem · 19h00', status: 'Encerrado',
+    golsMandante: [
+      { nome: 'Lucas Andrade', gols: 9 },
+      { nome: 'Gabriel Nunes', gols: 7 },
+      { nome: 'Matheus Rocha', gols: 6 },
+      { nome: 'Pedro Henrique Lima', gols: 4 },
+      { nome: 'Rafael Carvalho', gols: 3 },
+    ],
+    golsVisitante: [
+      { nome: 'Igor Nascimento', gols: 8 },
+      { nome: 'Rodrigo Campos', gols: 7 },
+      { nome: 'Marcelo Duarte', gols: 6 },
+      { nome: 'Henrique Gomes', gols: 5 },
+    ],
   },
   {
-    id: 2, mandante: 'ARA', visitante: 'PNH', placarM: 24, placarV: 27,
-    horario: 'Semifinal — ontem, 21h00', status: 'Encerrado',
-    destaque: 'Artilheiro: Renan Azevedo (PNH) · 8 gols',
+    id: 2, fase: 'Semifinal', mandante: 'ARA', visitante: 'PNH', placarM: 24, placarV: 27,
+    horario: 'Ontem · 21h00', status: 'Encerrado',
+    golsMandante: [
+      { nome: 'Felipe Moraes', gols: 8 },
+      { nome: 'Thiago Barbosa', gols: 7 },
+      { nome: 'Vinícius Cardoso', gols: 5 },
+      { nome: 'Diego Fernandes', gols: 4 },
+    ],
+    golsVisitante: [
+      { nome: 'Renan Azevedo', gols: 8 },
+      { nome: 'Eduardo Ramos', gols: 7 },
+      { nome: 'Fábio Correia', gols: 6 },
+      { nome: 'Wesley Oliveira', gols: 6 },
+    ],
   },
   {
-    id: 3, mandante: 'ARA', visitante: 'GUR', placarM: null, placarV: null,
-    horario: 'Disputa de 3º lugar — hoje, 17h00', status: 'Agendado',
+    id: 3, fase: 'Disputa de 3º lugar', mandante: 'ARA', visitante: 'GUR', placarM: null, placarV: null,
+    horario: 'Hoje · 17h00', status: 'Agendado',
+    golsMandante: [], golsVisitante: [],
   },
   {
-    id: 4, mandante: 'PLM', visitante: 'PNH', placarM: 18, placarV: 16,
-    horario: 'FINAL — hoje, 19h30', status: 'Em andamento',
-    destaque: '2º tempo em andamento · ginásio lotado',
+    id: 4, fase: 'Final', mandante: 'PLM', visitante: 'PNH', placarM: 18, placarV: 16,
+    horario: 'Hoje · 19h30', status: 'Em andamento',
+    golsMandante: [
+      { nome: 'Lucas Andrade', gols: 6 },
+      { nome: 'Gabriel Nunes', gols: 5 },
+      { nome: 'Matheus Rocha', gols: 4 },
+      { nome: 'Pedro Henrique Lima', gols: 3 },
+    ],
+    golsVisitante: [
+      { nome: 'Renan Azevedo', gols: 5 },
+      { nome: 'Eduardo Ramos', gols: 4 },
+      { nome: 'Fábio Correia', gols: 4 },
+      { nome: 'Wesley Oliveira', gols: 3 },
+    ],
   },
 ];
 
 const JOGOS_LIGA_2024: Jogo[] = [
   {
-    id: 1, mandante: 'PLM', visitante: 'GUR', placarM: 29, placarV: 26,
-    horario: 'Semifinal — 08 de jun. de 2024', status: 'Encerrado',
-    destaque: 'Artilheiro: Lucas Andrade (PLM) · 10 gols',
+    id: 1, fase: 'Semifinal', mandante: 'PLM', visitante: 'GUR', placarM: 29, placarV: 26,
+    horario: '08 de jun. de 2024', status: 'Encerrado',
+    golsMandante: [
+      { nome: 'Lucas Andrade', gols: 10 },
+      { nome: 'Gabriel Nunes', gols: 7 },
+      { nome: 'Matheus Rocha', gols: 6 },
+      { nome: 'Pedro Henrique Lima', gols: 6 },
+    ],
+    golsVisitante: [
+      { nome: 'Igor Nascimento', gols: 9 },
+      { nome: 'Rodrigo Campos', gols: 7 },
+      { nome: 'Marcelo Duarte', gols: 6 },
+      { nome: 'Henrique Gomes', gols: 4 },
+    ],
   },
   {
-    id: 2, mandante: 'ARA', visitante: 'PNH', placarM: 24, placarV: 27,
-    horario: 'Semifinal — 08 de jun. de 2024', status: 'Encerrado',
-    destaque: 'Artilheiro: Renan Azevedo (PNH) · 9 gols',
+    id: 2, fase: 'Semifinal', mandante: 'ARA', visitante: 'PNH', placarM: 24, placarV: 27,
+    horario: '08 de jun. de 2024', status: 'Encerrado',
+    golsMandante: [
+      { nome: 'Felipe Moraes', gols: 8 },
+      { nome: 'Thiago Barbosa', gols: 7 },
+      { nome: 'Vinícius Cardoso', gols: 5 },
+      { nome: 'Diego Fernandes', gols: 4 },
+    ],
+    golsVisitante: [
+      { nome: 'Renan Azevedo', gols: 9 },
+      { nome: 'Eduardo Ramos', gols: 8 },
+      { nome: 'Fábio Correia', gols: 6 },
+      { nome: 'Wesley Oliveira', gols: 4 },
+    ],
   },
   {
-    id: 3, mandante: 'PLM', visitante: 'PNH', placarM: 31, placarV: 28,
-    horario: 'FINAL — 15 de jun. de 2024', status: 'Encerrado',
-    destaque: 'Artilheiro: Lucas Andrade (PLM) · 11 gols · MVP da final',
+    id: 3, fase: 'Final', mandante: 'PLM', visitante: 'PNH', placarM: 31, placarV: 28,
+    horario: '15 de jun. de 2024', status: 'Encerrado',
+    golsMandante: [
+      { nome: 'Lucas Andrade', gols: 11 },
+      { nome: 'Gabriel Nunes', gols: 8 },
+      { nome: 'Matheus Rocha', gols: 7 },
+      { nome: 'Pedro Henrique Lima', gols: 5 },
+    ],
+    golsVisitante: [
+      { nome: 'Renan Azevedo', gols: 9 },
+      { nome: 'Eduardo Ramos', gols: 8 },
+      { nome: 'Fábio Correia', gols: 6 },
+      { nome: 'Wesley Oliveira', gols: 5 },
+    ],
   },
 ];
+
+const TODOS_CLUBES = Object.keys(CLUBES);
 
 const DADOS_ESTADUAL: DadosOperacionais = {
   bracket: BRACKET_EM_ANDAMENTO,
   elencos: ELENCOS,
-  checkin: montarCheckin(['PLM', 'PNH']),
+  checkin: montarCheckin(TODOS_CLUBES),
   jogos: JOGOS_ESTADUAL,
+  dataDia: 'Sábado, 12 de julho de 2025',
 };
 
 const DADOS_LIGA_2024: DadosOperacionais = {
   bracket: BRACKET_ENCERRADO,
   elencos: ELENCOS,
-  checkin: montarCheckin(['PLM', 'PNH']).map((c) => ({ ...c, presente: true })),
+  checkin: montarCheckin(TODOS_CLUBES).map((c) => ({ ...c, presente: true })),
   jogos: JOGOS_LIGA_2024,
+  dataDia: 'Domingo, 15 de junho de 2024',
 };
 
 const COMPETICOES: Competicao[] = [
@@ -714,18 +828,135 @@ function ResumoStat({
   icon: ReactNode;
 }) {
   return (
-    <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl px-4 py-3 flex items-center gap-3 flex-1 min-w-[120px]">
+    <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl px-5 py-4 flex items-center gap-4 flex-1 min-w-[140px]">
       <div className={cor}>{icon}</div>
       <div>
-        <p className={`font-display text-2xl leading-none ${cor}`}>{valor}</p>
-        <p className="font-body text-gray-soft text-[11px] uppercase tracking-wider mt-1">{label}</p>
+        <p className={`font-display text-3xl leading-none ${cor}`}>{valor}</p>
+        <p className="font-body text-gray-soft text-xs uppercase tracking-wider mt-1.5">{label}</p>
       </div>
     </div>
   );
 }
 
-function CheckinTab({ atletas }: { atletas: CheckinAtleta[] }) {
+function DadoCred({ label, valor }: { label: string; valor: string }) {
+  return (
+    <div className="bg-[#0d1b2a]/70 border border-federation/20 rounded-lg px-3.5 py-2.5">
+      <p className="font-body text-gray-soft text-[10px] uppercase tracking-widest">{label}</p>
+      <p className="font-body text-fht-white text-sm mt-1">{valor}</p>
+    </div>
+  );
+}
+
+// Credencial do atleta — carteirinha para conferência visual no check-in
+function CredencialModal({
+  atleta,
+  presente,
+  onToggle,
+  onClose,
+}: {
+  atleta: CheckinAtleta;
+  presente: boolean;
+  onToggle: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+      style={{ backgroundColor: 'rgba(0,0,0,0.78)' }}
+      onClick={onClose}
+    >
+      <div
+        className="bg-[#0a1628] border border-federation/30 rounded-2xl w-full max-w-md shadow-2xl max-h-[92vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="p-5 border-b border-federation/20 flex items-center justify-between">
+          <p className="font-display text-gold text-sm tracking-widest flex items-center gap-2">
+            <IdCard size={18} />
+            CREDENCIAL DO ATLETA
+          </p>
+          <button
+            onClick={onClose}
+            aria-label="Fechar credencial"
+            className="text-gray-soft hover:text-fht-white p-1.5 rounded-lg hover:bg-federation/10 transition-colors duration-150"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Corpo — carteirinha */}
+        <div className="p-6 flex flex-col items-center gap-4">
+          {SELO_DEMO}
+          <div className="w-32 h-32 rounded-2xl bg-federation/20 border-2 border-gold/40 flex items-center justify-center font-display text-fht-white text-5xl tracking-wider">
+            {iniciais(atleta.nome)}
+          </div>
+          <div className="text-center">
+            <h3 className="font-display text-fht-white text-2xl tracking-wide leading-tight">{atleta.nome}</h3>
+            <div className="flex items-center justify-center gap-2 mt-2 flex-wrap">
+              <span className="font-body text-gray-soft text-sm">
+                {atleta.sigla} · {nomeClube(atleta.sigla)}
+              </span>
+              <PosicaoTag posicao={atleta.posicao} />
+            </div>
+          </div>
+
+          <span
+            className={`font-body text-xs px-3 py-1 rounded-full border ${
+              presente
+                ? 'text-green-400 bg-green-500/10 border-green-500/30'
+                : 'text-orange-400 bg-orange-500/10 border-orange-500/30'
+            }`}
+          >
+            {presente ? 'Presença confirmada' : 'Aguardando check-in'}
+          </span>
+
+          <div className="w-full grid grid-cols-2 gap-3 mt-1">
+            <DadoCred label="CPF" valor={atleta.cpf} />
+            <DadoCred label="RG" valor={atleta.rg} />
+            <DadoCred label="Nascimento" valor={atleta.nascimento} />
+            <DadoCred label="Categoria" valor={atleta.categoria} />
+            <DadoCred label="Posição" valor={atleta.posicao} />
+            <DadoCred label="Clube" valor={nomeClube(atleta.sigla)} />
+          </div>
+        </div>
+
+        {/* Footer — conferência visual */}
+        <div className="p-5 border-t border-federation/20 flex flex-col sm:flex-row items-center gap-3">
+          <button
+            onClick={onToggle}
+            className={`font-display tracking-wider px-5 py-3 rounded-lg text-sm w-full sm:flex-1 flex items-center justify-center gap-2 transition-colors duration-250 ${
+              presente
+                ? 'text-green-400 bg-green-500/10 border border-green-500/40 hover:bg-green-500/20'
+                : 'text-night bg-gold hover:bg-gold-light'
+            }`}
+          >
+            {presente ? (
+              <>
+                <CircleCheck size={18} />
+                Presente — desfazer
+              </>
+            ) : (
+              <>
+                <UserCheck size={18} />
+                Confirmar presença
+              </>
+            )}
+          </button>
+          <button
+            onClick={onClose}
+            className="font-display text-gray-soft border border-federation/30 hover:border-federation/60 px-5 py-3 rounded-lg text-sm tracking-wider transition-colors duration-250 w-full sm:w-auto"
+          >
+            Fechar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CheckinTab({ atletas, local, dia }: { atletas: CheckinAtleta[]; local: string; dia: string }) {
   const [busca, setBusca] = useState<string>('');
+  const [credencial, setCredencial] = useState<CheckinAtleta | null>(null);
   const [presentes, setPresentes] = useState<Record<number, boolean>>(() => {
     const inicial: Record<number, boolean> = {};
     atletas.forEach((a) => {
@@ -738,7 +969,7 @@ function CheckinTab({ atletas }: { atletas: CheckinAtleta[] }) {
     return (
       <EmptyTab
         icon={<UserCheck size={32} className="text-gray-soft/50" />}
-        texto="O check-in fica disponível quando houver escalação para a rodada."
+        texto="O check-in do dia fica disponível quando houver atletas escalados para a competição."
       />
     );
   }
@@ -761,85 +992,135 @@ function CheckinTab({ atletas }: { atletas: CheckinAtleta[] }) {
   const toggle = (id: number) => setPresentes((p) => ({ ...p, [id]: !p[id] }));
 
   return (
-    <div className="flex flex-col gap-5">
-      <SecaoTitulo icon={<UserCheck size={14} />}>CHECK-IN DA RODADA · PLM x PNH (FINAL)</SecaoTitulo>
+    <div className="flex flex-col gap-6">
+      {/* Cabeçalho do dia */}
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h3 className="font-display text-fht-white text-2xl tracking-wide flex items-center gap-2">
+            <UserCheck size={22} className="text-gold" />
+            CHECK-IN DO DIA
+          </h3>
+          <div className="flex items-center gap-4 flex-wrap mt-2">
+            <span className="font-body text-gray-soft text-sm flex items-center gap-1.5">
+              <Calendar size={14} className="text-gold" />
+              {dia}
+            </span>
+            <span className="font-body text-gray-soft text-sm flex items-center gap-1.5">
+              <MapPin size={14} className="text-gold" />
+              {local}
+            </span>
+          </div>
+        </div>
+        {SELO_DEMO}
+      </div>
 
-      {/* Resumo */}
+      <p className="font-body text-gray-soft text-sm -mt-2 max-w-2xl">
+        Conferência visual na entrada — abra <span className="text-fht-white">Ver credencial</span> para comparar a foto
+        e os dados do atleta com a pessoa na porta antes de confirmar a presença.
+      </p>
+
+      {/* Resumo do dia */}
       <div className="flex flex-wrap gap-3">
-        <ResumoStat valor={total} label="Escalados" cor="text-fht-white" icon={<Users size={20} />} />
-        <ResumoStat valor={numPresentes} label="Presentes" cor="text-green-400" icon={<CircleCheck size={20} />} />
-        <ResumoStat valor={faltam} label="Faltam" cor="text-orange-400" icon={<Clock size={20} />} />
+        <ResumoStat valor={total} label="Escalados" cor="text-fht-white" icon={<Users size={24} />} />
+        <ResumoStat valor={numPresentes} label="Presentes" cor="text-green-400" icon={<CircleCheck size={24} />} />
+        <ResumoStat valor={faltam} label="Faltam" cor="text-orange-400" icon={<Clock size={24} />} />
       </div>
 
       {/* Busca */}
       <div className="relative">
-        <Search size={16} className="text-gray-soft absolute left-3.5 top-1/2 -translate-y-1/2" />
+        <Search size={18} className="text-gray-soft absolute left-4 top-1/2 -translate-y-1/2" />
         <input
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
           placeholder="Buscar atleta ou clube..."
-          className="font-body bg-[#0d1b2a]/80 border border-federation/20 focus:border-gold rounded-lg pl-10 pr-4 py-3 text-fht-white placeholder-gray-soft text-sm outline-none w-full"
+          className="font-body bg-[#0d1b2a]/80 border border-federation/20 focus:border-gold rounded-lg pl-11 pr-4 py-4 text-fht-white placeholder-gray-soft text-base outline-none w-full"
         />
       </div>
 
       {/* Lista */}
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-3">
         {filtrados.length === 0 ? (
-          <p className="font-body text-gray-soft text-sm text-center py-6">Nenhum atleta encontrado para “{busca}”.</p>
+          <p className="font-body text-gray-soft text-base text-center py-8">
+            Nenhum atleta encontrado para “{busca}”.
+          </p>
         ) : (
           filtrados.map((a) => {
             const pres = !!presentes[a.id];
             return (
               <div
                 key={a.id}
-                className={`flex items-center gap-3 rounded-lg border p-3 transition-colors duration-150 ${
+                className={`flex items-center gap-4 rounded-xl border p-4 transition-colors duration-150 flex-wrap ${
                   pres ? 'border-green-500/30 bg-green-500/5' : 'border-orange-500/30 bg-orange-500/5'
                 }`}
               >
-                <span className="w-10 h-10 rounded-lg bg-federation/20 flex items-center justify-center font-display text-fht-white text-sm shrink-0">
-                  {iniciais(a.nome)}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-body text-fht-white text-sm truncate">{a.nome}</p>
-                    {!pres && (
-                      <span className="font-body text-[10px] px-2 py-0.5 rounded-full border text-orange-400 bg-orange-500/10 border-orange-500/30">
-                        aguardando
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="font-body text-gray-soft text-xs">
-                      {a.sigla} · {nomeClube(a.sigla)}
-                    </span>
-                    <PosicaoTag posicao={a.posicao} />
-                  </div>
-                </div>
                 <button
-                  onClick={() => toggle(a.id)}
-                  className={`font-display text-xs tracking-wider px-4 py-2 rounded-lg shrink-0 flex items-center gap-1.5 transition-colors duration-150 ${
-                    pres
-                      ? 'text-green-400 bg-green-500/10 border border-green-500/40 hover:bg-green-500/20'
-                      : 'text-night bg-gold hover:bg-gold-light'
-                  }`}
+                  onClick={() => setCredencial(a)}
+                  className="flex items-center gap-4 min-w-0 flex-1 text-left"
                 >
-                  {pres ? (
-                    <>
-                      <CircleCheck size={15} />
-                      Presente
-                    </>
-                  ) : (
-                    <>
-                      <UserCheck size={15} />
-                      Confirmar presença
-                    </>
-                  )}
+                  <span className="w-12 h-12 rounded-xl bg-federation/20 flex items-center justify-center font-display text-fht-white text-lg shrink-0">
+                    {iniciais(a.nome)}
+                  </span>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-body text-fht-white text-base truncate">{a.nome}</p>
+                      {!pres && (
+                        <span className="font-body text-[11px] px-2 py-0.5 rounded-full border text-orange-400 bg-orange-500/10 border-orange-500/30">
+                          aguardando
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                      <span className="font-body text-gray-soft text-sm">
+                        {a.sigla} · {nomeClube(a.sigla)}
+                      </span>
+                      <PosicaoTag posicao={a.posicao} />
+                    </div>
+                  </div>
                 </button>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => setCredencial(a)}
+                    className="font-display text-gray-soft border border-federation/30 hover:border-federation/60 hover:text-fht-white px-4 py-2.5 rounded-lg text-sm tracking-wider flex items-center gap-2 transition-colors duration-150"
+                  >
+                    <Eye size={16} />
+                    Ver credencial
+                  </button>
+                  <button
+                    onClick={() => toggle(a.id)}
+                    className={`font-display text-sm tracking-wider px-4 py-2.5 rounded-lg flex items-center gap-2 transition-colors duration-150 ${
+                      pres
+                        ? 'text-green-400 bg-green-500/10 border border-green-500/40 hover:bg-green-500/20'
+                        : 'text-night bg-gold hover:bg-gold-light'
+                    }`}
+                  >
+                    {pres ? (
+                      <>
+                        <CircleCheck size={16} />
+                        Presente
+                      </>
+                    ) : (
+                      <>
+                        <UserCheck size={16} />
+                        Confirmar
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             );
           })
         )}
       </div>
+
+      {credencial && (
+        <CredencialModal
+          atleta={credencial}
+          presente={!!presentes[credencial.id]}
+          onToggle={() => toggle(credencial.id)}
+          onClose={() => setCredencial(null)}
+        />
+      )}
     </div>
   );
 }
@@ -853,44 +1134,87 @@ function jogoBadge(status: JogoStatus): string {
   return 'text-gray-soft bg-gray-soft/10 border-gray-soft/30';
 }
 
+function GolsColuna({ sigla, gols }: { sigla: string; gols: Goleador[] }) {
+  const total = gols.reduce((s, g) => s + g.gols, 0);
+  return (
+    <div className="flex flex-col gap-2.5">
+      <div className="flex items-center gap-2">
+        <SiglaBox sigla={sigla} />
+        <span className="font-body text-gray-soft text-xs">{total} gols</span>
+      </div>
+      <div className="flex flex-col gap-2">
+        {gols.map((g) => (
+          <div key={g.nome} className="flex items-center gap-2.5">
+            <span className="font-display text-gold text-base w-7 text-center shrink-0">{g.gols}</span>
+            <span className="font-body text-fht-white text-sm truncate">{g.nome}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function JogoCard({ jogo }: { jogo: Jogo }) {
   const temPlacar = jogo.placarM !== null && jogo.placarV !== null;
+  const mVenceu = temPlacar && (jogo.placarM as number) > (jogo.placarV as number);
+  const vVenceu = temPlacar && (jogo.placarV as number) > (jogo.placarM as number);
+  const temGols = jogo.golsMandante.length > 0 || jogo.golsVisitante.length > 0;
   return (
-    <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-4 flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-2">
-        <span className={`font-body text-xs px-2.5 py-1 rounded-full border ${jogoBadge(jogo.status)}`}>
-          {jogo.status}
-        </span>
-        <span className="font-body text-gray-soft text-xs flex items-center gap-1.5">
-          <Clock size={13} />
-          {jogo.horario}
-        </span>
-      </div>
-
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          <SiglaBox sigla={jogo.mandante} />
-          <span className="font-body text-fht-white text-sm truncate">{nomeClube(jogo.mandante)}</span>
-        </div>
-        <div className="font-display text-fht-white text-2xl tracking-wider shrink-0 px-2">
-          {temPlacar ? (
-            <span>
-              {jogo.placarM} <span className="text-gray-soft text-lg">×</span> {jogo.placarV}
-            </span>
-          ) : (
-            <span className="text-gray-soft">— × —</span>
-          )}
-        </div>
-        <div className="flex items-center gap-2 min-w-0 flex-1 justify-end">
-          <span className="font-body text-fht-white text-sm truncate text-right">{nomeClube(jogo.visitante)}</span>
-          <SiglaBox sigla={jogo.visitante} />
+    <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-2xl p-5 lg:p-6 flex flex-col gap-5">
+      {/* Fase + status */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <span className="font-display text-gold text-base tracking-widest">{jogo.fase.toUpperCase()}</span>
+        <div className="flex items-center gap-3">
+          <span className="font-body text-gray-soft text-sm flex items-center gap-1.5">
+            <Clock size={14} />
+            {jogo.horario}
+          </span>
+          <span className={`font-body text-xs px-3 py-1 rounded-full border ${jogoBadge(jogo.status)}`}>
+            {jogo.status}
+          </span>
         </div>
       </div>
 
-      {jogo.destaque && (
-        <p className="font-body text-gray-soft text-xs flex items-center gap-1.5 pt-1 border-t border-federation/10">
-          <Award size={13} className="text-gold shrink-0" />
-          {jogo.destaque}
+      {/* Placar */}
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+        <div className="flex flex-col items-center gap-2 text-center min-w-0">
+          <SiglaBox sigla={jogo.mandante} destaque={mVenceu} />
+          <span className={`font-body text-sm truncate max-w-full ${mVenceu ? 'text-fht-white' : 'text-gray-soft'}`}>
+            {nomeClube(jogo.mandante)}
+          </span>
+        </div>
+        <div className="flex items-center gap-3 px-1">
+          <span className={`font-display text-4xl lg:text-5xl leading-none ${mVenceu ? 'text-gold' : 'text-fht-white'}`}>
+            {jogo.placarM !== null ? jogo.placarM : '–'}
+          </span>
+          <span className="font-display text-gray-soft text-2xl">×</span>
+          <span className={`font-display text-4xl lg:text-5xl leading-none ${vVenceu ? 'text-gold' : 'text-fht-white'}`}>
+            {jogo.placarV !== null ? jogo.placarV : '–'}
+          </span>
+        </div>
+        <div className="flex flex-col items-center gap-2 text-center min-w-0">
+          <SiglaBox sigla={jogo.visitante} destaque={vVenceu} />
+          <span className={`font-body text-sm truncate max-w-full ${vVenceu ? 'text-fht-white' : 'text-gray-soft'}`}>
+            {nomeClube(jogo.visitante)}
+          </span>
+        </div>
+      </div>
+
+      {/* Destaques / gols dos dois times */}
+      {temGols ? (
+        <div className="border-t border-federation/15 pt-4">
+          <p className="font-display text-gold text-xs tracking-widest mb-3 flex items-center gap-2">
+            <Award size={14} />
+            DESTAQUES · GOLS
+          </p>
+          <div className="grid grid-cols-2 gap-4">
+            <GolsColuna sigla={jogo.mandante} gols={jogo.golsMandante} />
+            <GolsColuna sigla={jogo.visitante} gols={jogo.golsVisitante} />
+          </div>
+        </div>
+      ) : (
+        <p className="font-body text-gray-soft text-sm border-t border-federation/15 pt-4 text-center">
+          Escalações definidas · aguardando início do jogo.
         </p>
       )}
     </div>
@@ -921,25 +1245,25 @@ function JogosTab({ jogosIniciais }: { jogosIniciais: Jogo[] }) {
   };
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-6">
       <SecaoTitulo icon={<Play size={14} />}>JOGOS & PLACAR AO VIVO</SecaoTitulo>
 
       {/* Bloco de lançar placar */}
       {emAndamento && (
-        <div className="bg-[#0d1b2a]/60 border border-green-500/30 rounded-xl p-5 flex flex-col gap-4">
-          <div className="flex items-center justify-between gap-2">
-            <p className="font-display text-green-400 text-xs tracking-widest flex items-center gap-2">
-              <Play size={14} />
+        <div className="bg-[#0d1b2a]/60 border border-green-500/30 rounded-2xl p-6 flex flex-col gap-5">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <p className="font-display text-green-400 text-base tracking-widest flex items-center gap-2">
+              <Play size={16} />
               LANÇAR PLACAR — AO VIVO
             </p>
-            <span className="font-body text-gray-soft text-xs flex items-center gap-1.5">
-              <Clock size={13} />
-              {emAndamento.horario}
+            <span className="font-body text-gray-soft text-sm flex items-center gap-1.5">
+              <Clock size={14} />
+              {emAndamento.fase} · {emAndamento.horario}
             </span>
           </div>
-          <div className="flex items-end gap-3">
+          <div className="flex items-end gap-4">
             <div className="flex-1">
-              <span className="font-body text-gray-soft text-xs uppercase tracking-wider mb-1 block">
+              <span className="font-body text-gray-soft text-sm uppercase tracking-wider mb-2 block">
                 {emAndamento.mandante} · {nomeClube(emAndamento.mandante)}
               </span>
               <input
@@ -948,12 +1272,12 @@ function JogosTab({ jogosIniciais }: { jogosIniciais: Jogo[] }) {
                 value={pm}
                 onChange={(e) => setPm(e.target.value)}
                 placeholder="0"
-                className="font-body bg-[#0d1b2a]/80 border border-federation/20 focus:border-gold rounded-lg px-4 py-3 text-fht-white placeholder-gray-soft text-sm outline-none w-full text-center"
+                className="font-display bg-[#0d1b2a]/80 border border-federation/20 focus:border-gold rounded-lg px-4 py-4 text-fht-white placeholder-gray-soft text-2xl outline-none w-full text-center"
               />
             </div>
-            <span className="font-display text-gray-soft text-xl pb-3">×</span>
+            <span className="font-display text-gray-soft text-2xl pb-3">×</span>
             <div className="flex-1">
-              <span className="font-body text-gray-soft text-xs uppercase tracking-wider mb-1 block">
+              <span className="font-body text-gray-soft text-sm uppercase tracking-wider mb-2 block">
                 {emAndamento.visitante} · {nomeClube(emAndamento.visitante)}
               </span>
               <input
@@ -962,22 +1286,22 @@ function JogosTab({ jogosIniciais }: { jogosIniciais: Jogo[] }) {
                 value={pv}
                 onChange={(e) => setPv(e.target.value)}
                 placeholder="0"
-                className="font-body bg-[#0d1b2a]/80 border border-federation/20 focus:border-gold rounded-lg px-4 py-3 text-fht-white placeholder-gray-soft text-sm outline-none w-full text-center"
+                className="font-display bg-[#0d1b2a]/80 border border-federation/20 focus:border-gold rounded-lg px-4 py-4 text-fht-white placeholder-gray-soft text-2xl outline-none w-full text-center"
               />
             </div>
           </div>
           <button
             onClick={salvar}
-            className="font-display text-night bg-gold hover:bg-gold-light px-5 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250 flex items-center justify-center gap-2"
+            className="font-display text-night bg-gold hover:bg-gold-light px-5 py-3 rounded-lg text-base tracking-wider transition-colors duration-250 flex items-center justify-center gap-2"
           >
-            <Check size={16} />
+            <Check size={18} />
             Salvar placar
           </button>
         </div>
       )}
 
       {/* Lista de jogos */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
         {jogos.map((j) => (
           <JogoCard key={j.id} jogo={j} />
         ))}
@@ -1077,7 +1401,13 @@ function PainelFullscreen({
             />
           ))}
         {aba === 'equipes' && <EquipesTab elencos={elencos} />}
-        {aba === 'checkin' && <CheckinTab atletas={dados ? dados.checkin : []} />}
+        {aba === 'checkin' && (
+          <CheckinTab
+            atletas={dados ? dados.checkin : []}
+            local={comp.local}
+            dia={dados ? dados.dataDia : ''}
+          />
+        )}
         {aba === 'jogos' && <JogosTab jogosIniciais={dados ? dados.jogos : []} />}
       </div>
     </div>

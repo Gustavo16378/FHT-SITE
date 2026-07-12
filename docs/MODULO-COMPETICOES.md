@@ -106,9 +106,16 @@ Organizado em **abas**:
   (esmaecido). Conectores entre as fases.
 - **Equipes & Atletas:** clubes participantes; expandir um clube mostra os **atletas escalados com
   posição**.
-- **Check-in (dia do jogo):** lista dos atletas escalados com **busca**, botão **confirmar presença**,
-  contador **presentes × faltam** e destaque de **quem falta**. Sem facial — conferência visual (§3.1).
+- **Check-in do DIA (geral):** ✅ é **um check-in por DIA, não por jogo** (quando todos chegam no dia
+  do campeonato). Lista **TODOS** os atletas escalados (de todos os clubes) com **busca**, botão
+  **confirmar presença**, contador **presentes × faltam**. Ao clicar no atleta, abre a **CREDENCIAL**
+  (foto grande + nome/CPF/RG/categoria/posição/clube) pra **conferência visual** — o fiscal compara a
+  foto com a pessoa na porta (sem facial, §3.1).
 - **Jogos & Placar:** lançar/mostrar **placares** com os clubes e atletas envolvidos; painel "ao vivo".
+  A **tabela de jogos** mostra por partida: fase, placar destacado, status, horário e os **gols/
+  artilheiros** de cada time, de forma organizada (não só uma linha solta).
+- ⚙️ **UX pra diretores (público mais velho):** o painel todo deve ser **grande, claro e organizado** —
+  tipografia legível, bom espaçamento, botões óbvios, pouca densidade. Priorizar clareza sobre "denso".
 - **Progressão:** marcar quem **avançou / foi eliminado** → reflete no chaveamento.
 
 É a estrela do módulo — atualização manual, sensação de tempo real (§3.2).

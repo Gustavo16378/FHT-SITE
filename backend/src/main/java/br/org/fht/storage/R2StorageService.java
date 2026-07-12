@@ -17,6 +17,8 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.Optional;
 
 @ApplicationScoped
@@ -38,6 +40,11 @@ public class R2StorageService {
 
     @ConfigProperty(name = "r2.public-url")
     Optional<String> publicUrl;
+
+    // Fallback local quando o R2 não está configurado (dev/demo). No deploy, o
+    // R2 assume e este caminho nunca é usado — mesma interface, zero mudança no chamador.
+    @ConfigProperty(name = "storage.local-dir", defaultValue = "/app/uploads")
+    String localDir;
 
     private S3Client s3Client;
 
@@ -67,7 +74,7 @@ public class R2StorageService {
 
     public String upload(String key, FileUpload fileUpload) {
         if (s3Client == null) {
-            throw new WebApplicationException("Upload não disponível: R2 sem credenciais configuradas", 503);
+            return uploadLocal(key, fileUpload);
         }
 
         try {
@@ -88,6 +95,20 @@ public class R2StorageService {
             return publicUrl.orElse("") + "/" + key;
         } catch (IOException e) {
             throw new WebApplicationException("Falha ao fazer upload do arquivo: " + e.getMessage(), 500);
+        }
+    }
+
+    // Salva o arquivo no filesystem do backend e devolve uma URL servida por FileResource.
+    // É o modo dev/demo; troca-se pelo R2 só configurando as credenciais.
+    private String uploadLocal(String key, FileUpload fileUpload) {
+        try {
+            Path dest = Path.of(localDir, key).normalize();
+            Files.createDirectories(dest.getParent());
+            Files.copy(fileUpload.uploadedFile(), dest, StandardCopyOption.REPLACE_EXISTING);
+            LOG.info("Upload local (fallback sem R2): " + key);
+            return "/api/files/" + key;
+        } catch (IOException e) {
+            throw new WebApplicationException("Falha no upload local: " + e.getMessage(), 500);
         }
     }
 }

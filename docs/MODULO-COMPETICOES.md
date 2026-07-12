@@ -95,6 +95,24 @@ cada jogo e o sistema propaga. O efeito pra quem acompanha (público + painel) �
 Reaproveita a base de busca/painéis do admin (já pensada pra alimentar competições) e amarra com o
 check-in (§3.1) e os resultados públicos (§6 / modal do clube).
 
+## 3.3 Painel operacional em TELA CHEIA — o painel do dia do jogo (jul/2026)
+
+Ao clicar em "Gerenciar / Ver mais" numa competição, abre em **TELA CHEIA** (não painel lateral —
+tem informação demais). É o painel que a organização usa **ao vivo, no dia do campeonato**.
+Organizado em **abas**:
+
+- **Chaveamento (bracket):** visual de mata-mata com as fases (Quartas → Semifinal → Final), cada
+  confronto com os 2 clubes + placar, com destaque de **quem avançou** (vencedor) e **quem perdeu**
+  (esmaecido). Conectores entre as fases.
+- **Equipes & Atletas:** clubes participantes; expandir um clube mostra os **atletas escalados com
+  posição**.
+- **Check-in (dia do jogo):** lista dos atletas escalados com **busca**, botão **confirmar presença**,
+  contador **presentes × faltam** e destaque de **quem falta**. Sem facial — conferência visual (§3.1).
+- **Jogos & Placar:** lançar/mostrar **placares** com os clubes e atletas envolvidos; painel "ao vivo".
+- **Progressão:** marcar quem **avançou / foi eliminado** → reflete no chaveamento.
+
+É a estrela do módulo — atualização manual, sensação de tempo real (§3.2).
+
 ## 4. Modelagem de dados proposta (backend — a validar)
 
 Entidades novas (package `br.org.fht.model`), com migrations Flyway `V6+`:

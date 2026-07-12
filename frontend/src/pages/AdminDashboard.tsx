@@ -8,6 +8,13 @@ import {
 import { useAuth } from '../context/AuthContext'
 import { apiGet, apiPatch, ApiError } from '../services/api'
 import type { ClubeDTO, AtletaDTO, AdminDashboardDTO } from '../types/api'
+import { CompeticoesPage } from './admin/CompeticoesPage'
+import { FinanceiroPage } from './admin/FinanceiroPage'
+import { NoticiasPage } from './admin/NoticiasPage'
+import { DiretoriaPage } from './admin/DiretoriaPage'
+import { DocumentosPage } from './admin/DocumentosPage'
+import { GaleriaPage } from './admin/GaleriaPage'
+import { UsuariosPage } from './admin/UsuariosPage'
 
 /* ── tipos (view-model) ───────────────────────────────────────── */
 type Page = 'dashboard' | 'clubes' | 'atletas' | 'arbitros' | 'competicoes' | 'financeiro' | 'noticias' | 'galeria' | 'diretoria' | 'documentos' | 'usuarios'
@@ -594,6 +601,60 @@ function ClubeDetailPanel({
 }
 
 /* ── Dashboard Page ───────────────────────────────────────────── */
+/* ── mini-gráficos do dashboard (SVG/CSS puro, sem lib) ───────── */
+function VBars({ data, color }: { data: { label: string; value: number }[]; color: string }) {
+  const max = Math.max(1, ...data.map(d => d.value))
+  return (
+    <div className="flex items-end gap-1.5 h-40 mt-2">
+      {data.map((d, i) => (
+        <div key={i} className="flex-1 flex flex-col items-center justify-end gap-1 h-full">
+          <div className="w-full rounded-t transition-all duration-500" style={{ height: `${(d.value / max) * 100}%`, backgroundColor: color, minHeight: '3px' }} title={String(d.value)} />
+          <span className="font-body text-gray-soft text-[9px]">{d.label}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function DonutChart({ segments, total, centerLabel }: {
+  segments: { value: number; color: string; label: string }[]; total: number; centerLabel: string
+}) {
+  const r = 40
+  const circ = 2 * Math.PI * r
+  let acc = 0
+  return (
+    <div className="flex items-center gap-5">
+      <div className="relative w-32 h-32 flex-shrink-0">
+        <svg viewBox="0 0 100 100" className="w-full h-full" style={{ transform: 'rotate(-90deg)' }}>
+          <circle cx="50" cy="50" r={r} fill="none" stroke="rgba(26,58,143,0.2)" strokeWidth="10" />
+          {segments.map((s, i) => {
+            const len = total > 0 ? (s.value / total) * circ : 0
+            const el = (
+              <circle key={i} cx="50" cy="50" r={r} fill="none" stroke={s.color} strokeWidth="10"
+                strokeDasharray={`${len} ${circ - len}`} strokeDashoffset={-acc} />
+            )
+            acc += len
+            return el
+          })}
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="font-display text-fht-white text-3xl leading-none">{total}</span>
+          <span className="font-body text-gray-soft text-[10px] uppercase tracking-wider">{centerLabel}</span>
+        </div>
+      </div>
+      <div className="flex flex-col gap-2 flex-1">
+        {segments.map((s, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: s.color }} />
+            <span className="font-body text-gray-soft text-xs">{s.label}</span>
+            <span className="font-body text-fht-white text-xs ml-auto">{s.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function DashboardPage({ dashboard }: { dashboard: AdminDashboardDTO | null }) {
   const cards = [
     {
@@ -619,6 +680,22 @@ function DashboardPage({ dashboard }: { dashboard: AdminDashboardDTO | null }) {
       ],
     },
   ]
+
+  // Novas afiliações por mês — mock (ainda não há histórico no backend)
+  const meses = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D']
+  const afiliacoes = [2, 4, 3, 6, 5, 8, 7, 10, 9, 12, 11, 14].map((v, i) => ({ label: meses[i], value: v }))
+
+  // Composição de atletas — dados REAIS do dashboard
+  const ativos = dashboard?.atletas.ativos ?? 0
+  const agPgto = dashboard?.atletas.pendentes ?? 0
+  const totalAt = dashboard?.atletas.total ?? 0
+  const outros = Math.max(0, totalAt - ativos - agPgto)
+  const segAtletas = [
+    { value: ativos, color: '#4ade80', label: 'Ativos' },
+    { value: agPgto, color: '#facc15', label: 'Ag. pagamento' },
+    { value: outros, color: '#8A9BB5', label: 'Suspensos / rejeitados' },
+  ]
+
   return (
     <div>
       <h2 className="font-display text-fht-white text-3xl mb-6">DASHBOARD</h2>
@@ -636,6 +713,22 @@ function DashboardPage({ dashboard }: { dashboard: AdminDashboardDTO | null }) {
             </div>
           </div>
         ))}
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-5 mt-5">
+        <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-6">
+          <div className="flex items-center justify-between mb-1">
+            <p className="font-display text-gold text-xs tracking-widest">NOVAS AFILIAÇÕES — 2026</p>
+            <span className="font-body text-[10px] text-gray-soft/60 border border-federation/20 rounded-full px-2 py-0.5">demonstração</span>
+          </div>
+          <p className="font-body text-gray-soft text-xs mb-2">Clubes + atletas filiados por mês</p>
+          <VBars data={afiliacoes} color="#1E4DB7" />
+        </div>
+
+        <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-6">
+          <p className="font-display text-gold text-xs tracking-widest mb-5">COMPOSIÇÃO DE ATLETAS</p>
+          <DonutChart segments={segAtletas} total={totalAt} centerLabel="atletas" />
+        </div>
       </div>
     </div>
   )
@@ -1148,19 +1241,6 @@ function ArbitrosPage() {
   )
 }
 
-/* ── Placeholder V2 ───────────────────────────────────────────── */
-function PlaceholderPage({ title }: { title: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-24 text-center">
-      <div className="w-16 h-16 bg-federation/20 border border-federation/30 rounded-xl flex items-center justify-center mb-4">
-        <Trophy size={28} className="text-gold/50" />
-      </div>
-      <p className="font-display text-fht-white text-2xl mb-2">{title}</p>
-      <p className="font-body text-gray-soft text-sm">Seção em construção — vamos montar esta parte. 🚧</p>
-    </div>
-  )
-}
-
 /* ── Sidebar nav (agrupada por área) ──────────────────────────── */
 type NavItem = { id: Page; label: string; Icon: typeof LayoutDashboard }
 const NAV_GROUPS: { group: string | null; items: NavItem[] }[] = [
@@ -1297,13 +1377,13 @@ export default function AdminDashboard() {
               {page === 'clubes'      && <ClubesPage clubes={clubes} atletas={atletas} reload={reload} />}
               {page === 'atletas'     && <AtletasPage atletas={atletas} reload={reload} />}
               {page === 'arbitros'    && <ArbitrosPage />}
-              {page === 'competicoes' && <PlaceholderPage title="COMPETIÇÕES" />}
-              {page === 'financeiro'  && <PlaceholderPage title="FINANCEIRO" />}
-              {page === 'noticias'    && <PlaceholderPage title="NOTÍCIAS" />}
-              {page === 'galeria'     && <PlaceholderPage title="GALERIA" />}
-              {page === 'diretoria'   && <PlaceholderPage title="DIRETORIA" />}
-              {page === 'documentos'  && <PlaceholderPage title="DOCUMENTOS" />}
-              {page === 'usuarios'    && <PlaceholderPage title="USUÁRIOS & ADMINS" />}
+              {page === 'competicoes' && <CompeticoesPage />}
+              {page === 'financeiro'  && <FinanceiroPage />}
+              {page === 'noticias'    && <NoticiasPage />}
+              {page === 'galeria'     && <GaleriaPage />}
+              {page === 'diretoria'   && <DiretoriaPage />}
+              {page === 'documentos'  && <DocumentosPage />}
+              {page === 'usuarios'    && <UsuariosPage />}
             </>
           )}
         </main>

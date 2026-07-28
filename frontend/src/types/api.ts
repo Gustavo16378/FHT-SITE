@@ -115,7 +115,20 @@ export interface NoticiaDTO {
   updatedAt: string
 }
 
-/** POST /api/noticias/upload-imagem */
+/** Resposta dos endpoints de upload de imagem (notícias, galeria) */
 export interface UploadResponse {
   url: string
+}
+
+export type GaleriaTamanho = 'large' | 'medium' | 'small'
+
+/** FotoDTO — foto da galeria pública */
+export interface FotoDTO {
+  id: string
+  imagemUrl: string
+  evento: string
+  ano: string | null
+  categoria: string | null
+  tamanho: GaleriaTamanho
+  createdAt: string
 }

@@ -1,12 +1,47 @@
-import { gallery } from '../data/gallery'
+import { useEffect, useState } from 'react'
+import { Loader2, ImageIcon } from 'lucide-react'
 import { useInView } from '../hooks/useInView'
+import { apiGet, fileUrl } from '../services/api'
+import type { FotoDTO } from '../types/api'
+
+/** Um bloco do mosaico com legenda sempre visível. */
+function Tile({ foto, className }: { foto: FotoDTO; className?: string }) {
+  return (
+    <div className={`relative rounded-lg overflow-hidden group ${className ?? ''}`}>
+      <img
+        src={fileUrl(foto.imagemUrl)}
+        alt={foto.evento}
+        loading="lazy"
+        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+      />
+      {/* gradiente + legenda sempre visíveis */}
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-night via-night/50 to-transparent p-3 pt-10">
+        <p className="font-display text-fht-white text-base leading-tight">
+          {foto.evento} {foto.ano && <span className="text-gold">{foto.ano}</span>}
+        </p>
+        {foto.categoria && (
+          <p className="font-body text-gray-soft text-xs mt-0.5">{foto.categoria}</p>
+        )}
+      </div>
+    </div>
+  )
+}
 
 export default function Gallery() {
   const ref = useInView()
+  const [fotos, setFotos] = useState<FotoDTO[]>([])
+  const [carregando, setCarregando] = useState(true)
 
-  const large = gallery.filter((p) => p.size === 'large')
-  const medium = gallery.filter((p) => p.size === 'medium')
-  const small = gallery.filter((p) => p.size === 'small')
+  useEffect(() => {
+    apiGet<FotoDTO[]>('/api/galeria')
+      .then(setFotos)
+      .catch(() => setFotos([]))
+      .finally(() => setCarregando(false))
+  }, [])
+
+  const large = fotos.filter((p) => p.tamanho === 'large')
+  const medium = fotos.filter((p) => p.tamanho === 'medium')
+  const small = fotos.filter((p) => p.tamanho === 'small')
 
   return (
     <section id="galeria" className="py-20 bg-night">
@@ -17,70 +52,29 @@ export default function Gallery() {
           <div className="w-16 h-1 bg-gold" />
         </div>
 
-        {/* Mosaic grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-          {/* Large photos — span 2 cols */}
-          {large.map((photo) => (
-            <div
-              key={photo.id}
-              className="col-span-2 row-span-2 relative rounded-lg overflow-hidden group cursor-pointer aspect-[4/3]"
-            >
-              <img
-                src={photo.src}
-                alt={photo.event}
-                loading="lazy"
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-night/30 group-hover:opacity-0 transition-opacity duration-300" />
-              <div className="absolute inset-0 bg-gradient-to-t from-night/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              <div className="absolute bottom-0 left-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                <p className="font-display text-gold text-xl leading-tight">{photo.event}</p>
-                <p className="font-body text-gray-soft text-xs">{photo.category} · {photo.year}</p>
-              </div>
-            </div>
-          ))}
-
-          {/* Medium photos */}
-          {medium.map((photo) => (
-            <div
-              key={photo.id}
-              className="relative rounded-lg overflow-hidden group cursor-pointer aspect-square"
-            >
-              <img
-                src={photo.src}
-                alt={photo.event}
-                loading="lazy"
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-night/30 group-hover:opacity-0 transition-opacity duration-300" />
-              <div className="absolute inset-0 bg-gradient-to-t from-night/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              <div className="absolute bottom-0 left-0 right-0 p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                <p className="font-display text-fht-white text-base leading-tight">{photo.event}</p>
-                <p className="font-body text-gray-soft text-xs">{photo.year}</p>
-              </div>
-            </div>
-          ))}
-
-          {/* Small photos */}
-          {small.map((photo) => (
-            <div
-              key={photo.id}
-              className="relative rounded-lg overflow-hidden group cursor-pointer aspect-square"
-            >
-              <img
-                src={photo.src}
-                alt={photo.event}
-                loading="lazy"
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-night/30 group-hover:opacity-0 transition-opacity duration-300" />
-              <div className="absolute inset-0 bg-gradient-to-t from-night/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              <div className="absolute bottom-0 left-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                <p className="font-display text-fht-white text-sm leading-tight">{photo.event} · {photo.year}</p>
-              </div>
-            </div>
-          ))}
-        </div>
+        {carregando ? (
+          <div className="flex items-center justify-center gap-3 py-16">
+            <Loader2 size={22} className="text-gold animate-spin" />
+            <span className="font-body text-gray-soft text-sm">Carregando galeria...</span>
+          </div>
+        ) : fotos.length === 0 ? (
+          <div className="border border-federation/20 rounded-lg p-12 text-center flex flex-col items-center gap-3">
+            <ImageIcon size={36} className="text-gray-soft/40" />
+            <p className="font-body text-gray-soft text-sm">Em breve, os melhores momentos do handebol tocantinense aqui.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+            {large.map((foto) => (
+              <Tile key={foto.id} foto={foto} className="col-span-2 row-span-2 aspect-[4/3]" />
+            ))}
+            {medium.map((foto) => (
+              <Tile key={foto.id} foto={foto} className="aspect-square" />
+            ))}
+            {small.map((foto) => (
+              <Tile key={foto.id} foto={foto} className="aspect-square" />
+            ))}
+          </div>
+        )}
       </div>
     </section>
   )

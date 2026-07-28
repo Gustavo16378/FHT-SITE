@@ -71,3 +71,16 @@ VALUES
   E'Rascunho em edição — publicar após revisão da diretoria.',
   NULL, 'Administração FHT', '2026-07-25', false, 'RASCUNHO', NOW(), NOW())
 ON CONFLICT (id) DO NOTHING;
+
+-- ── Galeria (fotos) — mosaico com tamanhos variados ─────────────────────
+-- Limpar depois: DELETE FROM fotos WHERE id::text LIKE 'bbbbbbbb-%';
+INSERT INTO fotos (id, imagem_url, evento, ano, categoria, tamanho, created_at, updated_at)
+VALUES
+ ('bbbbbbbb-0000-0000-0000-000000000001', 'https://picsum.photos/seed/fht-g1/800/600', 'Campeonato Estadual', '2024', 'Adulto Masculino', 'large', NOW(), NOW()),
+ ('bbbbbbbb-0000-0000-0000-000000000002', 'https://picsum.photos/seed/fht-g2/600/600', 'Copa FHT Sub-18', '2024', 'Sub-18 Feminino', 'medium', NOW(), NOW()),
+ ('bbbbbbbb-0000-0000-0000-000000000003', 'https://picsum.photos/seed/fht-g3/600/600', 'Festival Sub-14', '2023', 'Sub-14', 'medium', NOW(), NOW()),
+ ('bbbbbbbb-0000-0000-0000-000000000004', 'https://picsum.photos/seed/fht-g4/600/600', 'Circuito Interior', '2023', 'Adulto Feminino', 'small', NOW(), NOW()),
+ ('bbbbbbbb-0000-0000-0000-000000000005', 'https://picsum.photos/seed/fht-g5/600/600', 'Jogos do Interior', '2022', 'Seleção TO', 'small', NOW(), NOW()),
+ ('bbbbbbbb-0000-0000-0000-000000000006', 'https://picsum.photos/seed/fht-g6/800/600', 'Final da Taça FHT', '2023', 'Adulto Masculino', 'large', NOW(), NOW()),
+ ('bbbbbbbb-0000-0000-0000-000000000007', 'https://picsum.photos/seed/fht-g7/600/600', 'Abertura da Temporada', '2024', 'Sub-16', 'medium', NOW(), NOW())
+ON CONFLICT (id) DO NOTHING;

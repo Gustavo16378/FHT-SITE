@@ -20,6 +20,7 @@ public record ClubeResponseDTO(
         @Schema(description = "URL do estatuto social (R2)") String estatutoUrl,
         @Schema(description = "Status atual", enumeration = {"PENDENTE", "ATIVO", "REJEITADO", "SUSPENSO"}) String status,
         @Schema(description = "Motivo da rejeição — preenchido quando status = REJEITADO") String motivoRejeicao,
+        @Schema(description = "Se o clube aparece na vitrine pública da home (só vale quando ATIVO)") boolean visivelNaHome,
         @Schema(description = "Data/hora da solicitação") LocalDateTime createdAt,
         @Schema(description = "Data/hora da última atualização") LocalDateTime updatedAt
 ) {}

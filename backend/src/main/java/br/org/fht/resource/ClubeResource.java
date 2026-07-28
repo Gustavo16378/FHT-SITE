@@ -62,6 +62,28 @@ public class ClubeResource {
     }
 
     @GET
+    @Path("/publico")
+    @Operation(summary = "Vitrine pública de clubes",
+            description = "Endpoint público. Lista os clubes ATIVOS e visíveis na home, só com dados públicos (sem CNPJ/documentos/contato).")
+    @APIResponse(responseCode = "200", description = "Clubes da vitrine")
+    public Response listarPublicos() {
+        return Response.ok(ApiResponse.ok(clubeService.listarPublicos(), "OK")).build();
+    }
+
+    @GET
+    @Path("/publico/{id}")
+    @Operation(summary = "Detalhe público de um clube",
+            description = "Endpoint público para o modal da home: dados públicos + elenco (atletas ativos).")
+    @APIResponses({
+            @APIResponse(responseCode = "200", description = "Detalhe público do clube"),
+            @APIResponse(responseCode = "404", description = "Clube não encontrado ou fora da vitrine")
+    })
+    public Response buscarPublico(
+            @Parameter(description = "UUID do clube", required = true) @PathParam("id") UUID id) {
+        return Response.ok(ApiResponse.ok(clubeService.buscarPublico(id), "OK")).build();
+    }
+
+    @GET
     @Path("/{id}")
     @RolesAllowed({"ADMIN_FHT", "ADMIN_CLUBE"})
     @SecurityRequirement(name = "BearerAuth")
@@ -174,9 +196,36 @@ public class ClubeResource {
         return Response.ok(ApiResponse.ok(null, "Clube reativado")).build();
     }
 
+    @PATCH
+    @Path("/{id}/vitrine")
+    @RolesAllowed("ADMIN_FHT")
+    @SecurityRequirement(name = "BearerAuth")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Operation(summary = "Mostrar/ocultar clube na vitrine da home",
+            description = "Liga/desliga o clube da vitrine pública. Não altera o status — o clube segue ATIVO.")
+    @APIResponses({
+            @APIResponse(responseCode = "200", description = "Vitrine atualizada"),
+            @APIResponse(responseCode = "401", description = "Token ausente ou inválido"),
+            @APIResponse(responseCode = "403", description = "Apenas ADMIN_FHT"),
+            @APIResponse(responseCode = "404", description = "Clube não encontrado")
+    })
+    public Response definirVitrine(
+            @Parameter(description = "UUID do clube", required = true) @PathParam("id") UUID id,
+            VitrineRequest req) {
+        boolean visivel = req == null || req.visivel() == null || req.visivel();
+        clubeService.definirVitrine(id, visivel);
+        return Response.ok(ApiResponse.ok(null, visivel ? "Clube exibido na home" : "Clube ocultado da home")).build();
+    }
+
     @Schema(description = "Motivo da rejeição")
     public record MotivoRequest(
             @Schema(description = "Texto explicando o motivo", example = "Documentação incompleta")
             String motivo
+    ) {}
+
+    @Schema(description = "Estado da vitrine do clube")
+    public record VitrineRequest(
+            @Schema(description = "true = aparece na home; false = oculto", example = "false")
+            Boolean visivel
     ) {}
 }

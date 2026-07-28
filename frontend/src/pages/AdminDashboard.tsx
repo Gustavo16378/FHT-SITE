@@ -27,7 +27,7 @@ interface Clube {
   id: string; nome: string; sigla: string; cidade: string; uf: string; cnpj: string
   representante: string; representanteEmail: string; representanteTelefone: string
   status: StatusClube; data: string; ataUrl: string; estatutoUrl: string
-  motivoRejeicao?: string
+  motivoRejeicao?: string; visivelNaHome: boolean
 }
 interface Atleta {
   id: string; nome: string; cpf: string; rg: string
@@ -67,6 +67,7 @@ function mapClube(d: ClubeDTO): Clube {
     ataUrl: d.ataFundacaoUrl ?? '#',
     estatutoUrl: d.estatutoUrl ?? '#',
     motivoRejeicao: d.motivoRejeicao ?? undefined,
+    visivelNaHome: d.visivelNaHome,
   }
 }
 
@@ -392,7 +393,7 @@ const competicoesClubeMock = [
 
 /* ── Clube Detail Panel ───────────────────────────────────────── */
 function ClubeDetailPanel({
-  clube, atletas, onClose, onAprovar, onRejeitar, onSuspender, onReativar, onVerAtleta,
+  clube, atletas, onClose, onAprovar, onRejeitar, onSuspender, onReativar, onToggleVitrine, onVerAtleta,
 }: {
   clube: Clube
   atletas: Atleta[]
@@ -401,6 +402,7 @@ function ClubeDetailPanel({
   onRejeitar: (id: string) => void
   onSuspender: (id: string) => void
   onReativar: (id: string) => void
+  onToggleVitrine: (id: string, visivel: boolean) => void
   onVerAtleta: (a: Atleta) => void
 }) {
   const atletasDoClube = atletas.filter(a => a.clube === clube.nome)
@@ -579,10 +581,20 @@ function ClubeDetailPanel({
             </>
           )}
           {clube.status === 'ATIVO' && (
-            <button onClick={() => onSuspender(clube.id)}
-              className="flex-1 font-display text-orange-400 bg-orange-500/10 border border-orange-500/30 hover:bg-orange-500/20 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250">
-              SUSPENDER CLUBE
-            </button>
+            <>
+              <button onClick={() => onToggleVitrine(clube.id, !clube.visivelNaHome)}
+                className={`flex-1 font-display py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250 border ${
+                  clube.visivelNaHome
+                    ? 'text-gold bg-gold/10 border-gold/30 hover:bg-gold/20'
+                    : 'text-gray-soft bg-gray-soft/10 border-gray-soft/30 hover:bg-gray-soft/20'
+                }`}>
+                {clube.visivelNaHome ? 'OCULTAR DA HOME' : 'MOSTRAR NA HOME'}
+              </button>
+              <button onClick={() => onSuspender(clube.id)}
+                className="flex-1 font-display text-orange-400 bg-orange-500/10 border border-orange-500/30 hover:bg-orange-500/20 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250">
+                SUSPENDER CLUBE
+              </button>
+            </>
           )}
           {clube.status === 'SUSPENSO' && (
             <button onClick={() => onReativar(clube.id)}
@@ -772,6 +784,7 @@ function ClubesPage({ clubes, atletas, reload }: {
   const handleAprovar = (id: string) => acao(() => apiPatch(`/api/clubes/${id}/aprovar`))
   const handleSuspender = (id: string) => acao(() => apiPatch(`/api/clubes/${id}/suspender`))
   const handleReativar = (id: string) => acao(() => apiPatch(`/api/clubes/${id}/reativar`))
+  const handleVitrine = (id: string, visivel: boolean) => acao(() => apiPatch(`/api/clubes/${id}/vitrine`, { visivel }))
 
   function abrirRejeitar(id: string) {
     setDetalhe(null)
@@ -869,6 +882,7 @@ function ClubesPage({ clubes, atletas, reload }: {
           onRejeitar={abrirRejeitar}
           onSuspender={handleSuspender}
           onReativar={handleReativar}
+          onToggleVitrine={handleVitrine}
           onVerAtleta={setAtletaDetalhe}
         />
       )}

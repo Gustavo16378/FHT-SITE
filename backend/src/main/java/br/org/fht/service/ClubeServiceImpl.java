@@ -1,12 +1,17 @@
 package br.org.fht.service;
 
+import br.org.fht.dto.clube.AtletaVitrineDTO;
 import br.org.fht.dto.clube.ClubeForm;
 import br.org.fht.dto.clube.ClubeResponseDTO;
 import br.org.fht.dto.clube.ClubeUpdateForm;
+import br.org.fht.dto.clube.ClubeVitrineDTO;
+import br.org.fht.dto.clube.ClubeVitrineDetalheDTO;
 import br.org.fht.mapper.ClubeMapper;
+import br.org.fht.model.Atleta;
 import br.org.fht.model.Clube;
 import br.org.fht.model.Role;
 import br.org.fht.model.Usuario;
+import br.org.fht.repository.AtletaRepository;
 import br.org.fht.repository.ClubeRepository;
 import br.org.fht.repository.UsuarioRepository;
 import br.org.fht.storage.R2StorageService;
@@ -17,14 +22,20 @@ import jakarta.transaction.Transactional;
 import jakarta.ws.rs.WebApplicationException;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
 @ApplicationScoped
 public class ClubeServiceImpl implements ClubeService {
 
+    // Ordem de exibição das categorias no card/modal (as demais vão pro fim, em ordem alfabética).
+    private static final List<String> ORDEM_CATEGORIAS =
+            List.of("Adulto", "Sub-18", "Sub-16", "Sub-14", "Sub-12");
+
     @Inject ClubeRepository clubeRepository;
     @Inject UsuarioRepository usuarioRepository;
+    @Inject AtletaRepository atletaRepository;
     @Inject R2StorageService r2;
 
     @Override
@@ -165,5 +176,77 @@ public class ClubeServiceImpl implements ClubeService {
         }
 
         clube.setStatus("ATIVO");
+    }
+
+    @Override
+    public List<ClubeVitrineDTO> listarPublicos() {
+        return clubeRepository.listVitrine().stream()
+                .map(clube -> {
+                    List<Atleta> ativos = atletasAtivos(clube.getId());
+                    return new ClubeVitrineDTO(
+                            clube.getId(),
+                            clube.getNome(),
+                            clube.getCidade(),
+                            clube.getUf(),
+                            clube.getSigla(),
+                            categorias(ativos),
+                            ativos.size()
+                    );
+                })
+                .toList();
+    }
+
+    @Override
+    public ClubeVitrineDetalheDTO buscarPublico(UUID id) {
+        Clube clube = clubeRepository.findByIdOptional(id)
+                .filter(c -> "ATIVO".equals(c.getStatus()) && c.isVisivelNaHome())
+                .orElseThrow(() -> new WebApplicationException("Clube não encontrado", 404));
+
+        List<Atleta> ativos = atletasAtivos(id);
+        List<AtletaVitrineDTO> elenco = ativos.stream()
+                .map(a -> new AtletaVitrineDTO(a.getNomeCompleto(), a.getPosicao(), a.getCategoria()))
+                .toList();
+
+        return new ClubeVitrineDetalheDTO(
+                clube.getId(),
+                clube.getNome(),
+                clube.getCidade(),
+                clube.getUf(),
+                clube.getSigla(),
+                categorias(ativos),
+                ativos.size(),
+                elenco
+        );
+    }
+
+    @Override
+    @Transactional
+    public void definirVitrine(UUID id, boolean visivel) {
+        Clube clube = clubeRepository.findByIdOptional(id)
+                .orElseThrow(() -> new WebApplicationException("Clube não encontrado", 404));
+        clube.setVisivelNaHome(visivel);
+    }
+
+    // --------------------- helpers vitrine ---------------------
+
+    private List<Atleta> atletasAtivos(UUID clubeId) {
+        return atletaRepository.findByClubeId(clubeId).stream()
+                .filter(a -> "ATIVO".equals(a.getStatus()))
+                .toList();
+    }
+
+    /** Categorias distintas dos atletas ativos, na ordem de exibição (base primeiro). */
+    private List<String> categorias(List<Atleta> atletas) {
+        return atletas.stream()
+                .map(Atleta::getCategoria)
+                .filter(c -> c != null && !c.isBlank())
+                .distinct()
+                .sorted(Comparator.comparingInt(this::ordemCategoria).thenComparing(Comparator.naturalOrder()))
+                .toList();
+    }
+
+    private int ordemCategoria(String categoria) {
+        int i = ORDEM_CATEGORIAS.indexOf(categoria);
+        return i >= 0 ? i : ORDEM_CATEGORIAS.size();
     }
 }

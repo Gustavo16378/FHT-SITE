@@ -17,4 +17,9 @@ public class ClubeRepository implements PanacheRepositoryBase<Clube, UUID> {
     public List<Clube> listAllOrdered() {
         return list("ORDER BY createdAt DESC");
     }
+
+    /** Clubes da vitrine pública: ATIVOS e marcados como visíveis na home. */
+    public List<Clube> listVitrine() {
+        return list("status = ?1 AND visivelNaHome = true ORDER BY nome ASC", "ATIVO");
+    }
 }

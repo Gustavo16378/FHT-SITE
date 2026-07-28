@@ -43,6 +43,11 @@ public class Clube extends DefaultEntity {
     @Column(name = "motivo_rejeicao")
     private String motivoRejeicao;
 
+    // Controle de vitrine pública, independente do status: clube ATIVO só aparece na
+    // home se este flag estiver ligado. Desligar NÃO tira a afiliação. Ver docs/MODULO-CLUBES-VITRINE.md §4.3.
+    @Column(name = "visivel_na_home", nullable = false)
+    private boolean visivelNaHome = true;
+
     public String getNome() { return nome; }
     public void setNome(String nome) { this.nome = nome; }
 
@@ -81,4 +86,7 @@ public class Clube extends DefaultEntity {
 
     public String getMotivoRejeicao() { return motivoRejeicao; }
     public void setMotivoRejeicao(String motivoRejeicao) { this.motivoRejeicao = motivoRejeicao; }
+
+    public boolean isVisivelNaHome() { return visivelNaHome; }
+    public void setVisivelNaHome(boolean visivelNaHome) { this.visivelNaHome = visivelNaHome; }
 }

@@ -3,6 +3,8 @@ package br.org.fht.service;
 import br.org.fht.dto.clube.ClubeForm;
 import br.org.fht.dto.clube.ClubeResponseDTO;
 import br.org.fht.dto.clube.ClubeUpdateForm;
+import br.org.fht.dto.clube.ClubeVitrineDTO;
+import br.org.fht.dto.clube.ClubeVitrineDetalheDTO;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 
 import java.util.List;
@@ -25,4 +27,13 @@ public interface ClubeService {
     void suspender(UUID id);
 
     void reativar(UUID id);
+
+    /** Vitrine pública: clubes ATIVOS e visíveis, só dados públicos. */
+    List<ClubeVitrineDTO> listarPublicos();
+
+    /** Detalhe público do clube (modal). 404 se não estiver ATIVO/visível. */
+    ClubeVitrineDetalheDTO buscarPublico(UUID id);
+
+    /** Liga/desliga o clube da vitrine da home (não altera status). */
+    void definirVitrine(UUID id, boolean visivel);
 }

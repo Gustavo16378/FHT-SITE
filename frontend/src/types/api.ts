@@ -25,8 +25,32 @@ export interface ClubeDTO {
   estatutoUrl: string | null
   status: ClubeStatus
   motivoRejeicao: string | null
+  visivelNaHome: boolean
   createdAt: string
   updatedAt: string
+}
+
+/** ClubeVitrineDTO — card público da home (só dados públicos) */
+export interface ClubeVitrineDTO {
+  id: string
+  nome: string
+  cidade: string
+  uf: string
+  sigla: string | null
+  categorias: string[]
+  totalAtletas: number
+}
+
+/** AtletaVitrineDTO — atleta no modal público */
+export interface AtletaVitrineDTO {
+  nome: string
+  posicao: string
+  categoria: string
+}
+
+/** ClubeVitrineDetalheDTO — detalhe público do clube (modal) */
+export interface ClubeVitrineDetalheDTO extends ClubeVitrineDTO {
+  atletas: AtletaVitrineDTO[]
 }
 
 /** AtletaResponseDTO — sexo vem como string ("M"/"F" ou "Masculino"/"Feminino") */

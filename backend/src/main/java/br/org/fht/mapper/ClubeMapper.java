@@ -22,6 +22,7 @@ public class ClubeMapper {
                 c.getEstatutoUrl(),
                 c.getStatus(),
                 c.getMotivoRejeicao(),
+                c.isVisivelNaHome(),
                 c.getCreatedAt(),
                 c.getUpdatedAt()
         );

@@ -120,6 +120,42 @@ export interface UploadResponse {
   url: string
 }
 
+/** DiretorDTO — membro da diretoria (institucional, público) */
+export interface DiretorDTO {
+  id: string
+  nome: string
+  cargo: string
+  area: string | null
+  mandato: string | null
+  email: string | null
+  telefone: string | null
+  desde: string | null
+  bio: string | null
+  fotoUrl: string | null
+  ordem: number
+  createdAt: string
+}
+
+export type DocumentoCategoria = 'Estatuto' | 'Regulamento' | 'Calendário' | 'Edital' | 'Circular'
+
+/** DocumentoDTO — documento institucional público (transparência) */
+export interface DocumentoDTO {
+  id: string
+  titulo: string
+  categoria: DocumentoCategoria
+  arquivoUrl: string
+  dataPublicacao: string
+  publicadoPor: string | null
+  tamanhoBytes: number | null
+  createdAt: string
+}
+
+/** POST /api/documentos/upload-arquivo */
+export interface DocumentoUploadResponse {
+  url: string
+  tamanhoBytes: number
+}
+
 export type GaleriaTamanho = 'large' | 'medium' | 'small'
 
 /** FotoDTO — foto da galeria pública */

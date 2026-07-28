@@ -1,503 +1,128 @@
-import { useState } from 'react';
-import {
-  Plus,
-  X,
-  UserCog,
-  Pencil,
-  Check,
-  Info,
-  Mail,
-  Phone,
-  Calendar,
-  Shield,
-  DollarSign,
-  Newspaper,
-  Award,
-  Users,
-} from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Plus, X, Pencil, Trash2, Upload, UserCog, Loader2, AlertCircle } from 'lucide-react';
+import { apiGet, apiPostJson, apiPut, apiDelete, apiPostForm, fileUrl } from '../../services/api';
+import type { DiretorDTO, UploadResponse } from '../../types/api';
 
-type Diretor = {
-  id: string;
+const AREAS = ['Gestão Geral', 'Competições', 'Financeiro', 'Arbitragem', 'Comunicação', 'Outra'];
+
+function iniciais(nome: string): string {
+  const p = nome.trim().split(/\s+/);
+  return ((p[0]?.[0] ?? '') + (p.length > 1 ? p[p.length - 1][0] : '')).toUpperCase();
+}
+
+interface FormDiretor {
   nome: string;
   cargo: string;
+  area: string;
   mandato: string;
   email: string;
   telefone: string;
-  area: string;
   desde: string;
-  bio: string[];
-};
-
-const DIRETORES: Diretor[] = [
-  {
-    id: 'presidente',
-    nome: 'João Carlos Mendonça',
-    cargo: 'Presidente',
-    mandato: '2023–2027',
-    email: 'presidencia@fht.org.br',
-    telefone: '(63) 98111-2023',
-    area: 'Gestão Geral',
-    desde: 'Fevereiro/2023',
-    bio: [
-      'Natural de Palmas, João Carlos Mendonça atua no handebol tocantinense há mais de duas décadas, tendo iniciado como atleta e passado por funções técnicas antes de assumir a gestão esportiva. Foi um dos idealizadores da reestruturação da federação em 2023.',
-      'À frente da presidência, tem priorizado a profissionalização administrativa da FHT, a ampliação do calendário estadual de competições e a filiação de novos clubes no interior do estado, com foco especial nas categorias de base.',
-      'Representa a federação junto à Confederação Brasileira de Handebol (CBHb) e articula parcerias com secretarias municipais de esporte para expandir a modalidade em Tocantins.',
-    ],
-  },
-  {
-    id: 'vice',
-    nome: 'Ana Paula Ribeiro',
-    cargo: 'Vice-Presidente',
-    mandato: '2023–2027',
-    email: 'vice@fht.org.br',
-    telefone: '(63) 98222-4477',
-    area: 'Gestão Geral',
-    desde: 'Fevereiro/2023',
-    bio: [
-      'Ana Paula Ribeiro é formada em Educação Física e pós-graduada em Gestão Esportiva. Coordenou projetos sociais de iniciação ao handebol em escolas públicas de Araguaína antes de integrar a diretoria.',
-      'Como Vice-Presidente, dá suporte direto à presidência e responde pela federação em suas ausências, além de coordenar a integração entre as diretorias técnica, financeira e de comunicação.',
-      'É uma das principais defensoras da equidade de gênero no esporte estadual, incentivando a criação de equipes femininas em todas as categorias filiadas.',
-    ],
-  },
-  {
-    id: 'tecnico',
-    nome: 'Roberto Alves Neto',
-    cargo: 'Diretor Técnico',
-    mandato: '2023–2027',
-    email: 'tecnico@fht.org.br',
-    telefone: '(63) 98333-1590',
-    area: 'Competições',
-    desde: 'Março/2023',
-    bio: [
-      'Roberto Alves Neto acumula experiência como treinador de equipes adultas e de base, com passagens por clubes de Palmas e Gurupi. Possui certificação técnica reconhecida pela CBHb.',
-      'Na direção técnica, é responsável pela elaboração do calendário estadual, pelo regulamento das competições e pela homologação de resultados oficiais da federação.',
-      'Coordena ainda o desenvolvimento das seleções tocantinenses que representam o estado em campeonatos regionais e nacionais, definindo comissões técnicas e critérios de convocação.',
-    ],
-  },
-  {
-    id: 'financeira',
-    nome: 'Silvia Monteiro',
-    cargo: 'Diretora Financeira',
-    mandato: '2023–2027',
-    email: 'financeiro@fht.org.br',
-    telefone: '(63) 98444-7788',
-    area: 'Financeiro',
-    desde: 'Fevereiro/2023',
-    bio: [
-      'Silvia Monteiro é contadora com ampla atuação no terceiro setor e em entidades esportivas sem fins lucrativos. Assumiu a diretoria financeira com o desafio de dar transparência às contas da federação.',
-      'É responsável pelo controle das anuidades dos atletas, das taxas de filiação dos clubes e pela prestação de contas anual da FHT, garantindo conformidade com as exigências legais e estatutárias.',
-      'Implantou controles internos para o acompanhamento de receitas e despesas e conduz a elaboração dos balanços e relatórios financeiros apresentados à assembleia dos clubes filiados.',
-    ],
-  },
-  {
-    id: 'arbitragem',
-    nome: 'Alexandre Costa',
-    cargo: 'Diretor de Arbitragem',
-    mandato: '2023–2027',
-    email: 'arbitragem@fht.org.br',
-    telefone: '(63) 98555-3120',
-    area: 'Arbitragem',
-    desde: 'Março/2023',
-    bio: [
-      'Alexandre Costa foi árbitro por mais de quinze anos, com atuação em competições estaduais e nacionais, antes de migrar para a gestão da arbitragem tocantinense.',
-      'À frente da diretoria, coordena o quadro de árbitros da federação, organiza as escalas para os jogos oficiais e promove cursos de formação e reciclagem para novos apitadores.',
-      'Zela pela padronização das súmulas e pela aplicação uniforme das regras oficiais em todas as competições organizadas ou chanceladas pela FHT.',
-    ],
-  },
-  {
-    id: 'comunicacao',
-    nome: 'Renata Pinheiro',
-    cargo: 'Diretora de Comunicação',
-    mandato: '2023–2027',
-    email: 'comunicacao@fht.org.br',
-    telefone: '(63) 98666-9041',
-    area: 'Comunicação',
-    desde: 'Abril/2023',
-    bio: [
-      'Renata Pinheiro é jornalista com experiência em assessoria de imprensa esportiva e gestão de mídias sociais. Integrou coberturas de eventos esportivos em todo o estado antes de assumir a diretoria.',
-      'Responde pela comunicação oficial da federação: divulgação de notícias, cobertura das competições, gestão do site institucional e das redes sociais, além do relacionamento com a imprensa.',
-      'Trabalha para dar visibilidade aos clubes e atletas tocantinenses, valorizando conquistas e fortalecendo a imagem do handebol como esporte em crescimento no estado.',
-    ],
-  },
-];
-
-const AREA_ICON: Record<string, typeof Shield> = {
-  'Gestão Geral': Users,
-  Competições: Award,
-  Financeiro: DollarSign,
-  Arbitragem: Shield,
-  Comunicação: Newspaper,
-};
-
-function iniciais(nome: string): string {
-  const partes = nome.trim().split(/\s+/);
-  const primeira = partes[0]?.[0] ?? '';
-  const ultima = partes.length > 1 ? partes[partes.length - 1][0] : '';
-  return (primeira + ultima).toUpperCase();
+  bio: string;
+  fotoUrl: string;
+  ordem: string;
 }
 
-const SELO_DEMO = (
-  <span className="font-body text-[10px] text-gray-soft/60 border border-federation/20 rounded-full px-2 py-0.5">
-    demonstração
-  </span>
-);
-
-type CardProps = {
-  diretor: Diretor;
-  onClick: () => void;
-};
-
-function DiretorCard({ diretor, onClick }: CardProps) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="bg-[#0d1b2a]/60 border border-federation/20 hover:border-gold/40 rounded-xl p-5 flex flex-col items-center text-center transition-colors duration-250 group"
-    >
-      <div className="w-20 h-20 rounded-lg bg-federation/20 border border-federation/40 group-hover:border-gold/50 flex items-center justify-center mb-4 transition-colors duration-250">
-        <span className="font-display text-gold text-3xl tracking-wider">
-          {iniciais(diretor.nome)}
-        </span>
-      </div>
-      <p className="font-body text-fht-white text-sm font-semibold leading-tight">
-        {diretor.nome}
-      </p>
-      <p className="font-body text-gray-soft text-xs mt-1">{diretor.cargo}</p>
-    </button>
-  );
+function vazio(): FormDiretor {
+  return { nome: '', cargo: '', area: 'Gestão Geral', mandato: '', email: '', telefone: '', desde: '', bio: '', fotoUrl: '', ordem: '0' };
 }
 
-type ModalProps = {
-  diretor: Diretor;
+function deDTO(d: DiretorDTO): FormDiretor {
+  return {
+    nome: d.nome, cargo: d.cargo, area: d.area ?? 'Gestão Geral', mandato: d.mandato ?? '',
+    email: d.email ?? '', telefone: d.telefone ?? '', desde: d.desde ?? '', bio: d.bio ?? '',
+    fotoUrl: d.fotoUrl ?? '', ordem: String(d.ordem ?? 0),
+  };
+}
+
+function FormModal({ editando, salvando, onClose, onSalvar }: {
+  editando: DiretorDTO | null;
+  salvando: boolean;
   onClose: () => void;
-};
+  onSalvar: (dados: FormDiretor, id: string | null) => void;
+}) {
+  const [form, setForm] = useState<FormDiretor>(editando ? deDTO(editando) : vazio());
+  const [enviando, setEnviando] = useState(false);
+  const set = <K extends keyof FormDiretor>(k: K, v: FormDiretor[K]) => setForm((f) => ({ ...f, [k]: v }));
 
-function DiretorModal({ diretor, onClose }: ModalProps) {
-  const [editando, setEditando] = useState<boolean>(false);
-  const [bioSalva, setBioSalva] = useState<string[]>(diretor.bio);
-  const [rascunho, setRascunho] = useState<string>(diretor.bio.join('\n\n'));
-  const [feedback, setFeedback] = useState<boolean>(false);
-
-  const AreaIcon = AREA_ICON[diretor.area] ?? UserCog;
-
-  function iniciarEdicao() {
-    setRascunho(bioSalva.join('\n\n'));
-    setEditando(true);
-    setFeedback(false);
+  async function enviarFoto(file: File) {
+    setEnviando(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await apiPostForm<UploadResponse>('/api/diretores/upload-foto', fd);
+      set('fotoUrl', res.url);
+    } catch { /* silencioso: admin pode colar URL */ }
+    finally { setEnviando(false); }
   }
 
-  function salvar() {
-    const paragrafos = rascunho
-      .split(/\n{2,}/)
-      .map((p) => p.trim())
-      .filter((p) => p.length > 0);
-    setBioSalva(paragrafos.length > 0 ? paragrafos : bioSalva);
-    setEditando(false);
-    setFeedback(true);
-  }
-
-  function cancelar() {
-    setEditando(false);
-  }
+  const campo = 'font-body bg-[#0d1b2a]/80 border border-federation/20 focus:border-gold rounded-lg px-4 py-3 text-fht-white placeholder-gray-soft text-sm outline-none w-full';
+  const rotulo = 'font-body text-gray-soft text-xs uppercase tracking-wider mb-1 block';
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ backgroundColor: 'rgba(0,0,0,0.75)' }}
-      onClick={onClose}
-    >
-      <div
-        className="bg-[#0a1628] border border-federation/30 rounded-xl w-full max-w-lg shadow-2xl max-h-[90vh] flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* header */}
-        <div className="p-5 border-b border-federation/20 flex items-start gap-4">
-          <div className="w-16 h-16 rounded-lg bg-federation/20 border border-federation/40 flex items-center justify-center shrink-0">
-            <span className="font-display text-gold text-2xl tracking-wider">
-              {iniciais(diretor.nome)}
-            </span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="font-display text-fht-white text-xl tracking-wide leading-none">
-                {diretor.nome}
-              </h3>
-              {SELO_DEMO}
-            </div>
-            <p className="font-body text-gold text-sm mt-1">{diretor.cargo}</p>
-            <span className="inline-flex items-center gap-1.5 font-body text-xs text-gray-soft mt-2">
-              <Calendar size={13} /> Mandato {diretor.mandato}
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-gray-soft hover:text-fht-white transition-colors duration-150 shrink-0"
-            aria-label="Fechar"
-          >
-            <X size={22} />
-          </button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.75)' }} onClick={onClose}>
+      <div className="bg-[#0a1628] border border-federation/30 rounded-xl w-full max-w-lg max-h-[92vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="p-5 border-b border-federation/20 flex items-center justify-between sticky top-0 bg-[#0a1628] z-10">
+          <h3 className="font-display text-fht-white text-xl tracking-wider">{editando ? 'EDITAR MEMBRO' : 'ADICIONAR MEMBRO'}</h3>
+          <button type="button" onClick={onClose} className="text-gray-soft hover:text-fht-white transition-colors duration-150"><X size={20} /></button>
         </div>
 
-        {/* corpo */}
-        <div className="p-5 flex flex-col gap-5 overflow-y-auto">
-          {/* dados de contato */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-lg px-3 py-2.5 flex items-center gap-2.5">
-              <AreaIcon size={16} className="text-blue-300 shrink-0" />
-              <div className="min-w-0">
-                <span className="font-body text-gray-soft text-[10px] uppercase tracking-wider block">
-                  Área
-                </span>
-                <span className="font-body text-fht-white text-sm truncate block">
-                  {diretor.area}
-                </span>
-              </div>
-            </div>
-            <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-lg px-3 py-2.5 flex items-center gap-2.5">
-              <Calendar size={16} className="text-blue-300 shrink-0" />
-              <div className="min-w-0">
-                <span className="font-body text-gray-soft text-[10px] uppercase tracking-wider block">
-                  Na diretoria desde
-                </span>
-                <span className="font-body text-fht-white text-sm truncate block">
-                  {diretor.desde}
-                </span>
-              </div>
-            </div>
-            <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-lg px-3 py-2.5 flex items-center gap-2.5">
-              <Mail size={16} className="text-blue-300 shrink-0" />
-              <div className="min-w-0">
-                <span className="font-body text-gray-soft text-[10px] uppercase tracking-wider block">
-                  E-mail
-                </span>
-                <span className="font-body text-fht-white text-sm truncate block">
-                  {diretor.email}
-                </span>
-              </div>
-            </div>
-            <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-lg px-3 py-2.5 flex items-center gap-2.5">
-              <Phone size={16} className="text-blue-300 shrink-0" />
-              <div className="min-w-0">
-                <span className="font-body text-gray-soft text-[10px] uppercase tracking-wider block">
-                  Telefone
-                </span>
-                <span className="font-body text-fht-white text-sm truncate block">
-                  {diretor.telefone}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* bio / curriculo */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <p className="font-display text-gold text-xs tracking-widest">
-                CURRÍCULO
-              </p>
-              {!editando && (
-                <button
-                  type="button"
-                  onClick={iniciarEdicao}
-                  className="inline-flex items-center gap-1.5 font-display text-gray-soft hover:text-gold text-xs tracking-wider transition-colors duration-150"
-                >
-                  <Pencil size={13} /> Editar
-                </button>
-              )}
-            </div>
-
-            {editando ? (
-              <div className="flex flex-col gap-3">
-                <textarea
-                  value={rascunho}
-                  onChange={(e) => setRascunho(e.target.value)}
-                  rows={9}
-                  className="font-body bg-[#0d1b2a]/80 border border-federation/20 focus:border-gold rounded-lg px-4 py-3 text-fht-white placeholder-gray-soft text-sm outline-none w-full resize-y leading-relaxed"
-                  placeholder="Escreva a bio do diretor. Separe os parágrafos com uma linha em branco."
-                />
-                <p className="font-body text-gray-soft text-xs">
-                  Separe parágrafos com uma linha em branco.
-                </p>
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={salvar}
-                    className="font-display text-night bg-gold hover:bg-gold-light px-5 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250 inline-flex items-center gap-2"
-                  >
-                    <Check size={16} /> Salvar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={cancelar}
-                    className="font-display text-gray-soft border border-federation/30 hover:border-federation/60 px-5 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250"
-                  >
-                    Cancelar
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-3">
-                {feedback && (
-                  <div className="flex items-center gap-2 bg-green-500/10 border border-green-500/30 rounded-lg px-3 py-2">
-                    <Check size={15} className="text-green-400 shrink-0" />
-                    <span className="font-body text-green-400 text-xs">
-                      Currículo atualizado (demonstração — não persiste no banco).
-                    </span>
-                  </div>
-                )}
-                {bioSalva.map((p, i) => (
-                  <p
-                    key={i}
-                    className="font-body text-gray-soft text-sm leading-relaxed"
-                  >
-                    {p}
-                  </p>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* footer */}
-        <div className="p-5 border-t border-federation/20 flex items-center gap-2">
-          <Info size={14} className="text-gray-soft shrink-0" />
-          <span className="font-body text-gray-soft text-xs">
-            Cada diretor pode editar o próprio perfil.
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function AdicionarModal({ onClose }: { onClose: () => void }) {
-  const [nome, setNome] = useState<string>('');
-  const [cargo, setCargo] = useState<string>('Presidente');
-  const [email, setEmail] = useState<string>('');
-  const [mandato, setMandato] = useState<string>('2023–2027');
-
-  const cargos = [
-    'Presidente',
-    'Vice-Presidente',
-    'Diretor Técnico',
-    'Diretora Financeira',
-    'Diretor de Arbitragem',
-    'Diretora de Comunicação',
-    'Conselho Fiscal',
-  ];
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ backgroundColor: 'rgba(0,0,0,0.75)' }}
-      onClick={onClose}
-    >
-      <div
-        className="bg-[#0a1628] border border-federation/30 rounded-xl w-full max-w-lg shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* header */}
-        <div className="p-5 border-b border-federation/20 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <h3 className="font-display text-fht-white text-lg tracking-wide">
-              ADICIONAR MEMBRO
-            </h3>
-            {SELO_DEMO}
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-gray-soft hover:text-fht-white transition-colors duration-150"
-            aria-label="Fechar"
-          >
-            <X size={22} />
-          </button>
-        </div>
-
-        {/* corpo */}
         <div className="p-5 flex flex-col gap-4">
+          {/* foto */}
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-lg bg-federation/20 border border-federation/40 flex items-center justify-center shrink-0">
-              <span className="font-display text-gold text-2xl tracking-wider">
-                {nome ? iniciais(nome) : '?'}
-              </span>
+            <div className="w-20 h-20 rounded-lg bg-federation/20 border border-federation/40 flex items-center justify-center overflow-hidden shrink-0">
+              {form.fotoUrl
+                ? <img src={fileUrl(form.fotoUrl)} alt="Foto" className="w-full h-full object-cover" />
+                : <span className="font-display text-gold text-2xl">{form.nome ? iniciais(form.nome) : '?'}</span>}
             </div>
-            <p className="font-body text-gray-soft text-xs leading-relaxed">
-              O avatar usa as iniciais do nome automaticamente. Uma foto poderá
-              ser enviada depois, no perfil do diretor.
-            </p>
+            <div className="flex-1">
+              <label className="inline-flex items-center gap-2 font-body text-sm text-gray-soft hover:text-gold border border-federation/30 hover:border-gold/40 rounded-lg px-3 py-2 cursor-pointer transition-colors duration-150">
+                {enviando ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
+                {enviando ? 'Enviando...' : 'Enviar foto'}
+                <input type="file" accept="image/*" className="hidden" disabled={enviando} onChange={(e) => { const f = e.target.files?.[0]; if (f) void enviarFoto(f); }} />
+              </label>
+              {form.fotoUrl && <button type="button" onClick={() => set('fotoUrl', '')} className="ml-2 font-body text-xs text-gray-soft hover:text-red-400">remover</button>}
+            </div>
           </div>
 
-          <label className="block">
-            <span className="font-body text-gray-soft text-xs uppercase tracking-wider mb-1 block">
-              Nome completo
-            </span>
-            <input
-              value={nome}
-              onChange={(e) => setNome(e.target.value)}
-              placeholder="Ex.: Maria Fernanda Souza"
-              className="font-body bg-[#0d1b2a]/80 border border-federation/20 focus:border-gold rounded-lg px-4 py-3 text-fht-white placeholder-gray-soft text-sm outline-none w-full"
-            />
-          </label>
+          <label className="block"><span className={rotulo}>Nome completo</span>
+            <input value={form.nome} onChange={(e) => set('nome', e.target.value)} placeholder="Ex.: Maria Fernanda Souza" className={campo} /></label>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <label className="block">
-              <span className="font-body text-gray-soft text-xs uppercase tracking-wider mb-1 block">
-                Cargo
-              </span>
-              <select
-                value={cargo}
-                onChange={(e) => setCargo(e.target.value)}
-                className="font-body bg-[#0d1b2a]/80 border border-federation/20 focus:border-gold rounded-lg px-4 py-3 text-fht-white placeholder-gray-soft text-sm outline-none w-full appearance-none cursor-pointer"
-              >
-                {cargos.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              <span className="font-body text-gray-soft text-xs uppercase tracking-wider mb-1 block">
-                Mandato
-              </span>
-              <input
-                value={mandato}
-                onChange={(e) => setMandato(e.target.value)}
-                placeholder="2023–2027"
-                className="font-body bg-[#0d1b2a]/80 border border-federation/20 focus:border-gold rounded-lg px-4 py-3 text-fht-white placeholder-gray-soft text-sm outline-none w-full"
-              />
-            </label>
+          <div className="grid grid-cols-2 gap-4">
+            <label className="block"><span className={rotulo}>Cargo</span>
+              <input value={form.cargo} onChange={(e) => set('cargo', e.target.value)} placeholder="Ex.: Presidente" className={campo} /></label>
+            <label className="block"><span className={rotulo}>Área</span>
+              <select value={form.area} onChange={(e) => set('area', e.target.value)} className={`${campo} appearance-none cursor-pointer`}>
+                {AREAS.map((a) => <option key={a} value={a} className="bg-[#0a1628]">{a}</option>)}
+              </select></label>
           </div>
 
-          <label className="block">
-            <span className="font-body text-gray-soft text-xs uppercase tracking-wider mb-1 block">
-              E-mail institucional
-            </span>
-            <input
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="nome@fht.org.br"
-              className="font-body bg-[#0d1b2a]/80 border border-federation/20 focus:border-gold rounded-lg px-4 py-3 text-fht-white placeholder-gray-soft text-sm outline-none w-full"
-            />
-          </label>
+          <div className="grid grid-cols-2 gap-4">
+            <label className="block"><span className={rotulo}>Mandato</span>
+              <input value={form.mandato} onChange={(e) => set('mandato', e.target.value)} placeholder="2023–2027" className={campo} /></label>
+            <label className="block"><span className={rotulo}>Na diretoria desde</span>
+              <input value={form.desde} onChange={(e) => set('desde', e.target.value)} placeholder="Fevereiro/2023" className={campo} /></label>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <label className="block"><span className={rotulo}>E-mail institucional</span>
+              <input value={form.email} onChange={(e) => set('email', e.target.value)} placeholder="nome@fht.org.br" className={campo} /></label>
+            <label className="block"><span className={rotulo}>Telefone</span>
+              <input value={form.telefone} onChange={(e) => set('telefone', e.target.value)} placeholder="(63) 9....." className={campo} /></label>
+          </div>
+
+          <label className="block"><span className={rotulo}>Ordem de exibição</span>
+            <input type="number" value={form.ordem} onChange={(e) => set('ordem', e.target.value)} className={`${campo} w-28`} /></label>
+
+          <label className="block"><span className={rotulo}>Bio / currículo <span className="normal-case text-gray-soft/60">(parágrafos separados por linha em branco)</span></span>
+            <textarea value={form.bio} onChange={(e) => set('bio', e.target.value)} rows={6} placeholder="Trajetória, formação, tempo de trabalho..." className={`${campo} resize-y leading-relaxed`} /></label>
         </div>
 
-        {/* footer */}
-        <div className="p-5 border-t border-federation/20 flex gap-3 justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            className="font-display text-gray-soft border border-federation/30 hover:border-federation/60 px-5 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250"
-          >
-            Cancelar
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="font-display text-night bg-gold hover:bg-gold-light px-5 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250 inline-flex items-center gap-2"
-          >
-            <Check size={16} /> Adicionar
+        <div className="p-5 border-t border-federation/20 flex gap-3 justify-end sticky bottom-0 bg-[#0a1628]">
+          <button type="button" onClick={onClose} className="font-display text-gray-soft border border-federation/30 hover:border-federation/60 px-5 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250">CANCELAR</button>
+          <button type="button" disabled={salvando || enviando} onClick={() => onSalvar(form, editando?.id ?? null)}
+            className="font-display text-night bg-gold hover:bg-gold-light disabled:opacity-60 disabled:cursor-not-allowed px-5 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250 inline-flex items-center gap-2">
+            {salvando && <Loader2 size={16} className="animate-spin" />}{editando ? 'SALVAR' : 'ADICIONAR'}
           </button>
         </div>
       </div>
@@ -506,61 +131,94 @@ function AdicionarModal({ onClose }: { onClose: () => void }) {
 }
 
 export function DiretoriaPage() {
-  const [selecionado, setSelecionado] = useState<Diretor | null>(null);
-  const [adicionando, setAdicionando] = useState<boolean>(false);
+  const [diretores, setDiretores] = useState<DiretorDTO[]>([]);
+  const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState('');
+  const [salvando, setSalvando] = useState(false);
+  const [modalAberto, setModalAberto] = useState(false);
+  const [editando, setEditando] = useState<DiretorDTO | null>(null);
+
+  async function carregar() {
+    setCarregando(true); setErro('');
+    try { setDiretores(await apiGet<DiretorDTO[]>('/api/diretores')); }
+    catch { setErro('Não foi possível carregar a diretoria.'); }
+    finally { setCarregando(false); }
+  }
+  useEffect(() => { void carregar(); }, []);
+
+  async function deletar(d: DiretorDTO) {
+    if (!window.confirm(`Remover ${d.nome} da diretoria?`)) return;
+    try { await apiDelete(`/api/diretores/${d.id}`); setDiretores((l) => l.filter((x) => x.id !== d.id)); }
+    catch { setErro('Não foi possível remover.'); }
+  }
+
+  async function salvar(dados: FormDiretor, id: string | null) {
+    if (!dados.nome.trim() || !dados.cargo.trim()) { setErro('Nome e cargo são obrigatórios.'); return; }
+    setSalvando(true); setErro('');
+    const payload = {
+      nome: dados.nome.trim(), cargo: dados.cargo.trim(), area: dados.area || null,
+      mandato: dados.mandato || null, email: dados.email || null, telefone: dados.telefone || null,
+      desde: dados.desde || null, bio: dados.bio || null, fotoUrl: dados.fotoUrl || null,
+      ordem: Number(dados.ordem) || 0,
+    };
+    try {
+      if (id === null) { const novo = await apiPostJson<DiretorDTO>('/api/diretores', payload); setDiretores((l) => [...l, novo]); }
+      else { const upd = await apiPut<DiretorDTO>(`/api/diretores/${id}`, payload); setDiretores((l) => l.map((x) => (x.id === id ? upd : x))); }
+      setModalAberto(false); setEditando(null);
+    } catch { setErro('Não foi possível salvar.'); }
+    finally { setSalvando(false); }
+  }
 
   return (
     <div>
-      {/* cabeçalho */}
       <div className="flex items-start justify-between flex-wrap gap-4 mb-6">
         <div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <h2 className="font-display text-fht-white text-3xl">DIRETORIA</h2>
-            {SELO_DEMO}
-          </div>
-          <p className="font-body text-gray-soft text-sm mt-1">
-            Membros da diretoria da federação — perfis exibidos no site
-            institucional.
-          </p>
+          <h2 className="font-display text-fht-white text-3xl">DIRETORIA</h2>
+          <p className="font-body text-gray-soft text-sm mt-1">Membros da diretoria — perfis exibidos no site institucional.</p>
         </div>
-        <button
-          type="button"
-          onClick={() => setAdicionando(true)}
-          className="font-display text-night bg-gold hover:bg-gold-light px-5 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250 inline-flex items-center gap-2"
-        >
+        <button type="button" onClick={() => { setEditando(null); setModalAberto(true); }}
+          className="font-display text-night bg-gold hover:bg-gold-light px-5 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250 inline-flex items-center gap-2">
           <Plus size={16} /> Adicionar membro
         </button>
       </div>
 
-      {/* nota */}
+      {erro && <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/30 text-red-300 rounded-lg px-4 py-3 mb-6 font-body text-sm"><AlertCircle size={16} /> {erro}</div>}
+
       <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-4 mb-6 flex items-center gap-3">
         <UserCog size={18} className="text-gold shrink-0" />
-        <p className="font-body text-gray-soft text-sm">
-          Cada diretor pode editar o próprio perfil (foto, biografia e contato).
-          Clique em um card para ver o currículo completo.
-        </p>
+        <p className="font-body text-gray-soft text-sm">Adicione, edite (foto, bio, contato) e ordene os membros. Clique num card para editar.</p>
       </div>
 
-      {/* grid de diretores */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        {DIRETORES.map((d) => (
-          <DiretorCard
-            key={d.id}
-            diretor={d}
-            onClick={() => setSelecionado(d)}
-          />
-        ))}
-      </div>
-
-      {/* modais */}
-      {selecionado && (
-        <DiretorModal
-          key={selecionado.id}
-          diretor={selecionado}
-          onClose={() => setSelecionado(null)}
-        />
+      {carregando ? (
+        <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-10 flex items-center justify-center gap-3">
+          <Loader2 size={22} className="text-gold animate-spin" /><span className="font-body text-gray-soft text-sm">Carregando...</span>
+        </div>
+      ) : diretores.length === 0 ? (
+        <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-10 text-center">
+          <UserCog size={30} className="text-gray-soft/50 mx-auto mb-3" />
+          <p className="font-body text-gray-soft text-sm">Nenhum membro ainda. Adicione o primeiro.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          {diretores.map((d) => (
+            <div key={d.id} className="bg-[#0d1b2a]/60 border border-federation/20 hover:border-gold/40 rounded-xl p-5 flex flex-col items-center text-center transition-colors duration-250 group relative">
+              <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button type="button" onClick={() => { setEditando(d); setModalAberto(true); }} title="Editar" className="p-1.5 rounded bg-night/70 border border-federation/30 text-fht-white hover:text-gold hover:border-gold/40"><Pencil size={13} /></button>
+                <button type="button" onClick={() => void deletar(d)} title="Remover" className="p-1.5 rounded bg-night/70 border border-red-500/30 text-red-400 hover:bg-red-500/20"><Trash2 size={13} /></button>
+              </div>
+              <button type="button" onClick={() => { setEditando(d); setModalAberto(true); }} className="flex flex-col items-center">
+                <div className="w-20 h-20 rounded-lg bg-federation/20 border border-federation/40 group-hover:border-gold/50 flex items-center justify-center mb-4 overflow-hidden transition-colors duration-250">
+                  {d.fotoUrl ? <img src={fileUrl(d.fotoUrl)} alt={d.nome} className="w-full h-full object-cover" /> : <span className="font-display text-gold text-3xl tracking-wider">{iniciais(d.nome)}</span>}
+                </div>
+                <p className="font-body text-fht-white text-sm font-semibold leading-tight">{d.nome}</p>
+                <p className="font-body text-gray-soft text-xs mt-1">{d.cargo}</p>
+              </button>
+            </div>
+          ))}
+        </div>
       )}
-      {adicionando && <AdicionarModal onClose={() => setAdicionando(false)} />}
+
+      {modalAberto && <FormModal editando={editando} salvando={salvando} onClose={() => { setModalAberto(false); setEditando(null); }} onSalvar={(dados, id) => void salvar(dados, id)} />}
     </div>
   );
 }

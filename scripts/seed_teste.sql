@@ -84,3 +84,33 @@ VALUES
  ('bbbbbbbb-0000-0000-0000-000000000006', 'https://picsum.photos/seed/fht-g6/800/600', 'Final da Taça FHT', '2023', 'Adulto Masculino', 'large', NOW(), NOW()),
  ('bbbbbbbb-0000-0000-0000-000000000007', 'https://picsum.photos/seed/fht-g7/600/600', 'Abertura da Temporada', '2024', 'Sub-16', 'medium', NOW(), NOW())
 ON CONFLICT (id) DO NOTHING;
+
+-- ── Diretoria ───────────────────────────────────────────────────────────
+-- Limpar depois: DELETE FROM diretores WHERE id::text LIKE 'cccccccc-%';
+INSERT INTO diretores (id, nome, cargo, area, mandato, email, telefone, desde, bio, ordem, created_at, updated_at)
+VALUES
+ ('cccccccc-0000-0000-0000-000000000001', 'João Carlos Mendonça', 'Presidente', 'Gestão Geral', '2023–2027', 'presidencia@fht.org.br', '(63) 98111-2023', 'Fevereiro/2023',
+  E'Natural de Palmas, atua no handebol tocantinense há mais de duas décadas, tendo iniciado como atleta antes de assumir a gestão esportiva.\n\nÀ frente da presidência, prioriza a profissionalização administrativa da FHT, a ampliação do calendário estadual e a filiação de novos clubes no interior.', 1, NOW(), NOW()),
+ ('cccccccc-0000-0000-0000-000000000002', 'Ana Paula Ribeiro', 'Vice-Presidente', 'Gestão Geral', '2023–2027', 'vice@fht.org.br', '(63) 98222-4477', 'Fevereiro/2023',
+  E'Formada em Educação Física e pós-graduada em Gestão Esportiva. Coordenou projetos sociais de iniciação ao handebol em escolas públicas.\n\nDá suporte direto à presidência e coordena a integração entre as diretorias.', 2, NOW(), NOW()),
+ ('cccccccc-0000-0000-0000-000000000003', 'Roberto Alves Neto', 'Diretor Técnico', 'Competições', '2023–2027', 'tecnico@fht.org.br', '(63) 98333-1590', 'Março/2023',
+  E'Treinador de equipes adultas e de base, com certificação técnica da CBHb.\n\nResponsável pelo calendário estadual, regulamento das competições e homologação de resultados oficiais.', 3, NOW(), NOW()),
+ ('cccccccc-0000-0000-0000-000000000004', 'Silvia Monteiro', 'Diretora Financeira', 'Financeiro', '2023–2027', 'financeiro@fht.org.br', '(63) 98444-7788', 'Fevereiro/2023',
+  E'Contadora com atuação em entidades esportivas sem fins lucrativos.\n\nResponsável pelo controle das anuidades, taxas de filiação e pela prestação de contas anual da FHT.', 4, NOW(), NOW()),
+ ('cccccccc-0000-0000-0000-000000000005', 'Alexandre Costa', 'Diretor de Arbitragem', 'Arbitragem', '2023–2027', 'arbitragem@fht.org.br', '(63) 98555-3120', 'Março/2023',
+  E'Árbitro por mais de quinze anos, com atuação em competições estaduais e nacionais.\n\nCoordena o quadro de árbitros, as escalas dos jogos e os cursos de formação.', 5, NOW(), NOW()),
+ ('cccccccc-0000-0000-0000-000000000006', 'Renata Pinheiro', 'Diretora de Comunicação', 'Comunicação', '2023–2027', 'comunicacao@fht.org.br', '(63) 98666-9041', 'Abril/2023',
+  E'Jornalista com experiência em assessoria de imprensa esportiva e mídias sociais.\n\nResponde pela comunicação oficial: notícias, cobertura das competições e redes sociais.', 6, NOW(), NOW())
+ON CONFLICT (id) DO NOTHING;
+
+-- ── Documentos institucionais (transparência) — PDF de exemplo público ──
+-- Limpar depois: DELETE FROM documentos WHERE id::text LIKE 'dddddddd-%';
+INSERT INTO documentos (id, titulo, categoria, arquivo_url, data_publicacao, publicado_por, tamanho_bytes, created_at, updated_at)
+VALUES
+ ('dddddddd-0000-0000-0000-000000000001', 'Estatuto da FHT — Versão 2023', 'Estatuto', 'https://www.africau.edu/images/default/sample.pdf', '2023-03-14', 'Administração FHT', 1887436, NOW(), NOW()),
+ ('dddddddd-0000-0000-0000-000000000002', 'Regulamento Geral de Competições 2026', 'Regulamento', 'https://www.africau.edu/images/default/sample.pdf', '2026-01-10', 'Administração FHT', 2516582, NOW(), NOW()),
+ ('dddddddd-0000-0000-0000-000000000003', 'Calendário Oficial de Competições 2026', 'Calendário', 'https://www.africau.edu/images/default/sample.pdf', '2026-01-05', 'Administração FHT', 655360, NOW(), NOW()),
+ ('dddddddd-0000-0000-0000-000000000004', 'Edital de Credenciamento de Árbitros 2026', 'Edital', 'https://www.africau.edu/images/default/sample.pdf', '2026-02-14', 'Administração FHT', 942080, NOW(), NOW()),
+ ('dddddddd-0000-0000-0000-000000000005', 'Circular nº 01/2026 — Prazo de Transferências', 'Circular', 'https://www.africau.edu/images/default/sample.pdf', '2026-02-28', 'Administração FHT', 317440, NOW(), NOW()),
+ ('dddddddd-0000-0000-0000-000000000006', 'Ata de Posse da Diretoria 2023–2027', 'Estatuto', 'https://www.africau.edu/images/default/sample.pdf', '2023-04-01', 'Administração FHT', 524288, NOW(), NOW())
+ON CONFLICT (id) DO NOTHING;

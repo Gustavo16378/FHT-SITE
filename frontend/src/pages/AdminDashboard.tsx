@@ -655,6 +655,12 @@ function DonutChart({ segments, total, centerLabel }: {
   )
 }
 
+function metricColor(label: string): string {
+  if (label === 'Ativos') return 'text-green-400'
+  if (label.startsWith('Pendentes') || label.startsWith('Ag.')) return 'text-yellow-400'
+  return 'text-fht-white'
+}
+
 function DashboardPage({ dashboard }: { dashboard: AdminDashboardDTO | null }) {
   const cards = [
     {
@@ -702,12 +708,12 @@ function DashboardPage({ dashboard }: { dashboard: AdminDashboardDTO | null }) {
       <div className="grid md:grid-cols-3 gap-5">
         {cards.map(g => (
           <div key={g.group} className={`bg-[#0d1b2a]/60 border ${g.color} rounded-xl p-5`}>
-            <p className="font-display text-gold text-base tracking-wider mb-3">{g.group.toUpperCase()}</p>
-            <div className="flex gap-4">
-              {g.items.map(i => (
-                <div key={i.label}>
-                  <p className="font-display text-fht-white text-3xl">{i.v}</p>
-                  <p className="font-body text-gray-soft text-xs">{i.label}</p>
+            <p className="font-display text-gold text-base tracking-wider mb-4">{g.group.toUpperCase()}</p>
+            <div className="flex divide-x divide-federation/20">
+              {g.items.map((i, idx) => (
+                <div key={i.label} className={`flex flex-col ${idx === 0 ? 'pr-5' : 'px-5'}`}>
+                  <span className={`font-display text-4xl leading-none ${metricColor(i.label)}`}>{i.v}</span>
+                  <span className="font-body text-gray-soft text-[11px] mt-1.5 whitespace-nowrap">{i.label}</span>
                 </div>
               ))}
             </div>

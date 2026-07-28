@@ -156,6 +156,50 @@ export interface DocumentoUploadResponse {
   tamanhoBytes: number
 }
 
+export type ArbitroStatus = 'PENDENTE' | 'CREDENCIADO' | 'REJEITADO' | 'SUSPENSO'
+
+/** ArbitroResponseDTO — visão completa (admin) */
+export interface ArbitroDTO {
+  id: string
+  nome: string
+  cpf: string | null
+  rg: string | null
+  orgaoEmissor: string | null
+  dataNascimento: string | null
+  sexo: string | null
+  telefone: string | null
+  email: string | null
+  cidade: string | null
+  uf: string | null
+  fotoUrl: string | null
+  rgUrl: string | null
+  comprovanteEscolarUrl: string | null
+  jaArbitro: boolean
+  nivelAtual: string | null
+  federacaoOrigem: string | null
+  temExperiencia: boolean
+  descricaoExperiencia: string | null
+  disponibilidadeFds: boolean
+  cursoInteresse: string | null
+  nivel: string | null
+  registro: string | null
+  inicioArbitragem: string | null
+  formacao: string | null
+  status: ArbitroStatus
+  motivoRejeicao: string | null
+  createdAt: string
+}
+
+/** ArbitroPublicoDTO — vitrine pública (credenciados) */
+export interface ArbitroPublicoDTO {
+  id: string
+  nome: string
+  cidade: string | null
+  uf: string | null
+  nivel: string | null
+  fotoUrl: string | null
+}
+
 export type GaleriaTamanho = 'large' | 'medium' | 'small'
 
 /** FotoDTO — foto da galeria pública */

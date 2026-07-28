@@ -1,7 +1,9 @@
-import { useState } from 'react'
-import { Star, Calendar, MapPin, Users, ArrowRight } from 'lucide-react'
-import { referees, refereeCourses } from '../data/referees'
+import { useEffect, useState } from 'react'
+import { Star, Calendar, MapPin, Users, ArrowRight, Loader2 } from 'lucide-react'
+import { refereeCourses } from '../data/referees'
 import { useInView } from '../hooks/useInView'
+import { apiGet, fileUrl } from '../services/api'
+import type { ArbitroPublicoDTO } from '../types/api'
 import ArbitroForm from './ArbitroForm'
 
 const levelColors: Record<string, string> = {
@@ -15,9 +17,27 @@ function getInitials(name: string) {
   return name.split(' ').slice(0, 2).map((n) => n[0]).join('')
 }
 
+/** Avatar do árbitro: foto quando existe/carrega, senão iniciais. */
+function Avatar({ arb }: { arb: ArbitroPublicoDTO }) {
+  const [erro, setErro] = useState(false)
+  if (!arb.fotoUrl || erro) {
+    return <span className="font-display text-gold text-lg">{getInitials(arb.nome)}</span>
+  }
+  return <img src={fileUrl(arb.fotoUrl)} alt={arb.nome} className="w-full h-full object-cover rounded-lg" onError={() => setErro(true)} />
+}
+
 export default function Referees() {
   const ref = useInView()
   const [showForm, setShowForm] = useState(false)
+  const [arbitros, setArbitros] = useState<ArbitroPublicoDTO[]>([])
+  const [carregando, setCarregando] = useState(true)
+
+  useEffect(() => {
+    apiGet<ArbitroPublicoDTO[]>('/api/arbitros/publico')
+      .then(setArbitros)
+      .catch(() => setArbitros([]))
+      .finally(() => setCarregando(false))
+  }, [])
 
   return (
     <>
@@ -33,34 +53,45 @@ export default function Referees() {
           {/* Árbitros credenciados */}
           <div className="lg:col-span-2">
             <h3 className="font-display text-fht-white text-3xl leading-none mb-6">ÁRBITROS CREDENCIADOS</h3>
-            <div className="grid sm:grid-cols-2 gap-4">
-              {referees.map((ref) => (
-                <div
-                  key={ref.id}
-                  className="flex items-center gap-4 bg-night/50 border border-federation/20 rounded-lg p-4 hover:border-gold/40 transition-colors duration-250 group"
-                >
-                  <div className="w-12 h-12 bg-federation/30 rounded-lg flex items-center justify-center flex-shrink-0 border border-federation/30 group-hover:border-gold/40 transition-colors duration-250">
-                    {ref.photo ? (
-                      <img src={ref.photo} alt={ref.name} className="w-full h-full object-cover rounded-lg" />
-                    ) : (
-                      <span className="font-display text-gold text-lg">{getInitials(ref.name)}</span>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-display text-fht-white text-lg leading-tight uppercase truncate">{ref.name}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className={`font-body text-xs px-2 py-0.5 rounded-full border ${levelColors[ref.level]}`}>
-                        {ref.level}
-                      </span>
-                      <span className="font-body text-gray-soft text-xs flex items-center gap-1">
-                        <MapPin size={10} /> {ref.city}
-                      </span>
+            {carregando ? (
+              <div className="flex items-center gap-3 py-10">
+                <Loader2 size={20} className="text-gold animate-spin" />
+                <span className="font-body text-gray-soft text-sm">Carregando árbitros...</span>
+              </div>
+            ) : arbitros.length === 0 ? (
+              <div className="border border-federation/20 rounded-lg p-8 text-center">
+                <p className="font-body text-gray-soft text-sm">Em breve, o corpo arbitral credenciado da FHT aparece aqui.</p>
+              </div>
+            ) : (
+              <div className="grid sm:grid-cols-2 gap-4">
+                {arbitros.map((arb) => (
+                  <div
+                    key={arb.id}
+                    className="flex items-center gap-4 bg-night/50 border border-federation/20 rounded-lg p-4 hover:border-gold/40 transition-colors duration-250 group"
+                  >
+                    <div className="w-12 h-12 bg-federation/30 rounded-lg flex items-center justify-center flex-shrink-0 border border-federation/30 group-hover:border-gold/40 transition-colors duration-250 overflow-hidden">
+                      <Avatar arb={arb} />
                     </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-display text-fht-white text-lg leading-tight uppercase truncate">{arb.nome}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        {arb.nivel && (
+                          <span className={`font-body text-xs px-2 py-0.5 rounded-full border ${levelColors[arb.nivel] ?? levelColors['Regional']}`}>
+                            {arb.nivel}
+                          </span>
+                        )}
+                        {arb.cidade && (
+                          <span className="font-body text-gray-soft text-xs flex items-center gap-1">
+                            <MapPin size={10} /> {arb.cidade}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <Star size={14} className="text-gold/50 group-hover:text-gold flex-shrink-0 transition-colors duration-250" />
                   </div>
-                  <Star size={14} className="text-gold/50 group-hover:text-gold flex-shrink-0 transition-colors duration-250" />
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Torne-se árbitro */}

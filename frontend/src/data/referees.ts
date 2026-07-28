@@ -1,12 +1,5 @@
-export type RefereeLevel = 'Nacional' | 'Estadual A' | 'Estadual B' | 'Regional'
-
-export interface Referee {
-  id: string
-  name: string
-  level: RefereeLevel
-  city: string
-  photo?: string
-}
+// Árbitros credenciados agora vêm da API (GET /api/arbitros/publico).
+// Aqui ficam só os cursos, que ainda não têm módulo de backend.
 
 export interface RefereeCourse {
   id: string
@@ -16,15 +9,6 @@ export interface RefereeCourse {
   spots: number
   registrationLink: string
 }
-
-export const referees: Referee[] = [
-  { id: '1', name: 'Carlos Alberto Souza', level: 'Nacional', city: 'Palmas' },
-  { id: '2', name: 'Fernanda Oliveira Lima', level: 'Nacional', city: 'Palmas' },
-  { id: '3', name: 'Ricardo Mendes', level: 'Estadual A', city: 'Araguaína' },
-  { id: '4', name: 'Patrícia Rocha', level: 'Estadual A', city: 'Gurupi' },
-  { id: '5', name: 'Marcos Vinicius Alves', level: 'Estadual B', city: 'Porto Nacional' },
-  { id: '6', name: 'Juliana Ferreira', level: 'Estadual B', city: 'Palmas' },
-]
 
 export const refereeCourses: RefereeCourse[] = [
   {

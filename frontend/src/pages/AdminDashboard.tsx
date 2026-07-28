@@ -6,8 +6,8 @@ import {
   Image as ImageIcon, Contact, UserCog, Wallet, Home,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { apiGet, apiPatch, ApiError } from '../services/api'
-import type { ClubeDTO, AtletaDTO, AdminDashboardDTO } from '../types/api'
+import { apiGet, apiPatch, ApiError, fileUrl } from '../services/api'
+import type { ClubeDTO, AtletaDTO, AdminDashboardDTO, ArbitroDTO } from '../types/api'
 import { CompeticoesPage } from './admin/CompeticoesPage'
 import { FinanceiroPage } from './admin/FinanceiroPage'
 import { NoticiasPage } from './admin/NoticiasPage'
@@ -38,7 +38,7 @@ interface Atleta {
   motivoRejeicao?: string; taxaValor?: number; taxaAno?: number
 }
 interface Arbitro {
-  id: number; nome: string; cpf: string; dataNascimento: string; foto: string
+  id: string; nome: string; cpf: string; dataNascimento: string; foto: string
   cidade: string; uf: string; telefone: string; email: string
   nivel: string; registro: string; inicioArbitragem: string; formacao: string
   status: StatusArbitro; motivoRejeicao?: string
@@ -107,13 +107,26 @@ function errMsg(e: unknown): string {
   return 'Ocorreu um erro inesperado.'
 }
 
-/* ── árbitros: ainda sem backend (mock local até criar o módulo) ─ */
-const arbitrosMock: Arbitro[] = [
-  { id: 1, nome: 'Fábio Martins Rocha', cpf: '222.333.444-01', dataNascimento: '1988-06-15', foto: 'https://i.pravatar.cc/150?img=12', cidade: 'Palmas', uf: 'TO', telefone: '(63) 98333-1001', email: 'fabio.arb@email.com', nivel: '', registro: '', inicioArbitragem: '2015', formacao: 'Curso de Formação de Árbitros CBHb 2015', status: 'PENDENTE' },
-  { id: 2, nome: 'Renata Alves Souza', cpf: '222.333.444-02', dataNascimento: '1992-02-20', foto: 'https://i.pravatar.cc/150?img=48', cidade: 'Porto Nacional', uf: 'TO', telefone: '(63) 98333-1002', email: 'renata.arb@email.com', nivel: 'Estadual B', registro: 'ARB-TO-0042', inicioArbitragem: '2013', formacao: 'Curso CBHb 2013 + Reciclagem 2020', status: 'CREDENCIADO' },
-  { id: 3, nome: 'Carlos Eduardo Nunes', cpf: '222.333.444-03', dataNascimento: '1985-10-08', foto: 'https://i.pravatar.cc/150?img=14', cidade: 'Gurupi', uf: 'TO', telefone: '(63) 98333-1003', email: 'carlos.arb@email.com', nivel: 'Nacional', registro: 'ARB-TO-0007', inicioArbitragem: '2008', formacao: 'Curso CBHb + Arbitragem Nacional 2018', status: 'CREDENCIADO' },
-  { id: 4, nome: 'Patrícia Gomes Lima', cpf: '222.333.444-04', dataNascimento: '1990-12-01', foto: 'https://i.pravatar.cc/150?img=44', cidade: 'Araguaína', uf: 'TO', telefone: '(63) 98333-1004', email: 'patricia.arb@email.com', nivel: 'Regional', registro: 'ARB-TO-0055', inicioArbitragem: '2019', formacao: 'Curso de Formação CBHb 2019', status: 'SUSPENSO' },
-]
+/* ── árbitro: DTO → view-model ────────────────────────────────── */
+function mapArbitro(d: ArbitroDTO): Arbitro {
+  return {
+    id: d.id,
+    nome: d.nome,
+    cpf: d.cpf ?? '',
+    dataNascimento: d.dataNascimento ?? '',
+    foto: d.fotoUrl ? fileUrl(d.fotoUrl) : '',
+    cidade: d.cidade ?? '',
+    uf: d.uf ?? '',
+    telefone: d.telefone ?? '',
+    email: d.email ?? '',
+    nivel: d.nivel ?? '',
+    registro: d.registro ?? '',
+    inicioArbitragem: d.inicioArbitragem ?? '',
+    formacao: d.formacao ?? '',
+    status: d.status,
+    motivoRejeicao: d.motivoRejeicao ?? undefined,
+  }
+}
 
 /* ── badge helpers ────────────────────────────────────────────── */
 const clubeBadge: Record<StatusClube, string> = {
@@ -1036,10 +1049,10 @@ function ArbitroDetailPanel({
 }: {
   arbitro: Arbitro
   onClose: () => void
-  onCredenciar: (id: number) => void
-  onRejeitar: (id: number) => void
-  onSuspender: (id: number) => void
-  onReativar: (id: number) => void
+  onCredenciar: (id: string) => void
+  onRejeitar: (id: string) => void
+  onSuspender: (id: string) => void
+  onReativar: (id: string) => void
 }) {
   const Info = ({ label, value }: { label: string; value: string }) => (
     <div>
@@ -1155,49 +1168,66 @@ function ArbitroDetailPanel({
   )
 }
 
-/* ── Árbitros Page (mock local — backend do módulo ainda não existe) ─ */
+/* ── Árbitros Page (API real) ─────────────────────────────────── */
 const NIVEIS_APROVACAO = ['Regional', 'Estadual B', 'Estadual A', 'Nacional']
 
 function ArbitrosPage() {
-  const [arbitros, setArbitros] = useState<Arbitro[]>(arbitrosMock)
+  const [arbitros, setArbitros] = useState<Arbitro[]>([])
+  const [carregando, setCarregando] = useState(true)
+  const [erro, setErro] = useState('')
   const [busca, setBusca] = useState('')
   const [detalhe, setDetalhe] = useState<Arbitro | null>(null)
-  const [modal, setModal] = useState<{ type: 'aprovar' | 'rejeitar'; id: number } | null>(null)
+  const [modal, setModal] = useState<{ type: 'aprovar' | 'rejeitar'; id: string } | null>(null)
   const [nivel, setNivel] = useState('')
   const [motivo, setMotivo] = useState('')
+
+  const carregar = useCallback(async () => {
+    setCarregando(true); setErro('')
+    try {
+      const lista = await apiGet<ArbitroDTO[]>('/api/arbitros')
+      setArbitros(lista.map(mapArbitro))
+    } catch {
+      setErro('Não foi possível carregar os árbitros.')
+    } finally {
+      setCarregando(false)
+    }
+  }, [])
+  useEffect(() => { carregar().catch(() => {}) }, [carregar])
+
   const arbitrosFiltrados = arbitros.filter(a =>
     a.nome.toLowerCase().includes(busca.toLowerCase()) ||
     a.cidade.toLowerCase().includes(busca.toLowerCase())
   )
 
-  // Sem endpoint de árbitros no backend ainda — muda só o estado local.
-  function handleCredenciar(id: number) {
-    setArbitros(p => p.map(a => a.id === id ? { ...a, status: 'CREDENCIADO', nivel: nivel || a.nivel } : a))
-    setNivel(''); setModal(null); setDetalhe(null)
+  async function acao(fn: () => Promise<void>) {
+    try {
+      await fn()
+      await carregar()
+    } catch (e) {
+      setErro(e instanceof ApiError ? e.message : 'Não foi possível concluir a ação.')
+    } finally {
+      setModal(null); setDetalhe(null); setNivel(''); setMotivo('')
+    }
   }
-  function handleRejeitar(id: number) {
-    setArbitros(p => p.map(a => a.id === id ? { ...a, status: 'REJEITADO', motivoRejeicao: motivo } : a))
-    setMotivo(''); setModal(null); setDetalhe(null)
-  }
-  function handleSuspender(id: number) {
-    setArbitros(p => p.map(a => a.id === id ? { ...a, status: 'SUSPENSO' } : a))
-    setDetalhe(null)
-  }
-  function handleReativar(id: number) {
-    setArbitros(p => p.map(a => a.id === id ? { ...a, status: 'CREDENCIADO' } : a))
-    setDetalhe(null)
-  }
-  function abrirCredenciar(id: number) { setDetalhe(null); setModal({ type: 'aprovar', id }) }
-  function abrirRejeitar(id: number) { setDetalhe(null); setModal({ type: 'rejeitar', id }) }
+  const handleCredenciar = (id: string) => acao(() => apiPatch(`/api/arbitros/${id}/credenciar`, { nivel }))
+  const handleRejeitar = (id: string) => acao(() => apiPatch(`/api/arbitros/${id}/rejeitar`, { motivo }))
+  const handleSuspender = (id: string) => acao(() => apiPatch(`/api/arbitros/${id}/suspender`))
+  const handleReativar = (id: string) => acao(() => apiPatch(`/api/arbitros/${id}/reativar`))
+  function abrirCredenciar(id: string) { setDetalhe(null); setNivel(''); setModal({ type: 'aprovar', id }) }
+  function abrirRejeitar(id: string) { setDetalhe(null); setMotivo(''); setModal({ type: 'rejeitar', id }) }
 
   return (
     <div>
       <h2 className="font-display text-fht-white text-3xl mb-6">ÁRBITROS</h2>
-      <div className="flex items-start gap-3 bg-blue-500/10 border border-blue-500/30 rounded-lg px-4 py-3 mb-5">
-        <AlertCircle size={16} className="text-blue-400 flex-shrink-0 mt-0.5" />
-        <p className="font-body text-blue-300 text-sm">Módulo de árbitros ainda não está integrado à API — dados de demonstração.</p>
-      </div>
+      {erro && (
+        <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/30 text-red-300 rounded-lg px-4 py-3 mb-5 font-body text-sm">
+          <AlertCircle size={16} /> {erro}
+        </div>
+      )}
       <SearchBar value={busca} onChange={setBusca} placeholder="Buscar por nome ou cidade..." />
+      {carregando ? (
+        <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-10 text-center font-body text-gray-soft text-sm">Carregando árbitros...</div>
+      ) : (
       <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl overflow-x-auto">
         <table className="w-full min-w-[600px]">
           <thead>
@@ -1227,6 +1257,7 @@ function ArbitrosPage() {
           </tbody>
         </table>
       </div>
+      )}
 
       {detalhe && (
         <ArbitroDetailPanel

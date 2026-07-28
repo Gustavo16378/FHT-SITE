@@ -114,3 +114,14 @@ VALUES
  ('dddddddd-0000-0000-0000-000000000005', 'Circular nº 01/2026 — Prazo de Transferências', 'Circular', 'https://www.africau.edu/images/default/sample.pdf', '2026-02-28', 'Administração FHT', 317440, NOW(), NOW()),
  ('dddddddd-0000-0000-0000-000000000006', 'Ata de Posse da Diretoria 2023–2027', 'Estatuto', 'https://www.africau.edu/images/default/sample.pdf', '2023-04-01', 'Administração FHT', 524288, NOW(), NOW())
 ON CONFLICT (id) DO NOTHING;
+
+-- ── Árbitros (status variados; credenciados aparecem no site) ───────────
+-- Limpar depois: DELETE FROM arbitros WHERE id::text LIKE 'eeeeeeee-%';
+INSERT INTO arbitros (id, nome, cpf, data_nascimento, sexo, telefone, email, cidade, uf, foto_url, ja_arbitro, tem_experiencia, disponibilidade_fds, nivel, registro, inicio_arbitragem, formacao, status, created_at, updated_at)
+VALUES
+ ('eeeeeeee-0000-0000-0000-000000000001', 'Carlos Eduardo Nunes', '222.333.444-07', '1985-10-08', 'Masculino', '(63) 98333-1007', 'carlos.arb@email.com', 'Gurupi', 'TO', 'https://i.pravatar.cc/150?img=14', true, true, true, 'Nacional', 'ARB-TO-0007', '2008', 'Curso CBHb + Arbitragem Nacional 2018', 'CREDENCIADO', NOW(), NOW()),
+ ('eeeeeeee-0000-0000-0000-000000000002', 'Renata Alves Souza', '222.333.444-08', '1992-02-20', 'Feminino', '(63) 98333-1008', 'renata.arb@email.com', 'Porto Nacional', 'TO', 'https://i.pravatar.cc/150?img=48', true, true, true, 'Estadual B', 'ARB-TO-0042', '2013', 'Curso CBHb 2013 + Reciclagem 2020', 'CREDENCIADO', NOW(), NOW()),
+ ('eeeeeeee-0000-0000-0000-000000000003', 'Marcos Vinicius Alves', '222.333.444-09', '1990-05-11', 'Masculino', '(63) 98333-1009', 'marcos.arb@email.com', 'Palmas', 'TO', 'https://i.pravatar.cc/150?img=33', true, true, true, 'Estadual A', 'ARB-TO-0021', '2016', 'Curso de Formação CBHb 2016', 'CREDENCIADO', NOW(), NOW()),
+ ('eeeeeeee-0000-0000-0000-000000000004', 'Fábio Martins Rocha', '222.333.444-10', '1988-06-15', 'Masculino', '(63) 98333-1010', 'fabio.arb@email.com', 'Palmas', 'TO', 'https://i.pravatar.cc/150?img=12', false, true, true, NULL, NULL, NULL, NULL, 'PENDENTE', NOW(), NOW()),
+ ('eeeeeeee-0000-0000-0000-000000000005', 'Patrícia Gomes Lima', '222.333.444-11', '1990-12-01', 'Feminino', '(63) 98333-1011', 'patricia.arb@email.com', 'Araguaína', 'TO', 'https://i.pravatar.cc/150?img=44', true, true, false, 'Regional', 'ARB-TO-0055', '2019', 'Curso de Formação CBHb 2019', 'SUSPENSO', NOW(), NOW())
+ON CONFLICT (id) DO NOTHING;

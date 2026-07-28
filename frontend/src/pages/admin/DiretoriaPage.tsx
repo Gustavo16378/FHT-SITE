@@ -10,6 +10,18 @@ function iniciais(nome: string): string {
   return ((p[0]?.[0] ?? '') + (p.length > 1 ? p[p.length - 1][0] : '')).toUpperCase();
 }
 
+/** Ordena a lista igual ao backend (ordem ASC, depois createdAt ASC). */
+function ordenar(lista: DiretorDTO[]): DiretorDTO[] {
+  return [...lista].sort((a, b) => (a.ordem - b.ordem) || a.createdAt.localeCompare(b.createdAt));
+}
+
+/** Avatar: foto quando existe/carrega, senão iniciais (não deixa ícone quebrado). */
+function Avatar({ nome, fotoUrl }: { nome: string; fotoUrl: string | null }) {
+  const [erro, setErro] = useState(false);
+  if (!fotoUrl || erro) return <span className="font-display text-gold text-2xl tracking-wider">{iniciais(nome)}</span>;
+  return <img src={fileUrl(fotoUrl)} alt={nome} className="w-full h-full object-cover" onError={() => setErro(true)} />;
+}
+
 interface FormDiretor {
   nome: string;
   cargo: string;
@@ -43,17 +55,22 @@ function FormModal({ editando, salvando, onClose, onSalvar }: {
 }) {
   const [form, setForm] = useState<FormDiretor>(editando ? deDTO(editando) : vazio());
   const [enviando, setEnviando] = useState(false);
+  const [erroFoto, setErroFoto] = useState('');
   const set = <K extends keyof FormDiretor>(k: K, v: FormDiretor[K]) => setForm((f) => ({ ...f, [k]: v }));
 
   async function enviarFoto(file: File) {
+    setErroFoto('');
     setEnviando(true);
     try {
       const fd = new FormData();
       fd.append('file', file);
       const res = await apiPostForm<UploadResponse>('/api/diretores/upload-foto', fd);
       set('fotoUrl', res.url);
-    } catch { /* silencioso: admin pode colar URL */ }
-    finally { setEnviando(false); }
+    } catch {
+      setErroFoto('Falha ao enviar a foto. Tente novamente.');
+    } finally {
+      setEnviando(false);
+    }
   }
 
   const campo = 'font-body bg-[#0d1b2a]/80 border border-federation/20 focus:border-gold rounded-lg px-4 py-3 text-fht-white placeholder-gray-soft text-sm outline-none w-full';
@@ -71,9 +88,7 @@ function FormModal({ editando, salvando, onClose, onSalvar }: {
           {/* foto */}
           <div className="flex items-center gap-4">
             <div className="w-20 h-20 rounded-lg bg-federation/20 border border-federation/40 flex items-center justify-center overflow-hidden shrink-0">
-              {form.fotoUrl
-                ? <img src={fileUrl(form.fotoUrl)} alt="Foto" className="w-full h-full object-cover" />
-                : <span className="font-display text-gold text-2xl">{form.nome ? iniciais(form.nome) : '?'}</span>}
+              <Avatar nome={form.nome || '?'} fotoUrl={form.fotoUrl || null} />
             </div>
             <div className="flex-1">
               <label className="inline-flex items-center gap-2 font-body text-sm text-gray-soft hover:text-gold border border-federation/30 hover:border-gold/40 rounded-lg px-3 py-2 cursor-pointer transition-colors duration-150">
@@ -82,6 +97,7 @@ function FormModal({ editando, salvando, onClose, onSalvar }: {
                 <input type="file" accept="image/*" className="hidden" disabled={enviando} onChange={(e) => { const f = e.target.files?.[0]; if (f) void enviarFoto(f); }} />
               </label>
               {form.fotoUrl && <button type="button" onClick={() => set('fotoUrl', '')} className="ml-2 font-body text-xs text-gray-soft hover:text-red-400">remover</button>}
+              {erroFoto && <p className="font-body text-red-400 text-xs mt-1.5">{erroFoto}</p>}
             </div>
           </div>
 
@@ -162,8 +178,8 @@ export function DiretoriaPage() {
       ordem: Number(dados.ordem) || 0,
     };
     try {
-      if (id === null) { const novo = await apiPostJson<DiretorDTO>('/api/diretores', payload); setDiretores((l) => [...l, novo]); }
-      else { const upd = await apiPut<DiretorDTO>(`/api/diretores/${id}`, payload); setDiretores((l) => l.map((x) => (x.id === id ? upd : x))); }
+      if (id === null) { const novo = await apiPostJson<DiretorDTO>('/api/diretores', payload); setDiretores((l) => ordenar([...l, novo])); }
+      else { const upd = await apiPut<DiretorDTO>(`/api/diretores/${id}`, payload); setDiretores((l) => ordenar(l.map((x) => (x.id === id ? upd : x)))); }
       setModalAberto(false); setEditando(null);
     } catch { setErro('Não foi possível salvar.'); }
     finally { setSalvando(false); }
@@ -208,7 +224,7 @@ export function DiretoriaPage() {
               </div>
               <button type="button" onClick={() => { setEditando(d); setModalAberto(true); }} className="flex flex-col items-center">
                 <div className="w-20 h-20 rounded-lg bg-federation/20 border border-federation/40 group-hover:border-gold/50 flex items-center justify-center mb-4 overflow-hidden transition-colors duration-250">
-                  {d.fotoUrl ? <img src={fileUrl(d.fotoUrl)} alt={d.nome} className="w-full h-full object-cover" /> : <span className="font-display text-gold text-3xl tracking-wider">{iniciais(d.nome)}</span>}
+                  <Avatar nome={d.nome} fotoUrl={d.fotoUrl} />
                 </div>
                 <p className="font-body text-fht-white text-sm font-semibold leading-tight">{d.nome}</p>
                 <p className="font-body text-gray-soft text-xs mt-1">{d.cargo}</p>

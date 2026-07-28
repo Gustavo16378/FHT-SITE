@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { FileText, Plus, X, Eye, Download, Trash2, Upload, Globe, Calendar, Loader2, AlertCircle } from 'lucide-react';
-import { apiGet, apiPostJson, apiDelete, apiPostForm, fileUrl } from '../../services/api';
+import { FileText, Plus, X, Eye, Download, Trash2, Pencil, Globe, Calendar, Loader2, AlertCircle } from 'lucide-react';
+import { apiGet, apiPostJson, apiPut, apiDelete, apiPostForm, fileUrl } from '../../services/api';
 import type { DocumentoDTO, DocumentoCategoria, DocumentoUploadResponse } from '../../types/api';
 
 const CATEGORIAS: DocumentoCategoria[] = ['Estatuto', 'Regulamento', 'Calendário', 'Edital', 'Circular'];
@@ -33,6 +33,7 @@ export function DocumentosPage() {
   const [erro, setErro] = useState('');
   const [filtro, setFiltro] = useState<DocumentoCategoria | 'Todos'>('Todos');
   const [addAberto, setAddAberto] = useState(false);
+  const [editando, setEditando] = useState<DocumentoDTO | null>(null);
   const [viewerDoc, setViewerDoc] = useState<DocumentoDTO | null>(null);
 
   async function carregar() {
@@ -103,6 +104,7 @@ export function DocumentosPage() {
               <div className="flex items-center gap-2 ml-auto">
                 <button onClick={() => setViewerDoc(doc)} title="Visualizar" className="font-body text-xs text-gray-soft hover:text-fht-white inline-flex items-center gap-1.5 border border-federation/30 hover:border-federation/60 rounded-lg px-3 py-2 transition-colors duration-150"><Eye size={15} /> Visualizar</button>
                 <a href={fileUrl(doc.arquivoUrl)} target="_blank" rel="noopener noreferrer" title="Baixar" className="text-gray-soft hover:text-gold border border-federation/30 hover:border-federation/60 rounded-lg p-2 transition-colors duration-150"><Download size={15} /></a>
+                <button onClick={() => setEditando(doc)} title="Editar" className="text-gray-soft hover:text-gold border border-federation/30 hover:border-gold/50 rounded-lg p-2 transition-colors duration-150"><Pencil size={15} /></button>
                 <button onClick={() => void deletar(doc)} title="Deletar" className="text-gray-soft hover:text-red-400 border border-federation/30 hover:border-red-500/50 rounded-lg p-2 transition-colors duration-150"><Trash2 size={15} /></button>
               </div>
             </div>
@@ -116,23 +118,34 @@ export function DocumentosPage() {
         </div>
       )}
 
-      {addAberto && <AddDocumentoModal onClose={() => setAddAberto(false)} onCriado={(d) => { setDocumentos((l) => [d, ...l]); setAddAberto(false); }} />}
+      {(addAberto || editando) && (
+        <DocumentoFormModal
+          editando={editando}
+          onClose={() => { setAddAberto(false); setEditando(null); }}
+          onSalvo={(d, isEdit) => {
+            setDocumentos((l) => (isEdit ? l.map((x) => (x.id === d.id ? d : x)) : [d, ...l]));
+            setAddAberto(false); setEditando(null);
+          }}
+        />
+      )}
       {viewerDoc && <ViewerModal doc={viewerDoc} onClose={() => setViewerDoc(null)} />}
     </div>
   );
 }
 
-function AddDocumentoModal({ onClose, onCriado }: { onClose: () => void; onCriado: (d: DocumentoDTO) => void }) {
-  const [titulo, setTitulo] = useState('');
-  const [categoria, setCategoria] = useState<DocumentoCategoria>('Regulamento');
-  const [arquivoUrl, setArquivoUrl] = useState('');
-  const [arquivoNome, setArquivoNome] = useState('');
-  const [tamanhoBytes, setTamanhoBytes] = useState<number | null>(null);
+function DocumentoFormModal({ editando, onClose, onSalvo }: { editando: DocumentoDTO | null; onClose: () => void; onSalvo: (d: DocumentoDTO, isEdit: boolean) => void }) {
+  const isEdit = editando !== null;
+  const [titulo, setTitulo] = useState(editando?.titulo ?? '');
+  const [categoria, setCategoria] = useState<DocumentoCategoria>(editando?.categoria ?? 'Regulamento');
+  const [arquivoUrl, setArquivoUrl] = useState(editando?.arquivoUrl ?? '');
+  const [arquivoNome, setArquivoNome] = useState(editando ? 'Arquivo atual — troque se quiser' : '');
+  const [tamanhoBytes, setTamanhoBytes] = useState<number | null>(editando?.tamanhoBytes ?? null);
   const [enviando, setEnviando] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
 
-  const podeEnviar = titulo.trim().length > 0 && arquivoUrl.length > 0;
+  // !enviando impede publicar com uma URL velha enquanto um arquivo de troca ainda sobe.
+  const podeEnviar = titulo.trim().length > 0 && arquivoUrl.length > 0 && !enviando;
 
   async function enviarArquivo(file: File) {
     setErro(''); setEnviando(true);
@@ -148,17 +161,20 @@ function AddDocumentoModal({ onClose, onCriado }: { onClose: () => void; onCriad
   async function salvar() {
     if (!podeEnviar) return;
     setSalvando(true); setErro('');
+    const payload = { titulo: titulo.trim(), categoria, arquivoUrl, tamanhoBytes };
     try {
-      const d = await apiPostJson<DocumentoDTO>('/api/documentos', { titulo: titulo.trim(), categoria, arquivoUrl, tamanhoBytes });
-      onCriado(d);
-    } catch { setErro('Não foi possível publicar o documento.'); setSalvando(false); }
+      const d = isEdit
+        ? await apiPut<DocumentoDTO>(`/api/documentos/${editando!.id}`, payload)
+        : await apiPostJson<DocumentoDTO>('/api/documentos', payload);
+      onSalvo(d, isEdit);
+    } catch { setErro('Não foi possível salvar o documento.'); setSalvando(false); }
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.75)' }} onClick={onClose}>
       <div className="bg-[#0a1628] border border-federation/30 rounded-xl w-full max-w-lg shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="p-5 border-b border-federation/20 flex items-center justify-between">
-          <h3 className="font-display text-fht-white text-xl tracking-wider">ADICIONAR DOCUMENTO</h3>
+          <h3 className="font-display text-fht-white text-xl tracking-wider">{isEdit ? 'EDITAR DOCUMENTO' : 'ADICIONAR DOCUMENTO'}</h3>
           <button onClick={onClose} className="text-gray-soft hover:text-fht-white transition-colors duration-150"><X size={20} /></button>
         </div>
 
@@ -189,7 +205,7 @@ function AddDocumentoModal({ onClose, onCriado }: { onClose: () => void; onCriad
         <div className="p-5 border-t border-federation/20 flex gap-3 justify-end">
           <button className={secundarioBtn} onClick={onClose}>Cancelar</button>
           <button className={primarioBtn + (podeEnviar && !salvando ? '' : ' opacity-40 cursor-not-allowed')} onClick={() => void salvar()} disabled={!podeEnviar || salvando}>
-            <span className="inline-flex items-center gap-2">{salvando && <Loader2 size={16} className="animate-spin" />}Publicar</span>
+            <span className="inline-flex items-center gap-2">{salvando && <Loader2 size={16} className="animate-spin" />}{isEdit ? 'Salvar' : 'Publicar'}</span>
           </button>
         </div>
       </div>

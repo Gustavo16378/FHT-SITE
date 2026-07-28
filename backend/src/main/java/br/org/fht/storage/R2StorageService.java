@@ -102,7 +102,13 @@ public class R2StorageService {
     // É o modo dev/demo; troca-se pelo R2 só configurando as credenciais.
     private String uploadLocal(String key, FileUpload fileUpload) {
         try {
-            Path dest = Path.of(localDir, key).normalize();
+            Path base = Path.of(localDir).toAbsolutePath().normalize();
+            Path dest = base.resolve(key).normalize();
+            // Proteção contra path traversal (../ no nome do arquivo): o destino tem que
+            // ficar DENTRO de localDir. Espelha a guarda de leitura do FileResource.
+            if (!dest.startsWith(base)) {
+                throw new WebApplicationException("Caminho de upload inválido", 400);
+            }
             Files.createDirectories(dest.getParent());
             Files.copy(fileUpload.uploadedFile(), dest, StandardCopyOption.REPLACE_EXISTING);
             LOG.info("Upload local (fallback sem R2): " + key);

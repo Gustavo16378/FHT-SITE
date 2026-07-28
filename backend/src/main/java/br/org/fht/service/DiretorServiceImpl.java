@@ -65,6 +65,9 @@ public class DiretorServiceImpl implements DiretorService {
     }
 
     private void validar(DiretorForm form) {
+        if (form == null) {
+            throw new WebApplicationException("Corpo da requisição obrigatório", 400);
+        }
         if (form.nome() == null || form.nome().isBlank()) {
             throw new WebApplicationException("O nome é obrigatório", 400);
         }

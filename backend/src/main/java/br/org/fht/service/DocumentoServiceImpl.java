@@ -76,6 +76,9 @@ public class DocumentoServiceImpl implements DocumentoService {
     }
 
     private void validar(DocumentoForm form) {
+        if (form == null) {
+            throw new WebApplicationException("Corpo da requisição obrigatório", 400);
+        }
         if (form.titulo() == null || form.titulo().isBlank()) {
             throw new WebApplicationException("O título é obrigatório", 400);
         }
@@ -91,8 +94,11 @@ public class DocumentoServiceImpl implements DocumentoService {
         d.setTitulo(form.titulo().trim());
         d.setCategoria(form.categoria());
         d.setArquivoUrl(form.arquivoUrl().trim());
-        d.setDataPublicacao(form.dataPublicacao() != null ? form.dataPublicacao() : LocalDate.now());
-        d.setTamanhoBytes(form.tamanhoBytes());
+        // data e tamanho: se o form omitir (edição parcial), preserva o valor atual —
+        // assim um PUT só de título não reescreve a data de publicação nem zera o tamanho.
+        if (form.dataPublicacao() != null) d.setDataPublicacao(form.dataPublicacao());
+        else if (d.getDataPublicacao() == null) d.setDataPublicacao(LocalDate.now());
+        if (form.tamanhoBytes() != null) d.setTamanhoBytes(form.tamanhoBytes());
     }
 
     private String nomeAutor(JsonWebToken jwt) {

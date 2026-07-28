@@ -26,6 +26,9 @@ public class NoticiaServiceImpl implements NoticiaService {
 
     private static final Set<String> CATEGORIAS = Set.of("Institucional", "Competição", "Arbitragem", "Seleção");
     private static final Set<String> STATUS = Set.of("RASCUNHO", "PUBLICADO");
+    // Slugs que colidem com subcaminhos literais de /api/noticias (ex.: /gerenciar, admin).
+    // Uma notícia com esse slug ficaria inacessível pela URL pública — então reservamos.
+    private static final Set<String> SLUGS_RESERVADOS = Set.of("gerenciar", "upload-imagem");
 
     @Inject NoticiaRepository noticiaRepository;
     @Inject R2StorageService r2;
@@ -124,9 +127,13 @@ public class NoticiaServiceImpl implements NoticiaService {
         n.setResumo(form.resumo());
         n.setConteudo(form.conteudo());
         n.setImagemCapaUrl(form.imagemCapaUrl());
-        n.setDataPublicacao(form.dataPublicacao() != null ? form.dataPublicacao() : LocalDate.now());
         n.setDestaque(Boolean.TRUE.equals(form.destaque()));
-        n.setStatus(form.status() != null ? form.status() : "RASCUNHO");
+        // status e dataPublicacao: se o form omitir (null), preserva o valor atual — assim uma
+        // edição parcial não despublica a notícia nem perde a data original. Na criação, aplica
+        // os defaults (status já nasce RASCUNHO no model; data vira hoje).
+        if (form.status() != null) n.setStatus(form.status());
+        if (form.dataPublicacao() != null) n.setDataPublicacao(form.dataPublicacao());
+        else if (n.getDataPublicacao() == null) n.setDataPublicacao(LocalDate.now());
     }
 
     /** Gera um slug único a partir do título, ignorando a própria notícia (na edição). */
@@ -136,9 +143,9 @@ public class NoticiaServiceImpl implements NoticiaService {
         int i = 2;
         while (true) {
             Optional<Noticia> existente = noticiaRepository.findBySlug(slug);
-            boolean livre = existente.isEmpty()
+            boolean disponivel = existente.isEmpty()
                     || (idAtual != null && existente.get().getId().equals(idAtual));
-            if (livre) {
+            if (disponivel && !SLUGS_RESERVADOS.contains(slug)) {
                 return slug;
             }
             slug = base + "-" + i++;

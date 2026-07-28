@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Calendar, User, ArrowLeft, Loader2, Newspaper } from 'lucide-react'
+import { Calendar, User, ArrowLeft, Loader2, Newspaper, RotateCw } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
-import { apiGet, fileUrl, ApiError } from '../services/api'
+import SafeImage from '../components/SafeImage'
+import { apiGet, ApiError } from '../services/api'
 import type { NoticiaDTO } from '../types/api'
 
 const categoryColors: Record<string, string> = {
@@ -33,19 +34,25 @@ export default function NoticiaPost() {
   const [noticia, setNoticia] = useState<NoticiaDTO | null>(null)
   const [carregando, setCarregando] = useState(true)
   const [naoEncontrada, setNaoEncontrada] = useState(false)
+  const [erro, setErro] = useState(false)
 
-  useEffect(() => {
+  function carregar() {
     window.scrollTo(0, 0)
     setCarregando(true)
     setNaoEncontrada(false)
+    setErro(false)
     apiGet<NoticiaDTO>(`/api/noticias/${slug}`)
       .then(setNoticia)
       .catch((err) => {
+        // 404 = notícia realmente não existe/não publicada; qualquer outro erro
+        // (rede, 500) é falha transitória — não afirmar que a notícia foi apagada.
         if (err instanceof ApiError && err.status === 404) setNaoEncontrada(true)
-        else setNaoEncontrada(true)
+        else setErro(true)
       })
       .finally(() => setCarregando(false))
-  }, [slug])
+  }
+
+  useEffect(() => { carregar() }, [slug])
 
   return (
     <div className="bg-night min-h-screen">
@@ -55,6 +62,20 @@ export default function NoticiaPost() {
           <div className="flex items-center justify-center gap-3 py-32">
             <Loader2 size={22} className="text-gold animate-spin" />
             <span className="font-body text-gray-soft text-sm">Carregando...</span>
+          </div>
+        ) : erro ? (
+          <div className="max-w-3xl mx-auto px-4 text-center py-32">
+            <Newspaper size={44} className="text-gray-soft/40 mx-auto mb-4" />
+            <h1 className="font-display text-fht-white text-3xl mb-2">Não foi possível carregar</h1>
+            <p className="font-body text-gray-soft text-sm mb-6">
+              Ocorreu um erro ao buscar a notícia. Verifique sua conexão e tente novamente.
+            </p>
+            <button
+              onClick={carregar}
+              className="inline-flex items-center gap-2 font-display text-night bg-gold hover:bg-gold-light px-6 py-3 rounded-lg text-sm tracking-wider transition-colors duration-250"
+            >
+              <RotateCw size={16} /> TENTAR NOVAMENTE
+            </button>
           </div>
         ) : naoEncontrada || !noticia ? (
           <div className="max-w-3xl mx-auto px-4 text-center py-32">
@@ -74,15 +95,12 @@ export default function NoticiaPost() {
           <article>
             {/* Capa */}
             <div className="relative h-64 sm:h-80 lg:h-[26rem] w-full overflow-hidden">
-              {noticia.imagemCapaUrl ? (
-                <img
-                  src={fileUrl(noticia.imagemCapaUrl)}
-                  alt={noticia.titulo}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className={`w-full h-full bg-gradient-to-br ${categoryGradient[noticia.categoria] ?? 'from-federation to-night'}`} />
-              )}
+              <SafeImage
+                src={noticia.imagemCapaUrl}
+                alt={noticia.titulo}
+                className="w-full h-full object-cover"
+                fallbackClassName={`bg-gradient-to-br ${categoryGradient[noticia.categoria] ?? 'from-federation to-night'}`}
+              />
               <div className="absolute inset-0 bg-gradient-to-t from-night via-night/50 to-transparent" />
             </div>
 

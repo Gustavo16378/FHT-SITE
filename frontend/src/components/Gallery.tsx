@@ -1,17 +1,17 @@
 import { useEffect, useState } from 'react'
-import { Loader2, ImageIcon } from 'lucide-react'
+import { Loader2, ImageIcon, RotateCw } from 'lucide-react'
 import { useInView } from '../hooks/useInView'
-import { apiGet, fileUrl } from '../services/api'
+import { apiGet } from '../services/api'
+import SafeImage from './SafeImage'
 import type { FotoDTO } from '../types/api'
 
 /** Um bloco do mosaico com legenda sempre visível. */
 function Tile({ foto, className }: { foto: FotoDTO; className?: string }) {
   return (
     <div className={`relative rounded-lg overflow-hidden group ${className ?? ''}`}>
-      <img
-        src={fileUrl(foto.imagemUrl)}
+      <SafeImage
+        src={foto.imagemUrl}
         alt={foto.evento}
-        loading="lazy"
         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
       />
       {/* gradiente + legenda sempre visíveis */}
@@ -31,13 +31,18 @@ export default function Gallery() {
   const ref = useInView()
   const [fotos, setFotos] = useState<FotoDTO[]>([])
   const [carregando, setCarregando] = useState(true)
+  const [erro, setErro] = useState(false)
 
-  useEffect(() => {
+  function carregar() {
+    setCarregando(true)
+    setErro(false)
     apiGet<FotoDTO[]>('/api/galeria')
       .then(setFotos)
-      .catch(() => setFotos([]))
+      .catch(() => setErro(true))
       .finally(() => setCarregando(false))
-  }, [])
+  }
+
+  useEffect(() => { carregar() }, [])
 
   const large = fotos.filter((p) => p.tamanho === 'large')
   const medium = fotos.filter((p) => p.tamanho === 'medium')
@@ -56,6 +61,13 @@ export default function Gallery() {
           <div className="flex items-center justify-center gap-3 py-16">
             <Loader2 size={22} className="text-gold animate-spin" />
             <span className="font-body text-gray-soft text-sm">Carregando galeria...</span>
+          </div>
+        ) : erro ? (
+          <div className="border border-federation/20 rounded-lg p-12 text-center flex flex-col items-center gap-3">
+            <p className="font-body text-gray-soft text-sm">Não foi possível carregar a galeria agora.</p>
+            <button onClick={carregar} className="inline-flex items-center gap-2 font-body text-gold hover:text-gold-light text-sm">
+              <RotateCw size={15} /> Tentar novamente
+            </button>
           </div>
         ) : fotos.length === 0 ? (
           <div className="border border-federation/20 rounded-lg p-12 text-center flex flex-col items-center gap-3">

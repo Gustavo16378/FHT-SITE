@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { MapPin, ArrowRight, X, Users, Loader2, Trophy } from 'lucide-react'
+import { MapPin, ArrowRight, X, Users, Loader2, Trophy, RotateCw } from 'lucide-react'
 import { useInView } from '../hooks/useInView'
 import { apiGet } from '../services/api'
 import type { ClubeVitrineDTO, ClubeVitrineDetalheDTO } from '../types/api'
@@ -127,14 +127,19 @@ export default function Clubs() {
   const ref = useInView()
   const [clubes, setClubes] = useState<ClubeVitrineDTO[]>([])
   const [carregando, setCarregando] = useState(true)
+  const [erro, setErro] = useState(false)
   const [modalId, setModalId] = useState<string | null>(null)
 
-  useEffect(() => {
+  function carregar() {
+    setCarregando(true)
+    setErro(false)
     apiGet<ClubeVitrineDTO[]>('/api/clubes/publico')
       .then(setClubes)
-      .catch(() => setClubes([]))
+      .catch(() => setErro(true))
       .finally(() => setCarregando(false))
-  }, [])
+  }
+
+  useEffect(() => { carregar() }, [])
 
   return (
     <section id="clubes" className="py-20 bg-night">
@@ -152,6 +157,13 @@ export default function Clubs() {
           <div className="flex items-center justify-center gap-3 py-16 mb-10">
             <Loader2 size={22} className="text-gold animate-spin" />
             <span className="font-body text-gray-soft text-sm">Carregando clubes...</span>
+          </div>
+        ) : erro ? (
+          <div className="border border-federation/20 rounded-lg p-10 text-center mb-10 flex flex-col items-center gap-3">
+            <p className="font-body text-gray-soft text-sm">Não foi possível carregar os clubes agora.</p>
+            <button onClick={carregar} className="inline-flex items-center gap-2 font-body text-gold hover:text-gold-light text-sm">
+              <RotateCw size={15} /> Tentar novamente
+            </button>
           </div>
         ) : clubes.length === 0 ? (
           <div className="border border-federation/20 rounded-lg p-10 text-center mb-10">

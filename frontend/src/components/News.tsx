@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Calendar, ArrowRight, Loader2 } from 'lucide-react'
+import { Calendar, ArrowRight, Loader2, RotateCw } from 'lucide-react'
 import { useInView } from '../hooks/useInView'
-import { apiGet, fileUrl } from '../services/api'
+import { apiGet } from '../services/api'
+import SafeImage from './SafeImage'
 import type { NoticiaDTO } from '../types/api'
 
 const categoryColors: Record<string, string> = {
@@ -27,32 +28,34 @@ function formatDate(dateStr: string) {
   })
 }
 
-/** Capa da notícia: imagem quando existe, senão um gradiente pela categoria. */
+/** Capa da notícia: imagem quando existe/carrega, senão um gradiente pela categoria. */
 function Capa({ noticia, className }: { noticia: NoticiaDTO; className?: string }) {
-  if (noticia.imagemCapaUrl) {
-    return (
-      <img
-        src={fileUrl(noticia.imagemCapaUrl)}
-        alt={noticia.titulo}
-        loading="lazy"
-        className={className}
-      />
-    )
-  }
-  return <div className={`${className} bg-gradient-to-br ${categoryGradient[noticia.categoria] ?? 'from-federation to-night'}`} />
+  return (
+    <SafeImage
+      src={noticia.imagemCapaUrl}
+      alt={noticia.titulo}
+      className={className}
+      fallbackClassName={`bg-gradient-to-br ${categoryGradient[noticia.categoria] ?? 'from-federation to-night'}`}
+    />
+  )
 }
 
 export default function News() {
   const ref = useInView()
   const [noticias, setNoticias] = useState<NoticiaDTO[]>([])
   const [carregando, setCarregando] = useState(true)
+  const [erro, setErro] = useState(false)
 
-  useEffect(() => {
+  function carregar() {
+    setCarregando(true)
+    setErro(false)
     apiGet<NoticiaDTO[]>('/api/noticias')
       .then(setNoticias)
-      .catch(() => setNoticias([]))
+      .catch(() => setErro(true))
       .finally(() => setCarregando(false))
-  }, [])
+  }
+
+  useEffect(() => { carregar() }, [])
 
   const featured = noticias.find((n) => n.destaque) ?? noticias[0]
   const outras = noticias.filter((n) => n.id !== featured?.id)
@@ -75,6 +78,13 @@ export default function News() {
           <div className="flex items-center justify-center gap-3 py-16">
             <Loader2 size={22} className="text-gold animate-spin" />
             <span className="font-body text-gray-soft text-sm">Carregando notícias...</span>
+          </div>
+        ) : erro ? (
+          <div className="border border-federation/20 rounded-lg p-10 text-center flex flex-col items-center gap-3">
+            <p className="font-body text-gray-soft text-sm">Não foi possível carregar as notícias agora.</p>
+            <button onClick={carregar} className="inline-flex items-center gap-2 font-body text-gold hover:text-gold-light text-sm">
+              <RotateCw size={15} /> Tentar novamente
+            </button>
           </div>
         ) : noticias.length === 0 ? (
           <div className="border border-federation/20 rounded-lg p-10 text-center">

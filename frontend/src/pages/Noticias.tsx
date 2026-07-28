@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Calendar, Loader2, Newspaper } from 'lucide-react'
+import { Calendar, Loader2, Newspaper, RotateCw } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
-import { apiGet, fileUrl } from '../services/api'
+import SafeImage from '../components/SafeImage'
+import { apiGet } from '../services/api'
 import type { NoticiaDTO, NoticiaCategoria } from '../types/api'
 
 const CATEGORIAS: NoticiaCategoria[] = ['Institucional', 'Competição', 'Arbitragem', 'Seleção']
@@ -33,14 +34,21 @@ function formatDate(dateStr: string) {
 export default function Noticias() {
   const [noticias, setNoticias] = useState<NoticiaDTO[]>([])
   const [carregando, setCarregando] = useState(true)
+  const [erro, setErro] = useState(false)
   const [filtro, setFiltro] = useState<NoticiaCategoria | 'Todas'>('Todas')
+
+  function carregar() {
+    setCarregando(true)
+    setErro(false)
+    apiGet<NoticiaDTO[]>('/api/noticias')
+      .then(setNoticias)
+      .catch(() => setErro(true))
+      .finally(() => setCarregando(false))
+  }
 
   useEffect(() => {
     window.scrollTo(0, 0)
-    apiGet<NoticiaDTO[]>('/api/noticias')
-      .then(setNoticias)
-      .catch(() => setNoticias([]))
-      .finally(() => setCarregando(false))
+    carregar()
   }, [])
 
   const lista = filtro === 'Todas' ? noticias : noticias.filter((n) => n.categoria === filtro)
@@ -83,6 +91,14 @@ export default function Noticias() {
             <Loader2 size={22} className="text-gold animate-spin" />
             <span className="font-body text-gray-soft text-sm">Carregando notícias...</span>
           </div>
+        ) : erro ? (
+          <div className="border border-federation/20 rounded-lg p-16 text-center flex flex-col items-center gap-3">
+            <Newspaper size={40} className="text-gray-soft/40" />
+            <p className="font-body text-gray-soft text-sm">Não foi possível carregar as notícias agora.</p>
+            <button onClick={carregar} className="inline-flex items-center gap-2 font-body text-gold hover:text-gold-light text-sm">
+              <RotateCw size={15} /> Tentar novamente
+            </button>
+          </div>
         ) : lista.length === 0 ? (
           <div className="border border-federation/20 rounded-lg p-16 text-center">
             <Newspaper size={40} className="text-gray-soft/40 mx-auto mb-4" />
@@ -101,16 +117,12 @@ export default function Noticias() {
                 className="bg-section-alt/60 border border-federation/20 rounded-lg overflow-hidden hover:border-gold/40 transition-colors duration-250 group flex flex-col"
               >
                 <div className="h-44 overflow-hidden">
-                  {n.imagemCapaUrl ? (
-                    <img
-                      src={fileUrl(n.imagemCapaUrl)}
-                      alt={n.titulo}
-                      loading="lazy"
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                  ) : (
-                    <div className={`w-full h-full bg-gradient-to-br ${categoryGradient[n.categoria] ?? 'from-federation to-night'}`} />
-                  )}
+                  <SafeImage
+                    src={n.imagemCapaUrl}
+                    alt={n.titulo}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    fallbackClassName={`bg-gradient-to-br ${categoryGradient[n.categoria] ?? 'from-federation to-night'}`}
+                  />
                 </div>
                 <div className="p-4 flex flex-col flex-1">
                   <span className={`font-body text-xs font-semibold px-2 py-0.5 rounded-full self-start ${categoryColors[n.categoria]}`}>

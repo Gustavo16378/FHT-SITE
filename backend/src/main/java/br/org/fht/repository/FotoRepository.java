@@ -10,8 +10,8 @@ import java.util.UUID;
 @ApplicationScoped
 public class FotoRepository implements PanacheRepositoryBase<Foto, UUID> {
 
-    /** Ordena por ano (mais recente primeiro) e, dentro do ano, pela mais nova. */
+    /** Ordena por ano (mais recente primeiro; sem ano vai pro fim) e, dentro do ano, pela mais nova. */
     public List<Foto> listOrdenadas() {
-        return list("ORDER BY ano DESC, createdAt DESC");
+        return list("ORDER BY ano DESC NULLS LAST, createdAt DESC");
     }
 }

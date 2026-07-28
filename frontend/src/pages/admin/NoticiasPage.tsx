@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import {
   Plus,
   X,
@@ -6,139 +6,107 @@ import {
   Pencil,
   Trash2,
   Upload,
-  Bold,
-  Italic,
-  Link as LinkIcon,
-  Image as ImageIcon,
   Newspaper,
   Calendar,
   Eye,
+  Star,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react';
+import { apiGet, apiPostJson, apiPut, apiDelete, apiPostForm, fileUrl } from '../../services/api';
+import type { NoticiaDTO, NoticiaCategoria, NoticiaStatus, UploadResponse } from '../../types/api';
 
-// ----------------------------- Tipos -----------------------------
-type Categoria = 'Institucional' | 'Competição' | 'Arbitragem' | 'Seleção';
-type Status = 'Publicado' | 'Rascunho';
+// ----------------------------- Constantes -----------------------------
+const CATEGORIAS: NoticiaCategoria[] = ['Institucional', 'Competição', 'Arbitragem', 'Seleção'];
 
-interface Noticia {
-  id: number;
-  titulo: string;
-  categoria: Categoria;
-  data: string;
-  status: Status;
-  resumo: string;
-  gradiente: string;
-}
-
-const CATEGORIAS: Categoria[] = ['Institucional', 'Competição', 'Arbitragem', 'Seleção'];
-
-// Gradiente da "capa" por categoria (sem imagem externa)
-const GRADIENTE_POR_CATEGORIA: Record<Categoria, string> = {
+// Gradiente da "capa" por categoria (fallback quando a notícia não tem imagem)
+const GRADIENTE_POR_CATEGORIA: Record<NoticiaCategoria, string> = {
   Institucional: 'from-federation to-blue-mid',
   Competição: 'from-[#F5C518] to-[#b8850a]',
   Arbitragem: 'from-blue-mid to-federation',
   Seleção: 'from-green-600 to-federation',
 };
 
-// Classe do badge de categoria (segue a paleta do design system)
-const BADGE_CATEGORIA: Record<Categoria, string> = {
+const BADGE_CATEGORIA: Record<NoticiaCategoria, string> = {
   Institucional: 'text-blue-300 bg-blue-mid/10 border-blue-400/30',
   Competição: 'text-gold bg-gold/10 border-gold/30',
   Arbitragem: 'text-orange-400 bg-orange-500/10 border-orange-500/30',
   Seleção: 'text-green-400 bg-green-500/10 border-green-500/30',
 };
 
-const BADGE_STATUS: Record<Status, string> = {
-  Publicado: 'text-green-400 bg-green-500/10 border-green-500/30',
-  Rascunho: 'text-gray-soft bg-gray-soft/10 border-gray-soft/30',
+const BADGE_STATUS: Record<NoticiaStatus, string> = {
+  PUBLICADO: 'text-green-400 bg-green-500/10 border-green-500/30',
+  RASCUNHO: 'text-gray-soft bg-gray-soft/10 border-gray-soft/30',
 };
 
-// ----------------------------- Mock -----------------------------
-const NOTICIAS_INICIAIS: Noticia[] = [
-  {
-    id: 1,
-    titulo: 'FHT lança calendário oficial 2025 com 8 competições estaduais',
-    categoria: 'Institucional',
-    data: '02 de mai. de 2025',
-    status: 'Publicado',
-    resumo:
-      'Presidência apresenta o calendário anual em Palmas; temporada abre com a Copa Tocantins de base em junho.',
-    gradiente: GRADIENTE_POR_CATEGORIA['Institucional'],
-  },
-  {
-    id: 2,
-    titulo: 'Curso de formação de árbitros abre vagas para todo o estado',
-    categoria: 'Arbitragem',
-    data: '18 de abr. de 2025',
-    status: 'Publicado',
-    resumo:
-      'Inscrições até 30/04 para novos árbitros de handebol; formação teórica e prática com aval da CBHb.',
-    gradiente: GRADIENTE_POR_CATEGORIA['Arbitragem'],
-  },
-  {
-    id: 3,
-    titulo: 'Palmas HC e Araguaína HC decidem a final adulta em Gurupi',
-    categoria: 'Competição',
-    data: '11 de abr. de 2025',
-    status: 'Publicado',
-    resumo:
-      'Clássico do handebol tocantinense define o campeão estadual adulto no ginásio Ayrton Senna.',
-    gradiente: GRADIENTE_POR_CATEGORIA['Competição'],
-  },
-  {
-    id: 4,
-    titulo: 'Seleção Tocantinense Sub-16 convoca atletas para peneira',
-    categoria: 'Seleção',
-    data: '29 de mar. de 2025',
-    status: 'Rascunho',
-    resumo:
-      'Comissão técnica lista 24 nomes de seis clubes filiados; treino de avaliação marcado para Porto Nacional.',
-    gradiente: GRADIENTE_POR_CATEGORIA['Seleção'],
-  },
-  {
-    id: 5,
-    titulo: 'Assembleia geral aprova novo estatuto e taxa de anuidade 2025',
-    categoria: 'Institucional',
-    data: '14 de mar. de 2025',
-    status: 'Rascunho',
-    resumo:
-      'Clubes filiados aprovam ajustes no estatuto e o valor da anuidade que habilita atletas às competições do ano.',
-    gradiente: GRADIENTE_POR_CATEGORIA['Institucional'],
-  },
-];
+const ROTULO_STATUS: Record<NoticiaStatus, string> = {
+  PUBLICADO: 'Publicado',
+  RASCUNHO: 'Rascunho',
+};
 
-const HOJE = '12 de jul. de 2026';
+function hojeISO(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function formatarData(iso: string): string {
+  if (!iso) return '';
+  return new Date(iso + 'T00:00:00').toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+}
 
 // ----------------------------- Editor -----------------------------
 interface FormNoticia {
   titulo: string;
-  categoria: Categoria;
-  corpo: string;
-  status: Status;
+  categoria: NoticiaCategoria;
+  resumo: string;
+  conteudo: string;
+  imagemCapaUrl: string;
+  dataPublicacao: string;
+  destaque: boolean;
+  status: NoticiaStatus;
 }
 
 interface EditorProps {
-  editando: Noticia | null;
+  editando: NoticiaDTO | null;
+  salvando: boolean;
   onCancelar: () => void;
-  onSalvar: (dados: FormNoticia, id: number | null) => void;
+  onSalvar: (dados: FormNoticia, id: string | null) => void;
 }
 
-function EditorNoticia({ editando, onCancelar, onSalvar }: EditorProps) {
+function EditorNoticia({ editando, salvando, onCancelar, onSalvar }: EditorProps) {
   const [form, setForm] = useState<FormNoticia>({
     titulo: editando?.titulo ?? '',
     categoria: editando?.categoria ?? 'Institucional',
-    corpo: editando?.resumo ?? '',
-    status: editando?.status ?? 'Rascunho',
+    resumo: editando?.resumo ?? '',
+    conteudo: editando?.conteudo ?? '',
+    imagemCapaUrl: editando?.imagemCapaUrl ?? '',
+    dataPublicacao: editando?.dataPublicacao ?? hojeISO(),
+    destaque: editando?.destaque ?? false,
+    status: editando?.status ?? 'RASCUNHO',
   });
+  const [enviandoCapa, setEnviandoCapa] = useState(false);
+  const [erroCapa, setErroCapa] = useState('');
 
   const atualizar = <K extends keyof FormNoticia>(campo: K, valor: FormNoticia[K]) =>
     setForm((f) => ({ ...f, [campo]: valor }));
 
-  const ferramentas: { icon: typeof Bold; label: string }[] = [
-    { icon: Bold, label: 'Negrito' },
-    { icon: Italic, label: 'Itálico' },
-    { icon: LinkIcon, label: 'Link' },
-    { icon: ImageIcon, label: 'Imagem' },
-  ];
+  async function enviarCapa(file: File) {
+    setErroCapa('');
+    setEnviandoCapa(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await apiPostForm<UploadResponse>('/api/noticias/upload-imagem', fd);
+      atualizar('imagemCapaUrl', res.url);
+    } catch {
+      setErroCapa('Falha ao enviar a imagem. Tente novamente.');
+    } finally {
+      setEnviandoCapa(false);
+    }
+  }
 
   return (
     <div
@@ -184,69 +152,132 @@ function EditorNoticia({ editando, onCancelar, onSalvar }: EditorProps) {
             />
           </label>
 
-          <label className="block">
-            <span className="font-body text-gray-soft text-xs uppercase tracking-wider mb-1 block">
-              Categoria
-            </span>
-            <select
-              value={form.categoria}
-              onChange={(e) => atualizar('categoria', e.target.value as Categoria)}
-              className="font-body bg-[#0d1b2a]/80 border border-federation/20 focus:border-gold rounded-lg px-4 py-3 text-fht-white placeholder-gray-soft text-sm outline-none w-full appearance-none cursor-pointer"
-            >
-              {CATEGORIAS.map((c) => (
-                <option key={c} value={c} className="bg-[#0a1628]">
-                  {c}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <label className="block">
+              <span className="font-body text-gray-soft text-xs uppercase tracking-wider mb-1 block">
+                Categoria
+              </span>
+              <select
+                value={form.categoria}
+                onChange={(e) => atualizar('categoria', e.target.value as NoticiaCategoria)}
+                className="font-body bg-[#0d1b2a]/80 border border-federation/20 focus:border-gold rounded-lg px-4 py-3 text-fht-white text-sm outline-none w-full appearance-none cursor-pointer"
+              >
+                {CATEGORIAS.map((c) => (
+                  <option key={c} value={c} className="bg-[#0a1628]">
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-          {/* capa - upload mock */}
+            <label className="block">
+              <span className="font-body text-gray-soft text-xs uppercase tracking-wider mb-1 block">
+                Data de publicação
+              </span>
+              <input
+                type="date"
+                value={form.dataPublicacao}
+                onChange={(e) => atualizar('dataPublicacao', e.target.value)}
+                className="font-body bg-[#0d1b2a]/80 border border-federation/20 focus:border-gold rounded-lg px-4 py-3 text-fht-white text-sm outline-none w-full [color-scheme:dark]"
+              />
+            </label>
+          </div>
+
+          {/* capa - upload real + URL colada */}
           <div className="block">
             <span className="font-body text-gray-soft text-xs uppercase tracking-wider mb-1 block">
               Capa
             </span>
-            <div className="border border-dashed border-federation/30 hover:border-federation/60 rounded-lg p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-colors duration-150 bg-[#0d1b2a]/40">
-              <Upload size={26} className="text-gold mb-2" />
-              <p className="font-body text-fht-white text-sm">
-                Arraste uma imagem ou clique para enviar
-              </p>
-              <p className="font-body text-gray-soft text-xs mt-1">
-                JPG ou PNG até 5 MB — proporção 16:9 recomendada
-              </p>
-            </div>
+            {form.imagemCapaUrl ? (
+              <div className="relative rounded-lg overflow-hidden border border-federation/20">
+                <img
+                  src={fileUrl(form.imagemCapaUrl)}
+                  alt="Capa da notícia"
+                  className="w-full h-44 object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={() => atualizar('imagemCapaUrl', '')}
+                  className="absolute top-2 right-2 bg-night/80 hover:bg-night text-fht-white rounded-full p-1.5"
+                  aria-label="Remover capa"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            ) : (
+              <label className="border border-dashed border-federation/30 hover:border-federation/60 rounded-lg p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-colors duration-150 bg-[#0d1b2a]/40">
+                {enviandoCapa ? (
+                  <Loader2 size={26} className="text-gold mb-2 animate-spin" />
+                ) : (
+                  <Upload size={26} className="text-gold mb-2" />
+                )}
+                <p className="font-body text-fht-white text-sm">
+                  {enviandoCapa ? 'Enviando...' : 'Clique para enviar uma imagem'}
+                </p>
+                <p className="font-body text-gray-soft text-xs mt-1">
+                  JPG ou PNG até 5 MB — proporção 16:9 recomendada
+                </p>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={enviandoCapa}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) void enviarCapa(f);
+                  }}
+                />
+              </label>
+            )}
+            <input
+              value={form.imagemCapaUrl}
+              onChange={(e) => atualizar('imagemCapaUrl', e.target.value)}
+              placeholder="...ou cole a URL de uma imagem"
+              className="font-body bg-[#0d1b2a]/80 border border-federation/20 focus:border-gold rounded-lg px-4 py-2.5 text-fht-white placeholder-gray-soft text-xs outline-none w-full mt-2"
+            />
+            {erroCapa && <p className="font-body text-red-400 text-xs mt-1">{erroCapa}</p>}
           </div>
 
-          {/* corpo - WYSIWYG fake */}
-          <div className="block">
+          {/* resumo */}
+          <label className="block">
+            <span className="font-body text-gray-soft text-xs uppercase tracking-wider mb-1 block">
+              Resumo <span className="text-gray-soft/50 normal-case">(aparece no card)</span>
+            </span>
+            <textarea
+              value={form.resumo}
+              onChange={(e) => atualizar('resumo', e.target.value)}
+              rows={2}
+              placeholder="Uma ou duas frases que resumem a notícia."
+              className="font-body bg-[#0d1b2a]/80 border border-federation/20 focus:border-gold rounded-lg px-4 py-3 text-fht-white placeholder-gray-soft text-sm outline-none w-full resize-y"
+            />
+          </label>
+
+          {/* corpo */}
+          <label className="block">
             <span className="font-body text-gray-soft text-xs uppercase tracking-wider mb-1 block">
               Corpo
             </span>
-            <div className="border border-federation/20 rounded-lg overflow-hidden">
-              <div className="flex items-center gap-1 px-2 py-2 border-b border-federation/20 bg-[#0d1b2a]/80">
-                {ferramentas.map((f) => (
-                  <button
-                    key={f.label}
-                    type="button"
-                    aria-label={f.label}
-                    className="w-8 h-8 flex items-center justify-center rounded text-gray-soft hover:text-gold hover:bg-federation/20 transition-colors duration-150"
-                  >
-                    <f.icon size={16} />
-                  </button>
-                ))}
-                <span className="ml-auto font-body text-[10px] text-gray-soft/60 border border-federation/20 rounded-full px-2 py-0.5">
-                  demonstração
-                </span>
-              </div>
-              <textarea
-                value={form.corpo}
-                onChange={(e) => atualizar('corpo', e.target.value)}
-                rows={7}
-                placeholder="Escreva o conteúdo da notícia..."
-                className="font-body bg-[#0d1b2a]/80 rounded-none px-4 py-3 text-fht-white placeholder-gray-soft text-sm outline-none w-full resize-y border-0"
-              />
-            </div>
-          </div>
+            <textarea
+              value={form.conteudo}
+              onChange={(e) => atualizar('conteudo', e.target.value)}
+              rows={8}
+              placeholder="Escreva o conteúdo completo da notícia..."
+              className="font-body bg-[#0d1b2a]/80 border border-federation/20 focus:border-gold rounded-lg px-4 py-3 text-fht-white placeholder-gray-soft text-sm outline-none w-full resize-y"
+            />
+          </label>
+
+          {/* destaque */}
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.destaque}
+              onChange={(e) => atualizar('destaque', e.target.checked)}
+              className="w-4 h-4 accent-gold"
+            />
+            <span className="font-body text-fht-white text-sm flex items-center gap-1.5">
+              <Star size={15} className="text-gold" /> Destacar na home (card grande)
+            </span>
+          </label>
 
           {/* toggle status */}
           <div className="block">
@@ -254,7 +285,7 @@ function EditorNoticia({ editando, onCancelar, onSalvar }: EditorProps) {
               Situação
             </span>
             <div className="inline-flex rounded-lg border border-federation/20 overflow-hidden">
-              {(['Rascunho', 'Publicado'] as Status[]).map((s) => {
+              {(['RASCUNHO', 'PUBLICADO'] as NoticiaStatus[]).map((s) => {
                 const ativo = form.status === s;
                 return (
                   <button
@@ -263,13 +294,13 @@ function EditorNoticia({ editando, onCancelar, onSalvar }: EditorProps) {
                     onClick={() => atualizar('status', s)}
                     className={`font-display text-sm tracking-wider px-5 py-2.5 transition-colors duration-150 ${
                       ativo
-                        ? s === 'Publicado'
+                        ? s === 'PUBLICADO'
                           ? 'bg-green-500/20 text-green-400'
                           : 'bg-gray-soft/15 text-fht-white'
                         : 'text-gray-soft hover:text-fht-white'
                     }`}
                   >
-                    {s.toUpperCase()}
+                    {ROTULO_STATUS[s].toUpperCase()}
                   </button>
                 );
               })}
@@ -288,9 +319,11 @@ function EditorNoticia({ editando, onCancelar, onSalvar }: EditorProps) {
           </button>
           <button
             type="button"
+            disabled={salvando || enviandoCapa}
             onClick={() => onSalvar(form, editando?.id ?? null)}
-            className="font-display text-night bg-gold hover:bg-gold-light px-5 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250"
+            className="font-display text-night bg-gold hover:bg-gold-light disabled:opacity-60 disabled:cursor-not-allowed px-5 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250 flex items-center gap-2"
           >
+            {salvando && <Loader2 size={16} className="animate-spin" />}
             {editando ? 'SALVAR ALTERAÇÕES' : 'SALVAR NOTÍCIA'}
           </button>
         </div>
@@ -301,20 +334,40 @@ function EditorNoticia({ editando, onCancelar, onSalvar }: EditorProps) {
 
 // ----------------------------- Página -----------------------------
 export function NoticiasPage() {
-  const [noticias, setNoticias] = useState<Noticia[]>(NOTICIAS_INICIAIS);
-  const [categoriaFiltro, setCategoriaFiltro] = useState<Categoria | 'Todas'>('Todas');
-  const [statusFiltro, setStatusFiltro] = useState<Status | 'Todos'>('Todos');
+  const [noticias, setNoticias] = useState<NoticiaDTO[]>([]);
+  const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState('');
+  const [salvando, setSalvando] = useState(false);
+
+  const [categoriaFiltro, setCategoriaFiltro] = useState<NoticiaCategoria | 'Todas'>('Todas');
+  const [statusFiltro, setStatusFiltro] = useState<NoticiaStatus | 'Todos'>('Todos');
   const [busca, setBusca] = useState('');
   const [editorAberto, setEditorAberto] = useState(false);
-  const [editando, setEditando] = useState<Noticia | null>(null);
-  const [proximoId, setProximoId] = useState(6);
+  const [editando, setEditando] = useState<NoticiaDTO | null>(null);
+
+  async function carregar() {
+    setCarregando(true);
+    setErro('');
+    try {
+      const lista = await apiGet<NoticiaDTO[]>('/api/noticias/gerenciar');
+      setNoticias(lista);
+    } catch {
+      setErro('Não foi possível carregar as notícias.');
+    } finally {
+      setCarregando(false);
+    }
+  }
+
+  useEffect(() => {
+    void carregar();
+  }, []);
 
   const abrirNova = () => {
     setEditando(null);
     setEditorAberto(true);
   };
 
-  const abrirEdicao = (n: Noticia) => {
+  const abrirEdicao = (n: NoticiaDTO) => {
     setEditando(n);
     setEditorAberto(true);
   };
@@ -324,39 +377,44 @@ export function NoticiasPage() {
     setEditando(null);
   };
 
-  const deletar = (id: number) => setNoticias((lista) => lista.filter((n) => n.id !== id));
-
-  const salvar = (dados: FormNoticia, id: number | null) => {
-    if (id === null) {
-      const nova: Noticia = {
-        id: proximoId,
-        titulo: dados.titulo.trim() || 'Notícia sem título',
-        categoria: dados.categoria,
-        data: HOJE,
-        status: dados.status,
-        resumo: dados.corpo.trim() || 'Sem conteúdo.',
-        gradiente: GRADIENTE_POR_CATEGORIA[dados.categoria],
-      };
-      setNoticias((lista) => [nova, ...lista]);
-      setProximoId((v) => v + 1);
-    } else {
-      setNoticias((lista) =>
-        lista.map((n) =>
-          n.id === id
-            ? {
-                ...n,
-                titulo: dados.titulo.trim() || n.titulo,
-                categoria: dados.categoria,
-                status: dados.status,
-                resumo: dados.corpo.trim() || n.resumo,
-                gradiente: GRADIENTE_POR_CATEGORIA[dados.categoria],
-              }
-            : n,
-        ),
-      );
+  async function deletar(n: NoticiaDTO) {
+    if (!window.confirm(`Deletar a notícia "${n.titulo}"? Essa ação não pode ser desfeita.`)) return;
+    try {
+      await apiDelete(`/api/noticias/${n.id}`);
+      setNoticias((lista) => lista.filter((x) => x.id !== n.id));
+    } catch {
+      setErro('Não foi possível deletar a notícia.');
     }
-    fecharEditor();
-  };
+  }
+
+  async function salvar(dados: FormNoticia, id: string | null) {
+    setSalvando(true);
+    setErro('');
+    const payload = {
+      titulo: dados.titulo.trim(),
+      categoria: dados.categoria,
+      resumo: dados.resumo.trim() || null,
+      conteudo: dados.conteudo.trim() || null,
+      imagemCapaUrl: dados.imagemCapaUrl.trim() || null,
+      dataPublicacao: dados.dataPublicacao || null,
+      destaque: dados.destaque,
+      status: dados.status,
+    };
+    try {
+      if (id === null) {
+        const criada = await apiPostJson<NoticiaDTO>('/api/noticias', payload);
+        setNoticias((lista) => [criada, ...lista]);
+      } else {
+        const atualizada = await apiPut<NoticiaDTO>(`/api/noticias/${id}`, payload);
+        setNoticias((lista) => lista.map((x) => (x.id === id ? atualizada : x)));
+      }
+      fecharEditor();
+    } catch {
+      setErro('Não foi possível salvar. Verifique o título e a categoria.');
+    } finally {
+      setSalvando(false);
+    }
+  }
 
   const filtradas = noticias.filter((n) => {
     const okCat = categoriaFiltro === 'Todas' || n.categoria === categoriaFiltro;
@@ -365,19 +423,14 @@ export function NoticiasPage() {
     return okCat && okStatus && okBusca;
   });
 
-  const totalPublicadas = noticias.filter((n) => n.status === 'Publicado').length;
-  const totalRascunhos = noticias.filter((n) => n.status === 'Rascunho').length;
+  const totalPublicadas = noticias.filter((n) => n.status === 'PUBLICADO').length;
+  const totalRascunhos = noticias.filter((n) => n.status === 'RASCUNHO').length;
 
   return (
     <div>
       {/* Cabeçalho */}
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-        <div className="flex items-center gap-3">
-          <h2 className="font-display text-fht-white text-3xl">NOTÍCIAS</h2>
-          <span className="font-body text-[10px] text-gray-soft/60 border border-federation/20 rounded-full px-2 py-0.5">
-            demonstração
-          </span>
-        </div>
+        <h2 className="font-display text-fht-white text-3xl">NOTÍCIAS</h2>
         <button
           type="button"
           onClick={abrirNova}
@@ -387,6 +440,12 @@ export function NoticiasPage() {
           NOVA NOTÍCIA
         </button>
       </div>
+
+      {erro && (
+        <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/30 text-red-300 rounded-lg px-4 py-3 mb-6 font-body text-sm">
+          <AlertCircle size={16} /> {erro}
+        </div>
+      )}
 
       {/* Resumo rápido */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
@@ -400,20 +459,12 @@ export function NoticiasPage() {
         <p className="font-display text-gold text-xs tracking-widest mb-4">FILTROS</p>
 
         <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-          {/* Categorias */}
           <div className="flex flex-wrap gap-2">
-            <PillFiltro
-              ativo={categoriaFiltro === 'Todas'}
-              onClick={() => setCategoriaFiltro('Todas')}
-            >
+            <PillFiltro ativo={categoriaFiltro === 'Todas'} onClick={() => setCategoriaFiltro('Todas')}>
               Todas
             </PillFiltro>
             {CATEGORIAS.map((c) => (
-              <PillFiltro
-                key={c}
-                ativo={categoriaFiltro === c}
-                onClick={() => setCategoriaFiltro(c)}
-              >
+              <PillFiltro key={c} ativo={categoriaFiltro === c} onClick={() => setCategoriaFiltro(c)}>
                 {c}
               </PillFiltro>
             ))}
@@ -421,16 +472,14 @@ export function NoticiasPage() {
 
           <div className="hidden lg:block h-6 w-px bg-federation/20" />
 
-          {/* Status */}
           <div className="flex flex-wrap gap-2">
-            {(['Todos', 'Publicado', 'Rascunho'] as (Status | 'Todos')[]).map((s) => (
+            {(['Todos', 'PUBLICADO', 'RASCUNHO'] as (NoticiaStatus | 'Todos')[]).map((s) => (
               <PillFiltro key={s} ativo={statusFiltro === s} onClick={() => setStatusFiltro(s)}>
-                {s}
+                {s === 'Todos' ? 'Todos' : ROTULO_STATUS[s]}
               </PillFiltro>
             ))}
           </div>
 
-          {/* Busca */}
           <div className="relative lg:ml-auto w-full lg:w-64">
             <Search
               size={16}
@@ -447,79 +496,98 @@ export function NoticiasPage() {
       </div>
 
       {/* Lista */}
-      <div className="flex flex-col gap-4">
-        {filtradas.map((n) => (
-          <div
-            key={n.id}
-            className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-4 flex flex-col sm:flex-row gap-4 hover:border-federation/40 transition-colors duration-150"
-          >
-            {/* miniatura */}
+      {carregando ? (
+        <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-10 flex items-center justify-center gap-3">
+          <Loader2 size={22} className="text-gold animate-spin" />
+          <span className="font-body text-gray-soft text-sm">Carregando notícias...</span>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-4">
+          {filtradas.map((n) => (
             <div
-              className={`w-full sm:w-44 h-28 rounded-lg bg-gradient-to-br ${n.gradiente} flex-shrink-0 flex items-end p-3`}
+              key={n.id}
+              className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-4 flex flex-col sm:flex-row gap-4 hover:border-federation/40 transition-colors duration-150"
             >
-              <Newspaper size={22} className="text-white/80" />
-            </div>
+              {/* miniatura */}
+              {n.imagemCapaUrl ? (
+                <div className="w-full sm:w-44 h-28 rounded-lg overflow-hidden flex-shrink-0">
+                  <img src={fileUrl(n.imagemCapaUrl)} alt={n.titulo} className="w-full h-full object-cover" />
+                </div>
+              ) : (
+                <div
+                  className={`w-full sm:w-44 h-28 rounded-lg bg-gradient-to-br ${GRADIENTE_POR_CATEGORIA[n.categoria]} flex-shrink-0 flex items-end p-3`}
+                >
+                  <Newspaper size={22} className="text-white/80" />
+                </div>
+              )}
 
-            {/* conteúdo */}
-            <div className="flex-1 min-w-0 flex flex-col">
-              <div className="flex flex-wrap items-center gap-2 mb-2">
-                <span
-                  className={`font-body text-xs px-2.5 py-1 rounded-full border ${BADGE_CATEGORIA[n.categoria]}`}
-                >
-                  {n.categoria}
-                </span>
-                <span
-                  className={`font-body text-xs px-2.5 py-1 rounded-full border ${BADGE_STATUS[n.status]}`}
-                >
-                  {n.status}
-                </span>
-                <span className="font-body text-gray-soft text-xs flex items-center gap-1">
-                  <Calendar size={13} />
-                  {n.data}
-                </span>
+              {/* conteúdo */}
+              <div className="flex-1 min-w-0 flex flex-col">
+                <div className="flex flex-wrap items-center gap-2 mb-2">
+                  <span className={`font-body text-xs px-2.5 py-1 rounded-full border ${BADGE_CATEGORIA[n.categoria]}`}>
+                    {n.categoria}
+                  </span>
+                  <span className={`font-body text-xs px-2.5 py-1 rounded-full border ${BADGE_STATUS[n.status]}`}>
+                    {ROTULO_STATUS[n.status]}
+                  </span>
+                  {n.destaque && (
+                    <span className="font-body text-xs px-2.5 py-1 rounded-full border text-gold bg-gold/10 border-gold/30 flex items-center gap-1">
+                      <Star size={12} /> Destaque
+                    </span>
+                  )}
+                  <span className="font-body text-gray-soft text-xs flex items-center gap-1">
+                    <Calendar size={13} />
+                    {formatarData(n.dataPublicacao)}
+                  </span>
+                </div>
+
+                <h3 className="font-display text-fht-white text-lg leading-snug tracking-wide">{n.titulo}</h3>
+                <p className="font-body text-gray-soft text-sm mt-1 line-clamp-2">{n.resumo}</p>
+
+                {/* ações */}
+                <div className="flex items-center gap-2 mt-auto pt-3">
+                  <button
+                    type="button"
+                    onClick={() => abrirEdicao(n)}
+                    className="font-body text-gray-soft hover:text-gold border border-federation/30 hover:border-gold/50 px-3 py-1.5 rounded-lg text-xs tracking-wider transition-colors duration-150 flex items-center gap-1.5"
+                  >
+                    <Pencil size={14} />
+                    Editar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void deletar(n)}
+                    className="font-body text-gray-soft hover:text-red-400 border border-federation/30 hover:border-red-500/50 px-3 py-1.5 rounded-lg text-xs tracking-wider transition-colors duration-150 flex items-center gap-1.5"
+                  >
+                    <Trash2 size={14} />
+                    Deletar
+                  </button>
+                </div>
               </div>
-
-              <h3 className="font-display text-fht-white text-lg leading-snug tracking-wide">
-                {n.titulo}
-              </h3>
-              <p className="font-body text-gray-soft text-sm mt-1 line-clamp-2">{n.resumo}</p>
-
-              {/* ações */}
-              <div className="flex items-center gap-2 mt-auto pt-3">
-                <button
-                  type="button"
-                  onClick={() => abrirEdicao(n)}
-                  className="font-body text-gray-soft hover:text-gold border border-federation/30 hover:border-gold/50 px-3 py-1.5 rounded-lg text-xs tracking-wider transition-colors duration-150 flex items-center gap-1.5"
-                >
-                  <Pencil size={14} />
-                  Editar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => deletar(n.id)}
-                  className="font-body text-gray-soft hover:text-red-400 border border-federation/30 hover:border-red-500/50 px-3 py-1.5 rounded-lg text-xs tracking-wider transition-colors duration-150 flex items-center gap-1.5"
-                >
-                  <Trash2 size={14} />
-                  Deletar
-                </button>
-              </div>
             </div>
-          </div>
-        ))}
+          ))}
 
-        {filtradas.length === 0 && (
-          <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-10 text-center">
-            <Newspaper size={34} className="text-gray-soft/50 mx-auto mb-3" />
-            <p className="font-body text-gray-soft text-sm">
-              Nenhuma notícia encontrada com os filtros atuais.
-            </p>
-          </div>
-        )}
-      </div>
+          {filtradas.length === 0 && (
+            <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-10 text-center">
+              <Newspaper size={34} className="text-gray-soft/50 mx-auto mb-3" />
+              <p className="font-body text-gray-soft text-sm">
+                {noticias.length === 0
+                  ? 'Nenhuma notícia ainda. Clique em "Nova notícia" para publicar a primeira.'
+                  : 'Nenhuma notícia encontrada com os filtros atuais.'}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Editor */}
       {editorAberto && (
-        <EditorNoticia editando={editando} onCancelar={fecharEditor} onSalvar={salvar} />
+        <EditorNoticia
+          editando={editando}
+          salvando={salvando}
+          onCancelar={fecharEditor}
+          onSalvar={(dados, id) => void salvar(dados, id)}
+        />
       )}
     </div>
   );

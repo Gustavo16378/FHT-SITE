@@ -21,6 +21,14 @@ function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
+// Monta a URL absoluta de um arquivo servido pelo backend (uploads locais em dev vêm
+// como caminho relativo `/api/files/...`). URLs externas coladas passam direto.
+export function fileUrl(path: string | null | undefined): string {
+  if (!path) return ''
+  if (/^https?:\/\//i.test(path)) return path
+  return `${API_URL}${path}`
+}
+
 async function handle<T>(res: Response): Promise<T> {
   let body: ApiEnvelope<T> | null = null
   try {

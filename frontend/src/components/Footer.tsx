@@ -1,14 +1,15 @@
 import { IconInstagram, IconFacebook, IconYoutube } from './SocialIcons'
 
+// Âncoras com "/" para funcionarem tanto na home quanto a partir de outras rotas.
 const quickLinks = [
-  { label: 'Competições', href: '#competicoes' },
-  { label: 'Cadastro', href: '#cadastro' },
-  { label: 'Notícias', href: '#noticias' },
-  { label: 'Sobre a FHT', href: '#sobre' },
-  { label: 'Clubes', href: '#clubes' },
-  { label: 'Árbitros', href: '#arbitros' },
-  { label: 'Documentos', href: '#documentos' },
-  { label: 'Contato', href: '#contato' },
+  { label: 'Competições', href: '/#competicoes' },
+  { label: 'Cadastro', href: '/#cadastro' },
+  { label: 'Notícias', href: '/noticias' },
+  { label: 'Sobre a FHT', href: '/#sobre' },
+  { label: 'Clubes', href: '/#clubes' },
+  { label: 'Árbitros', href: '/#arbitros' },
+  { label: 'Documentos', href: '/#documentos' },
+  { label: 'Contato', href: '/#contato' },
 ]
 
 const institutionalLinks = [

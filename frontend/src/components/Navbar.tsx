@@ -6,14 +6,15 @@ import { useScrollDirection } from '../hooks/useScrollDirection'
 import { useAuth } from '../context/AuthContext'
 import logo from '../assets/logo.png'
 
+// Prefixo "/" nas âncoras: funcionam tanto na home quanto a partir de outras rotas (ex.: /noticias).
 const navLinks = [
-  { label: 'Competições', href: '#competicoes' },
-  { label: 'Notícias', href: '#noticias' },
-  { label: 'Sobre a FHT', href: '#sobre' },
-  { label: 'Clubes', href: '#clubes' },
-  { label: 'Árbitros', href: '#arbitros' },
-  { label: 'Transparência', href: '#documentos' },
-  { label: 'Contato', href: '#contato' },
+  { label: 'Competições', href: '/#competicoes' },
+  { label: 'Notícias', href: '/#noticias' },
+  { label: 'Sobre a FHT', href: '/#sobre' },
+  { label: 'Clubes', href: '/#clubes' },
+  { label: 'Árbitros', href: '/#arbitros' },
+  { label: 'Transparência', href: '/#documentos' },
+  { label: 'Contato', href: '/#contato' },
 ]
 
 export default function Navbar() {
@@ -222,7 +223,7 @@ export default function Navbar() {
                 Entrar
               </a>
               <a
-                href="#cadastro"
+                href="/#cadastro"
                 onClick={closeMenu}
                 style={{
                   display: 'block',
@@ -265,7 +266,7 @@ export default function Navbar() {
           <div className="flex items-center justify-between h-16 lg:h-20">
 
             {/* Logo */}
-            <a href="#hero" className="flex items-center gap-2">
+            <a href="/#hero" className="flex items-center gap-2">
               <img src={logo} alt="Logo FHT" className="w-20 h-20 object-contain" />
               <div className="hidden sm:block">
                 <p className="font-display text-fht-white text-lg leading-none tracking-wide">FEDERAÇÃO DE HANDEBOL</p>
@@ -314,7 +315,7 @@ export default function Navbar() {
                     <LogIn size={15} /> Entrar
                   </Link>
                   <a
-                    href="#cadastro"
+                    href="/#cadastro"
                     className="hidden md:block font-display text-night bg-gold hover:bg-gold-light px-5 py-2 rounded-lg text-sm tracking-wider transition-colors duration-250"
                   >
                     CADASTRAR EQUIPE

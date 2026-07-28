@@ -18,6 +18,8 @@ import CookieBanner from './components/CookieBanner'
 import Login from './pages/Login'
 import ClubeDashboard from './pages/ClubeDashboard'
 import AdminDashboard from './pages/AdminDashboard'
+import Noticias from './pages/Noticias'
+import NoticiaPost from './pages/NoticiaPost'
 
 function SitePrincipal() {
   return (
@@ -47,6 +49,8 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<SitePrincipal />} />
+          <Route path="/noticias" element={<Noticias />} />
+          <Route path="/noticias/:slug" element={<NoticiaPost />} />
           <Route path="/login" element={<Login />} />
           <Route path="/clube" element={
             <ProtectedRoute role="ADMIN_CLUBE">

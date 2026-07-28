@@ -70,3 +70,28 @@ export interface LoginResponse {
   refreshToken: string | null
   role: 'ADMIN_FHT' | 'ADMIN_CLUBE'
 }
+
+export type NoticiaCategoria = 'Institucional' | 'Competição' | 'Arbitragem' | 'Seleção'
+export type NoticiaStatus = 'RASCUNHO' | 'PUBLICADO'
+
+/** NoticiaResumoDTO / NoticiaResponseDTO — `conteudo` só vem no detalhe (slug) e na listagem admin. */
+export interface NoticiaDTO {
+  id: string
+  titulo: string
+  slug: string
+  categoria: NoticiaCategoria
+  resumo: string | null
+  conteudo?: string | null
+  imagemCapaUrl: string | null
+  autorNome: string | null
+  dataPublicacao: string
+  destaque: boolean
+  status: NoticiaStatus
+  createdAt: string
+  updatedAt: string
+}
+
+/** POST /api/noticias/upload-imagem */
+export interface UploadResponse {
+  url: string
+}

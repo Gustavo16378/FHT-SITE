@@ -31,3 +31,43 @@ ON CONFLICT (cpf) DO NOTHING;
 INSERT INTO usuarios (nome, email, senha_hash, role, clube_id, ativo)
 VALUES ('Palmas Handebol Clube', 'clube@fht.org.br', '$2a$10$OCUw.OlNjbQtqBxK0QUo3O2fXD98b7jcO2YE6xyssv56z00pgG0ze', 'ADMIN_CLUBE', '11111111-1111-1111-1111-111111111111', true)
 ON CONFLICT (email) DO NOTHING;
+
+-- ── Notícias (blog) — mistura de categorias, 1 destaque e 1 rascunho ─────
+-- Limpar depois: DELETE FROM noticias WHERE id::text LIKE 'aaaaaaaa-%';
+INSERT INTO noticias (id, titulo, slug, categoria, resumo, conteudo, imagem_capa_url, autor_nome, data_publicacao, destaque, status, created_at, updated_at)
+VALUES
+ ('aaaaaaaa-0000-0000-0000-000000000001',
+  'FHT lança calendário oficial de competições para a temporada 2026',
+  'fht-lanca-calendario-2026', 'Institucional',
+  'A Federação de Handebol do Tocantins divulgou o calendário completo da temporada, com competições em todas as categorias de base e adulto.',
+  E'A Federação de Handebol do Tocantins (FHT) apresentou nesta semana, em Palmas, o calendário oficial da temporada 2026.\n\nSão oito competições ao longo do ano, contemplando as categorias de base (Sub-12 a Sub-18) e o adulto masculino e feminino. A temporada abre em junho com a Copa Tocantins de base.\n\n"Queremos dar previsibilidade aos clubes para que possam planejar suas equipes com antecedência", afirmou a presidência durante o anúncio.',
+  'https://picsum.photos/seed/fht-calendario/800/450', 'Administração FHT', '2026-07-20', true, 'PUBLICADO', NOW(), NOW()),
+
+ ('aaaaaaaa-0000-0000-0000-000000000002',
+  'Campeonato Tocantinense tem rodada emocionante em Palmas',
+  'campeonato-tocantinense-rodada-palmas', 'Competição',
+  'Equipes disputaram duas rodadas no Ginásio Ayrton Senna com casa cheia e grande nível técnico.',
+  E'O fim de semana foi de handebol intenso no Ginásio Ayrton Senna, em Palmas.\n\nDuas rodadas do Campeonato Tocantinense movimentaram as arquibancadas, com jogos equilibrados e definições apenas nos minutos finais. O Palmas HC segue na liderança.\n\nA próxima rodada acontece em Araguaína, no próximo mês.',
+  'https://picsum.photos/seed/fht-rodada/800/450', 'Administração FHT', '2026-07-14', false, 'PUBLICADO', NOW(), NOW()),
+
+ ('aaaaaaaa-0000-0000-0000-000000000003',
+  'Curso de formação de árbitros abre vagas para Palmas e Araguaína',
+  'curso-formacao-arbitros-2026', 'Arbitragem',
+  'A FHT abre inscrições para o curso de formação de árbitros, em parceria com a CBHb, com vagas nas duas maiores cidades do estado.',
+  E'A FHT abriu as inscrições para o curso de formação de árbitros de handebol.\n\nA capacitação, em parceria com a Confederação Brasileira de Handebol (CBHb), terá módulos teóricos e práticos e vagas em Palmas e Araguaína. As inscrições vão até o fim do mês.\n\nO objetivo é ampliar o quadro de arbitragem do estado para as competições da temporada.',
+  'https://picsum.photos/seed/fht-arbitros/800/450', 'Administração FHT', '2026-07-05', false, 'PUBLICADO', NOW(), NOW()),
+
+ ('aaaaaaaa-0000-0000-0000-000000000004',
+  'Seleção Tocantinense Sub-18 se prepara para os Jogos do Interior',
+  'selecao-sub18-jogos-do-interior', 'Seleção',
+  'O grupo de trabalho se reuniu para os primeiros treinos da temporada visando representar o estado nos Jogos do Interior.',
+  E'A comissão técnica da Seleção Tocantinense Sub-18 iniciou a preparação para os Jogos do Interior.\n\nO grupo, formado por atletas de seis clubes filiados, realizou os primeiros treinos de avaliação em Porto Nacional. A convocação final será divulgada nas próximas semanas.',
+  'https://picsum.photos/seed/fht-selecao/800/450', 'Administração FHT', '2026-06-28', false, 'PUBLICADO', NOW(), NOW()),
+
+ ('aaaaaaaa-0000-0000-0000-000000000005',
+  'Assembleia geral aprova novo estatuto e taxa de anuidade 2026',
+  'assembleia-estatuto-anuidade-2026', 'Institucional',
+  'Clubes filiados aprovam ajustes no estatuto e o valor da anuidade que habilita atletas às competições do ano.',
+  E'Rascunho em edição — publicar após revisão da diretoria.',
+  NULL, 'Administração FHT', '2026-07-25', false, 'RASCUNHO', NOW(), NOW())
+ON CONFLICT (id) DO NOTHING;

@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { apiGet, apiPatch, ApiError, fileUrl } from '../services/api'
-import type { ClubeDTO, AtletaDTO, AdminDashboardDTO, ArbitroDTO } from '../types/api'
+import type { ClubeDTO, AtletaDTO, AdminDashboardDTO, ArbitroDTO, ConsentimentoDTO } from '../types/api'
 import { CompeticoesPage } from './admin/CompeticoesPage'
 import { FinanceiroPage } from './admin/FinanceiroPage'
 import { NoticiasPage } from './admin/NoticiasPage'
@@ -20,7 +20,7 @@ import { UsuariosPage } from './admin/UsuariosPage'
 type Page = 'dashboard' | 'clubes' | 'atletas' | 'arbitros' | 'competicoes' | 'financeiro' | 'noticias' | 'galeria' | 'diretoria' | 'documentos' | 'usuarios'
 
 type StatusClube = 'PENDENTE' | 'ATIVO' | 'REJEITADO' | 'SUSPENSO'
-type StatusAtleta = 'AGUARDANDO_PAGAMENTO' | 'ATIVO' | 'REJEITADO' | 'SUSPENSO'
+type StatusAtleta = 'AGUARDANDO_PAGAMENTO' | 'AGUARDANDO_APROVACAO' | 'ATIVO' | 'REJEITADO' | 'SUSPENSO'
 type StatusArbitro = 'PENDENTE' | 'CREDENCIADO' | 'REJEITADO' | 'SUSPENSO'
 
 interface Clube {
@@ -36,6 +36,11 @@ interface Atleta {
   status: StatusAtleta; transferencia: boolean; clubeAnterior?: string
   fotoUrl: string; rgUrl: string; comprovanteResidenciaUrl: string; comprovanteUrl: string
   motivoRejeicao?: string; taxaValor?: number; taxaAno?: number
+  // LGPD art. 14 — responsável legal e consentimentos do menor
+  menorDeIdade: boolean; prazoPagamentoAte: string | null
+  responsavelNome?: string; responsavelCpf?: string; responsavelParentesco?: string
+  responsavelEmail?: string; responsavelTelefone?: string
+  consentimentos: ConsentimentoDTO[]
 }
 interface Arbitro {
   id: string; nome: string; cpf: string; dataNascimento: string; foto: string
@@ -98,6 +103,14 @@ function mapAtleta(d: AtletaDTO, clubeNome: string, clubeStatus?: StatusClube): 
     motivoRejeicao: d.motivoRejeicao ?? undefined,
     taxaValor: d.taxaValor ?? undefined,
     taxaAno: d.taxaAno ?? undefined,
+    menorDeIdade: d.menorDeIdade,
+    prazoPagamentoAte: d.prazoPagamentoAte,
+    responsavelNome: d.responsavelNome ?? undefined,
+    responsavelCpf: d.responsavelCpf ?? undefined,
+    responsavelParentesco: d.responsavelParentesco ?? undefined,
+    responsavelEmail: d.responsavelEmail ?? undefined,
+    responsavelTelefone: d.responsavelTelefone ?? undefined,
+    consentimentos: d.consentimentos ?? [],
   }
 }
 
@@ -136,10 +149,18 @@ const clubeBadge: Record<StatusClube, string> = {
   SUSPENSO:  'text-orange-400 bg-orange-500/10 border-orange-500/30',
 }
 const atletaBadge: Record<StatusAtleta, string> = {
-  AGUARDANDO_PAGAMENTO: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30',
+  AGUARDANDO_PAGAMENTO: 'text-red-400 bg-red-500/10 border-red-500/30',
+  AGUARDANDO_APROVACAO: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30',
   ATIVO: 'text-green-400 bg-green-500/10 border-green-500/30',
   REJEITADO: 'text-red-400 bg-red-500/10 border-red-500/30',
   SUSPENSO: 'text-orange-400 bg-orange-500/10 border-orange-500/30',
+}
+const atletaStatusLabel: Record<StatusAtleta, string> = {
+  AGUARDANDO_PAGAMENTO: 'FALTA PGTO',
+  AGUARDANDO_APROVACAO: 'AG. APROVAÇÃO',
+  ATIVO: 'ATIVO',
+  REJEITADO: 'REJEITADO',
+  SUSPENSO: 'SUSPENSO',
 }
 const arbitroBadge: Record<StatusArbitro, string> = {
   PENDENTE: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30',
@@ -238,6 +259,16 @@ function AtletaDetailPanel({
     ? Math.floor((Date.now() - new Date(atleta.dataNascimento).getTime()) / (1000 * 60 * 60 * 24 * 365.25))
     : null
 
+  // Espelha os bloqueios do backend (AtletaServiceImpl.aprovar) para não mostrar um botão que vai dar erro.
+  const temComprovante = Boolean(atleta.comprovanteUrl && atleta.comprovanteUrl !== '#')
+  const temConsentimentoMenor = atleta.consentimentos.some(
+    c => c.finalidade === 'CADASTRO_ATLETA_MENOR' && !c.revogadoEm)
+  const bloqueioAprovacao = !temComprovante
+    ? 'Aprovação bloqueada: comprovante de pagamento Pix não enviado.'
+    : atleta.menorDeIdade && !temConsentimentoMenor
+      ? 'Aprovação bloqueada: atleta menor sem consentimento do responsável legal (LGPD art. 14).'
+      : null
+
   return (
     <div className="fixed inset-0 z-50 flex" onClick={onClose}>
       <div className="flex-1 backdrop-blur-sm" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }} />
@@ -255,10 +286,13 @@ function AtletaDetailPanel({
             <div>
               <div className="flex items-center gap-2 mb-0.5">
                 <span className={`font-body text-xs px-2.5 py-0.5 rounded-full border ${atletaBadge[atleta.status]}`}>
-                  {atleta.status === 'AGUARDANDO_PAGAMENTO' ? 'AG. PAGAMENTO' : atleta.status}
+                  {atletaStatusLabel[atleta.status]}
                 </span>
                 {atleta.transferencia && (
                   <span className="font-body text-xs px-2 py-0.5 rounded-full border text-blue-400 bg-blue-500/10 border-blue-500/30">TRANSFERÊNCIA</span>
+                )}
+                {atleta.menorDeIdade && (
+                  <span className="font-body text-xs px-2 py-0.5 rounded-full border text-purple-400 bg-purple-500/10 border-purple-500/30">MENOR</span>
                 )}
               </div>
               <h2 className="font-display text-fht-white text-xl leading-tight">{atleta.nome}</h2>
@@ -327,6 +361,53 @@ function AtletaDetailPanel({
             </div>
           </div>
 
+          {/* responsável legal — LGPD art. 14 */}
+          {atleta.menorDeIdade && (
+            <div className="bg-[#0d1b2a]/60 border border-purple-500/30 rounded-xl p-5">
+              <p className="font-display text-purple-400 text-xs tracking-widest mb-4">RESPONSÁVEL LEGAL (LGPD ART. 14)</p>
+              {atleta.responsavelNome ? (
+                <div className="grid grid-cols-2 gap-4">
+                  <Info label="Nome" value={atleta.responsavelNome} />
+                  <Info label="Parentesco" value={atleta.responsavelParentesco ?? '—'} />
+                  <Info label="CPF" value={atleta.responsavelCpf ?? '—'} />
+                  <Info label="Telefone" value={atleta.responsavelTelefone ?? '—'} />
+                  <Info label="E-mail" value={atleta.responsavelEmail ?? '—'} />
+                </div>
+              ) : (
+                <p className="font-body text-red-400 text-sm leading-relaxed">
+                  Atleta menor sem responsável legal registrado — cadastro anterior à regra da LGPD.
+                  A aprovação fica bloqueada até o clube completar os dados.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* consentimentos LGPD */}
+          {atleta.consentimentos.length > 0 && (
+            <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-5">
+              <p className="font-display text-gold text-xs tracking-widest mb-4">CONSENTIMENTOS (LGPD)</p>
+              <div className="flex flex-col gap-2">
+                {atleta.consentimentos.map(c => (
+                  <div key={c.id} className="flex items-center justify-between px-4 py-3 bg-federation/10 border border-federation/20 rounded-lg">
+                    <div>
+                      <p className="font-body text-fht-white text-sm">
+                        {c.finalidade === 'CADASTRO_ATLETA_MENOR' ? 'Filiação autorizada pelo responsável' : 'Uso de imagem no site'}
+                      </p>
+                      <p className="font-body text-gray-soft text-xs mt-0.5">
+                        {c.consentidoPorNome ?? '—'} · {formatDate(c.concedidoEm)} · termo v{c.textoVersao}
+                      </p>
+                    </div>
+                    <span className={`font-body text-xs px-2.5 py-1 rounded-full border ${
+                      c.revogadoEm ? 'text-gray-soft bg-federation/10 border-federation/30' : 'text-green-400 bg-green-500/10 border-green-500/30'
+                    }`}>
+                      {c.revogadoEm ? 'revogado' : 'ativo'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* documentos */}
           <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-5">
             <p className="font-display text-gold text-xs tracking-widest mb-4">DOCUMENTOS</p>
@@ -364,16 +445,22 @@ function AtletaDetailPanel({
 
         {/* ações fixas no rodapé */}
         <div className="sticky bottom-0 bg-[#0a1628] border-t border-federation/20 p-5 flex flex-wrap gap-3">
-          {atleta.status === 'AGUARDANDO_PAGAMENTO' && (
+          {(atleta.status === 'AGUARDANDO_PAGAMENTO' || atleta.status === 'AGUARDANDO_APROVACAO') && (
             <>
-              <button onClick={() => onAprovar(atleta.id)}
-                className="flex-1 font-display text-night bg-green-500 hover:bg-green-400 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250">
-                APROVAR
-              </button>
-              <button onClick={() => onRejeitar(atleta.id)}
-                className="flex-1 font-display text-fht-white bg-red-500/20 border border-red-500/40 hover:bg-red-500/30 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250">
-                REJEITAR
-              </button>
+              <div className="w-full flex flex-wrap gap-3">
+                <button onClick={() => onAprovar(atleta.id)} disabled={bloqueioAprovacao !== null}
+                  title={bloqueioAprovacao ?? undefined}
+                  className="flex-1 font-display text-night bg-green-500 hover:bg-green-400 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-green-500">
+                  APROVAR
+                </button>
+                <button onClick={() => onRejeitar(atleta.id)}
+                  className="flex-1 font-display text-fht-white bg-red-500/20 border border-red-500/40 hover:bg-red-500/30 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250">
+                  REJEITAR
+                </button>
+              </div>
+              {bloqueioAprovacao && (
+                <p className="w-full font-body text-yellow-400 text-xs -mt-1">{bloqueioAprovacao}</p>
+              )}
             </>
           )}
           {atleta.status === 'ATIVO' && (
@@ -568,7 +655,7 @@ function ClubeDetailPanel({
                     </div>
                     <div className="flex items-center gap-2">
                       <span className={`font-body text-xs px-2 py-0.5 rounded-full border ${atletaBadge[a.status]}`}>
-                        {a.status === 'AGUARDANDO_PAGAMENTO' ? 'AG. PGTO' : a.status}
+                        {atletaStatusLabel[a.status]}
                       </span>
                       <span className="font-body text-gray-soft text-xs group-hover:text-gold transition-colors duration-200">›</span>
                     </div>
@@ -701,7 +788,8 @@ function DashboardPage({ dashboard }: { dashboard: AdminDashboardDTO | null }) {
       items: [
         { label: 'Total', v: dashboard?.atletas.total ?? 0 },
         { label: 'Ativos', v: dashboard?.atletas.ativos ?? 0 },
-        { label: 'Ag. pagamento', v: dashboard?.atletas.pendentes ?? 0 },
+        { label: 'Ag. aprovação', v: dashboard?.atletas.aguardandoAprovacao ?? 0 },
+        { label: 'Falta pagamento', v: (dashboard?.atletas.pendentes ?? 0) - (dashboard?.atletas.aguardandoAprovacao ?? 0) },
       ],
     },
     {
@@ -718,12 +806,14 @@ function DashboardPage({ dashboard }: { dashboard: AdminDashboardDTO | null }) {
 
   // Composição de atletas — dados REAIS do dashboard
   const ativos = dashboard?.atletas.ativos ?? 0
-  const agPgto = dashboard?.atletas.pendentes ?? 0
+  const agAprov = dashboard?.atletas.aguardandoAprovacao ?? 0
+  const agPgto = Math.max(0, (dashboard?.atletas.pendentes ?? 0) - agAprov)
   const totalAt = dashboard?.atletas.total ?? 0
-  const outros = Math.max(0, totalAt - ativos - agPgto)
+  const outros = Math.max(0, totalAt - ativos - agAprov - agPgto)
   const segAtletas = [
     { value: ativos, color: '#4ade80', label: 'Ativos' },
-    { value: agPgto, color: '#facc15', label: 'Ag. pagamento' },
+    { value: agAprov, color: '#facc15', label: 'Ag. aprovação' },
+    { value: agPgto, color: '#f87171', label: 'Falta pagamento' },
     { value: outros, color: '#8A9BB5', label: 'Suspensos / rejeitados' },
   ]
 
@@ -1007,7 +1097,7 @@ function AtletasPage({ atletas, reload }: {
                 <td className="px-4 py-3 font-body text-gray-soft text-sm">{a.categoria}</td>
                 <td className="px-4 py-3">
                   <span className={`font-body text-xs px-2.5 py-1 rounded-full border ${atletaBadge[a.status]}`}>
-                    {a.status === 'AGUARDANDO_PAGAMENTO' ? 'AG. PGTO' : a.status}
+                    {atletaStatusLabel[a.status]}
                   </span>
                 </td>
                 <td className="px-4 py-3">

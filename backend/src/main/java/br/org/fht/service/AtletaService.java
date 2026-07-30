@@ -1,5 +1,7 @@
 package br.org.fht.service;
 
+import br.org.fht.common.OrigemRequisicao;
+import br.org.fht.dto.atleta.AtletaDocumentosForm;
 import br.org.fht.dto.atleta.AtletaForm;
 import br.org.fht.dto.atleta.AtletaResponseDTO;
 import br.org.fht.dto.atleta.AtletaUpdateForm;
@@ -10,13 +12,15 @@ import java.util.UUID;
 
 public interface AtletaService {
 
-    AtletaResponseDTO cadastrar(AtletaForm form, JsonWebToken jwt);
+    AtletaResponseDTO cadastrar(AtletaForm form, JsonWebToken jwt, OrigemRequisicao origem);
 
     List<AtletaResponseDTO> listar(JsonWebToken jwt);
 
     AtletaResponseDTO buscarPorId(UUID id, JsonWebToken jwt);
 
     AtletaResponseDTO atualizar(UUID id, AtletaUpdateForm form, JsonWebToken jwt);
+
+    AtletaResponseDTO anexarDocumentos(UUID id, AtletaDocumentosForm form, JsonWebToken jwt);
 
     void aprovar(UUID id);
 

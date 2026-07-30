@@ -64,19 +64,43 @@ public class AtletaForm {
     @RestForm @Schema(description = "Nome do clube anterior (obrigatório se isTransferencia = true)")
     public String clubeAnterior;
 
+    /* ── Responsável legal — obrigatório quando o atleta é menor de 18 (LGPD art. 14) ── */
+
+    @RestForm @Schema(description = "Nome do responsável legal (obrigatório se o atleta for menor)", example = "Maria Souza Lima")
+    public String responsavelNome;
+
+    @RestForm @Schema(description = "CPF do responsável legal (obrigatório se o atleta for menor)", example = "98765432100")
+    public String responsavelCpf;
+
+    @RestForm @Schema(description = "Parentesco do responsável", enumeration = {"Mãe", "Pai", "Tutor legal", "Outro"})
+    public String responsavelParentesco;
+
+    @RestForm @Schema(description = "E-mail do responsável legal", example = "maria@email.com")
+    public String responsavelEmail;
+
+    @RestForm @Schema(description = "Telefone do responsável legal", example = "(63) 98888-7777")
+    public String responsavelTelefone;
+
+    @RestForm @Schema(description = "Aceite do termo de filiação pelo responsável ('true'/'false'). Obrigatório se o atleta for menor (LGPD art. 14, §1).")
+    public String consentimentoCadastro;
+
+    @RestForm @Schema(description = "Autorização de uso de imagem/nome no site e na galeria ('true'/'false'). Sempre opcional e revogável.")
+    public String consentimentoImagem;
+
     @RestForm("foto")
-    @Schema(description = "Foto 3x4 (JPG/PNG, máx. 2 MB)", required = true)
+    @Schema(description = "Foto 3x4 (JPG/PNG, máx. 2 MB) — opcional, pode ser anexada depois")
     public FileUpload foto;
 
     @RestForm("rgDoc")
-    @Schema(description = "Documento RG digitalizado (PDF/JPG, máx. 5 MB)", required = true)
+    @Schema(description = "Documento RG digitalizado (PDF/JPG, máx. 5 MB) — OBRIGATÓRIO no cadastro", required = true)
     public FileUpload rgDoc;
 
     @RestForm("comprovanteResidencia")
-    @Schema(description = "Comprovante de residência (PDF/JPG, máx. 5 MB)", required = true)
+    @Schema(description = "Comprovante de residência (PDF/JPG, máx. 5 MB) — opcional, pode ser anexado depois")
     public FileUpload comprovanteResidencia;
 
     @RestForm("comprovantePix")
-    @Schema(description = "Comprovante do pagamento Pix da taxa de filiação (PDF/JPG, máx. 5 MB)")
+    @Schema(description = "Comprovante do pagamento Pix da taxa de filiação (PDF/JPG, máx. 5 MB). "
+            + "Sem ele o cadastro fica AGUARDANDO_PAGAMENTO e é apagado ao vencer o prazo.")
     public FileUpload comprovantePix;
 }

@@ -28,15 +28,29 @@ function errMsg(e: unknown): string {
 
 const statusBadge: Record<AtletaStatus, string> = {
   ATIVO: 'text-green-400 bg-green-500/10 border-green-500/30',
-  AGUARDANDO_PAGAMENTO: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30',
+  AGUARDANDO_PAGAMENTO: 'text-red-400 bg-red-500/10 border-red-500/30',
+  AGUARDANDO_APROVACAO: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30',
   REJEITADO: 'text-red-400 bg-red-500/10 border-red-500/30',
   SUSPENSO: 'text-orange-400 bg-orange-500/10 border-orange-500/30',
 }
 const statusLabel: Record<AtletaStatus, string> = {
   ATIVO: 'Ativo',
-  AGUARDANDO_PAGAMENTO: 'Aguardando pgto.',
+  AGUARDANDO_PAGAMENTO: 'Falta pagamento',
+  AGUARDANDO_APROVACAO: 'Aguardando aprovação',
   REJEITADO: 'Rejeitado',
   SUSPENSO: 'Suspenso',
+}
+
+/** Quanto falta para o cadastro ser apagado por falta de comprovante. */
+function prazoRestante(iso: string | null): { texto: string; vencido: boolean } | null {
+  if (!iso) return null
+  const alvo = new Date(iso).getTime()
+  if (isNaN(alvo)) return null
+  const restanteMs = alvo - Date.now()
+  if (restanteMs <= 0) return { texto: 'prazo vencido', vencido: true }
+  const horas = Math.floor(restanteMs / 3_600_000)
+  const minutos = Math.floor((restanteMs % 3_600_000) / 60_000)
+  return { texto: horas > 0 ? `${horas}h${minutos.toString().padStart(2, '0')}` : `${minutos} min`, vencido: false }
 }
 
 const clubeStatusBadge: Record<ClubeStatus, string> = {
@@ -60,7 +74,28 @@ const lbl = 'font-body text-gray-soft text-xs uppercase tracking-wider mb-1 bloc
 /* ── formulário multi-step ──────────────────────────────── */
 const POSICOES = ['Goleiro','Armador Central','Armador Direito','Armador Esquerdo','Ponta Direita','Ponta Esquerda','Pivô']
 const CATEGORIAS = ['Sub-12','Sub-14','Sub-16','Sub-18','Adulto']
-const STEPS = ['Dados Pessoais','Contato e Endereço','Dados Esportivos','Documentos e Pagamento']
+const PARENTESCOS = ['Mãe','Pai','Tutor legal','Outro']
+
+/** Etapa "Responsável (LGPD)" só existe quando o atleta é menor de 18 (LGPD art. 14). */
+const STEP_LABEL = {
+  pessoais: 'Dados Pessoais',
+  contato: 'Contato e Endereço',
+  esportivos: 'Dados Esportivos',
+  responsavel: 'Responsável (LGPD)',
+  documentos: 'Documentos e Pagamento',
+} as const
+type StepKey = keyof typeof STEP_LABEL
+
+const STEPS_ADULTO: StepKey[] = ['pessoais', 'contato', 'esportivos', 'documentos']
+const STEPS_MENOR: StepKey[] = ['pessoais', 'contato', 'esportivos', 'responsavel', 'documentos']
+
+/** Espelha a regra do backend: menor de 18 hoje dispara as exigências do art. 14. */
+function isMenorDeIdade(nascimentoIso: string): boolean {
+  if (!nascimentoIso) return false
+  const d = new Date(`${nascimentoIso}T00:00:00`)
+  if (isNaN(d.getTime())) return false
+  return new Date(d.getFullYear() + 18, d.getMonth(), d.getDate()) > new Date()
+}
 
 const blankAtleta = {
   // etapa 1
@@ -69,39 +104,67 @@ const blankAtleta = {
   telefone:'', email:'', cep:'', logradouro:'', numero:'', bairro:'', cidade:'', uf:'TO',
   // etapa 3
   posicao:'', categoria:'', transferencia: false, clubeAnterior:'',
+  // etapa do responsável (só menores)
+  responsavelNome:'', responsavelCpf:'', responsavelParentesco:'', responsavelEmail:'', responsavelTelefone:'',
+  consentimentoCadastro: false, consentimentoImagem: false,
 }
 
-function StepBar({ step }: { step: number }) {
+function StepBar({ steps, step }: { steps: StepKey[]; step: number }) {
   return (
     <div className="flex items-center gap-2 mb-8">
-      {STEPS.map((s, i) => (
-        <div key={i} className="flex items-center gap-2 flex-1">
+      {steps.map((s, i) => (
+        <div key={s} className="flex items-center gap-2 flex-1">
           <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-display flex-shrink-0 transition-colors duration-250 ${
-            i < step ? 'bg-gold text-night' : i === step ? 'bg-gold text-night' : 'bg-federation/20 text-gray-soft border border-federation/30'
+            i <= step ? 'bg-gold text-night' : 'bg-federation/20 text-gray-soft border border-federation/30'
           }`}>{i < step ? <CheckCircle size={14} /> : i + 1}</div>
-          <span className={`font-body text-xs hidden sm:block ${i === step ? 'text-fht-white' : 'text-gray-soft'}`}>{s}</span>
-          {i < STEPS.length - 1 && <div className={`h-px flex-1 ${i < step ? 'bg-gold/50' : 'bg-federation/20'}`} />}
+          <span className={`font-body text-xs hidden sm:block ${i === step ? 'text-fht-white' : 'text-gray-soft'}`}>{STEP_LABEL[s]}</span>
+          {i < steps.length - 1 && <div className={`h-px flex-1 ${i < step ? 'bg-gold/50' : 'bg-federation/20'}`} />}
         </div>
       ))}
     </div>
   )
 }
 
-function FileBtn({ file, onChange, label: lbl2, accept }: {
+function FileBtn({ file, onChange, label: lbl2, accept, obrigatorio = false, hint }: {
   file: File | null; onChange: (f: File | null) => void; label: string; accept: string
+  obrigatorio?: boolean; hint?: string
 }) {
   return (
     <div>
-      <span className={lbl}>{lbl2} *</span>
+      <span className={lbl}>
+        {lbl2} {obrigatorio ? <span className="text-gold">*</span> : <span className="normal-case tracking-normal">(opcional)</span>}
+      </span>
       <label className={`flex items-center gap-3 px-4 py-3 rounded-lg border text-sm font-body transition-colors duration-250 cursor-pointer ${
         file ? 'border-green-500/50 bg-green-500/10 text-green-400' : 'border-federation/20 bg-[#0d1b2a]/80 text-gray-soft hover:border-gold/40 hover:text-fht-white'
       }`}>
-        <input type="file" accept={accept} required className="hidden" onChange={e => onChange(e.target.files?.[0] ?? null)} />
+        <input type="file" accept={accept} className="hidden" onChange={e => onChange(e.target.files?.[0] ?? null)} />
         {file
           ? <><CheckCircle size={16} className="flex-shrink-0" /><span className="truncate">{file.name}</span></>
           : <><Upload size={16} className="flex-shrink-0" /><span>Selecionar arquivo</span></>}
       </label>
+      {hint && <p className="font-body text-gray-soft text-xs mt-1.5 leading-relaxed">{hint}</p>}
     </div>
+  )
+}
+
+/** Checkbox de consentimento — destacado, não escondido no meio do texto (LGPD art. 14, §1). */
+function ConsentBox({ checked, onChange, titulo, children, obrigatorio = false }: {
+  checked: boolean; onChange: (v: boolean) => void; titulo: string
+  children: React.ReactNode; obrigatorio?: boolean
+}) {
+  return (
+    <label className={`flex gap-3 p-4 rounded-lg border cursor-pointer transition-colors duration-250 ${
+      checked ? 'border-gold/50 bg-gold/5' : 'border-federation/20 bg-[#0d1b2a]/40 hover:border-gold/30'
+    }`}>
+      <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)}
+        className="mt-1 w-4 h-4 flex-shrink-0 accent-gold cursor-pointer" />
+      <span>
+        <span className="font-display text-fht-white text-sm block mb-1">
+          {titulo} {obrigatorio && <span className="text-gold">*</span>}
+        </span>
+        <span className="font-body text-gray-soft text-xs leading-relaxed block">{children}</span>
+      </span>
+    </label>
   )
 }
 
@@ -143,8 +206,8 @@ function DashboardPage({ atletas }: { atletas: AtletaDTO[] }) {
   const cards = [
     { label: 'Total de Atletas', value: atletas.length, color: 'border-federation/30' },
     { label: 'Atletas Ativos', value: atletas.filter(a => a.status === 'ATIVO').length, color: 'border-green-500/30' },
-    { label: 'Aguardando Aprovação', value: atletas.filter(a => a.status === 'AGUARDANDO_PAGAMENTO').length, color: 'border-yellow-500/30' },
-    { label: 'Rejeitados', value: atletas.filter(a => a.status === 'REJEITADO').length, color: 'border-red-500/30' },
+    { label: 'Falta Pagamento', value: atletas.filter(a => a.status === 'AGUARDANDO_PAGAMENTO').length, color: 'border-red-500/30' },
+    { label: 'Aguardando Aprovação', value: atletas.filter(a => a.status === 'AGUARDANDO_APROVACAO').length, color: 'border-yellow-500/30' },
   ]
 
   // Elenco por categoria — dados REAIS dos atletas do clube
@@ -278,9 +341,20 @@ function AtletaDetailPanel({ atleta, onClose, onSaved }: {
     categoria: atleta.categoria,
     transferencia: atleta.transferencia,
     clubeAnterior: atleta.clubeAnterior ?? '',
+    responsavelNome: atleta.responsavelNome ?? '',
+    responsavelCpf: atleta.responsavelCpf ?? '',
+    responsavelParentesco: atleta.responsavelParentesco ?? '',
+    responsavelEmail: atleta.responsavelEmail ?? '',
+    responsavelTelefone: atleta.responsavelTelefone ?? '',
+    consentimentoCadastro: false,
   })
+
+  // Menor sem o consentimento do responsável fica travado na aprovação — a edição é onde se regulariza.
+  const precisaRegularizar = atleta.menorDeIdade
+    && !atleta.consentimentos.some(c => c.finalidade === 'CADASTRO_ATLETA_MENOR' && !c.revogadoEm)
   const [saving, setSaving] = useState(false)
   const [erro, setErro] = useState('')
+  const [enviando, setEnviando] = useState<string | null>(null)
 
   function change(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
     const { name, value } = e.target
@@ -290,11 +364,34 @@ function AtletaDetailPanel({ atleta, onClose, onSaved }: {
   async function salvar() {
     setSaving(true); setErro('')
     try {
-      await apiPut(`/api/atletas/${atleta.id}`, form)
+      // Campos do responsável só fazem sentido para menor — não sujar o cadastro do adulto.
+      const {
+        responsavelNome, responsavelCpf, responsavelParentesco, responsavelEmail,
+        responsavelTelefone, consentimentoCadastro, ...dadosBase
+      } = form
+      const payload = atleta.menorDeIdade
+        ? { ...dadosBase, responsavelNome, responsavelCpf, responsavelParentesco, responsavelEmail, responsavelTelefone, consentimentoCadastro }
+        : dadosBase
+
+      await apiPut(`/api/atletas/${atleta.id}`, payload)
       onSaved()
       onClose()
     } catch (e) {
       setErro(errMsg(e)); setSaving(false)
+    }
+  }
+
+  /** Anexa um documento que faltou no cadastro. O Pix tira o atleta da fila de expurgo. */
+  async function anexar(campo: string, file: File) {
+    setEnviando(campo); setErro('')
+    try {
+      const fd = new FormData()
+      fd.append(campo, file)
+      await apiPostForm(`/api/atletas/${atleta.id}/documentos`, fd)
+      onSaved()
+      onClose()
+    } catch (e) {
+      setErro(errMsg(e)); setEnviando(null)
     }
   }
 
@@ -306,11 +403,13 @@ function AtletaDetailPanel({ atleta, onClose, onSaved }: {
   )
 
   const docs = [
-    { label: 'Foto 3x4', url: atleta.fotoUrl },
-    { label: 'RG digitalizado', url: atleta.rgUrl },
-    { label: 'Comprovante de residência', url: atleta.comprovanteResidenciaUrl },
-    { label: 'Comprovante de pagamento Pix', url: atleta.comprovantePagamentoUrl },
+    { label: 'Foto 3x4', url: atleta.fotoUrl, campo: 'foto', accept: 'image/*' },
+    { label: 'RG digitalizado', url: atleta.rgUrl, campo: 'rgDoc', accept: '.pdf,image/*' },
+    { label: 'Comprovante de residência', url: atleta.comprovanteResidenciaUrl, campo: 'comprovanteResidencia', accept: '.pdf,image/*' },
+    { label: 'Comprovante de pagamento Pix', url: atleta.comprovantePagamentoUrl, campo: 'comprovantePix', accept: '.pdf,image/*' },
   ]
+
+  const prazo = prazoRestante(atleta.prazoPagamentoAte)
 
   return (
     <div className="fixed inset-0 z-50 flex" onClick={onClose}>
@@ -343,6 +442,37 @@ function AtletaDetailPanel({ atleta, onClose, onSaved }: {
             <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3">
               <AlertCircle size={16} className="text-red-400 flex-shrink-0" />
               <p className="font-body text-red-400 text-sm">{erro}</p>
+            </div>
+          )}
+
+          {atleta.status === 'AGUARDANDO_PAGAMENTO' && (
+            <div className={`flex items-start gap-3 rounded-lg px-4 py-3 border ${
+              prazo?.vencido ? 'bg-red-500/10 border-red-500/30' : 'bg-yellow-500/10 border-yellow-500/30'
+            }`}>
+              <AlertCircle size={16} className={`flex-shrink-0 mt-0.5 ${prazo?.vencido ? 'text-red-400' : 'text-yellow-400'}`} />
+              <div>
+                <p className={`font-display text-sm ${prazo?.vencido ? 'text-red-400' : 'text-yellow-400'}`}>
+                  Comprovante de pagamento pendente
+                </p>
+                <p className="font-body text-gray-soft text-xs mt-1 leading-relaxed">
+                  {prazo?.vencido
+                    ? 'O prazo venceu — este cadastro será apagado na próxima limpeza automática. Anexe o comprovante o quanto antes.'
+                    : `Faltam ${prazo?.texto ?? '—'} para o cadastro ser apagado automaticamente. Anexe o comprovante Pix em Documentos, abaixo.`}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {precisaRegularizar && !editing && (
+            <div className="flex items-start gap-3 bg-purple-500/10 border border-purple-500/30 rounded-lg px-4 py-3">
+              <AlertCircle size={16} className="text-purple-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-display text-purple-400 text-sm">Falta o consentimento do responsável</p>
+                <p className="font-body text-gray-soft text-xs mt-1 leading-relaxed">
+                  Atleta menor de idade sem o aceite do responsável legal registrado (LGPD art. 14) — a federação
+                  não consegue aprovar. Clique em <span className="text-fht-white">Editar dados</span> para completar.
+                </p>
+              </div>
             </div>
           )}
 
@@ -392,6 +522,49 @@ function AtletaDetailPanel({ atleta, onClose, onSaved }: {
                   </select>
                 </div>
               </div>
+              {atleta.menorDeIdade && (
+                <div className="flex flex-col gap-4 pt-4 border-t border-federation/20">
+                  <p className="font-display text-purple-400 text-xs tracking-widest">RESPONSÁVEL LEGAL (LGPD ART. 14)</p>
+                  <div>
+                    <span className={lbl}>Nome do responsável</span>
+                    <input name="responsavelNome" value={form.responsavelNome} onChange={change} className={inp} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <span className={lbl}>CPF do responsável</span>
+                      <input name="responsavelCpf" value={form.responsavelCpf}
+                        onChange={e => setForm(p => ({ ...p, responsavelCpf: maskCPF(e.target.value) }))} className={inp} />
+                    </div>
+                    <div>
+                      <span className={lbl}>Parentesco</span>
+                      <select name="responsavelParentesco" value={form.responsavelParentesco} onChange={change} className={sel}>
+                        <option value="">Selecione</option>
+                        {PARENTESCOS.map(p => <option key={p} value={p}>{p}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <span className={lbl}>E-mail do responsável</span>
+                      <input name="responsavelEmail" value={form.responsavelEmail} onChange={change} className={inp} />
+                    </div>
+                    <div>
+                      <span className={lbl}>Telefone do responsável</span>
+                      <input name="responsavelTelefone" value={form.responsavelTelefone}
+                        onChange={e => setForm(p => ({ ...p, responsavelTelefone: maskPhone(e.target.value) }))} className={inp} />
+                    </div>
+                  </div>
+
+                  {precisaRegularizar && (
+                    <ConsentBox obrigatorio checked={form.consentimentoCadastro}
+                      onChange={v => setForm(p => ({ ...p, consentimentoCadastro: v }))}
+                      titulo="Autorização do responsável para a filiação">
+                      Este cadastro não tem o consentimento do responsável registrado, e por isso a federação
+                      não consegue aprová-lo. Marque para registrar o aceite do responsável legal e liberar a aprovação.
+                    </ConsentBox>
+                  )}
+                </div>
+              )}
               <p className="font-body text-gray-soft/60 text-xs">CPF, documentos e status não são editáveis aqui.</p>
             </div>
           ) : (
@@ -417,20 +590,63 @@ function AtletaDetailPanel({ atleta, onClose, onSaved }: {
                   {atleta.taxaValor != null && <Info label="Taxa" value={`R$ ${Number(atleta.taxaValor).toFixed(2)} — ${atleta.taxaAno ?? ''}`} />}
                 </div>
               </div>
+              {atleta.menorDeIdade && (
+                <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-5">
+                  <p className="font-display text-gold text-xs tracking-widest mb-4">RESPONSÁVEL LEGAL</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <Info label="Nome" value={atleta.responsavelNome ?? ''} />
+                    <Info label="Parentesco" value={atleta.responsavelParentesco ?? ''} />
+                    <Info label="CPF" value={atleta.responsavelCpf ?? ''} />
+                    <Info label="Telefone" value={atleta.responsavelTelefone ?? ''} />
+                    <Info label="E-mail" value={atleta.responsavelEmail ?? ''} />
+                  </div>
+                </div>
+              )}
+
+              {atleta.consentimentos.length > 0 && (
+                <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-5">
+                  <p className="font-display text-gold text-xs tracking-widest mb-4">CONSENTIMENTOS (LGPD)</p>
+                  <div className="flex flex-col gap-2">
+                    {atleta.consentimentos.map(c => (
+                      <div key={c.id} className="flex items-center justify-between px-4 py-3 bg-federation/10 border border-federation/20 rounded-lg">
+                        <div>
+                          <p className="font-body text-fht-white text-sm">
+                            {c.finalidade === 'CADASTRO_ATLETA_MENOR' ? 'Filiação autorizada pelo responsável' : 'Uso de imagem no site'}
+                          </p>
+                          <p className="font-body text-gray-soft text-xs mt-0.5">
+                            {c.consentidoPorNome ?? '—'} · {fmtDate(c.concedidoEm)} · termo v{c.textoVersao}
+                          </p>
+                        </div>
+                        <span className={`font-body text-xs px-2.5 py-1 rounded-full border ${
+                          c.revogadoEm ? 'text-gray-soft bg-federation/10 border-federation/30' : 'text-green-400 bg-green-500/10 border-green-500/30'
+                        }`}>
+                          {c.revogadoEm ? 'revogado' : 'ativo'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-5">
                 <p className="font-display text-gold text-xs tracking-widest mb-4">DOCUMENTOS</p>
                 <div className="flex flex-col gap-2">
-                  {docs.map(({ label, url }) => url ? (
+                  {docs.map(({ label, url, campo, accept }) => url ? (
                     <a key={label} href={url} target="_blank" rel="noopener noreferrer"
                       className="flex items-center justify-between px-4 py-3 bg-federation/10 border border-federation/20 rounded-lg hover:border-gold/40 transition-colors duration-200">
                       <span className="font-body text-fht-white text-sm">{label}</span>
                       <span className="font-body text-gray-soft text-xs">Abrir →</span>
                     </a>
                   ) : (
-                    <div key={label} className="flex items-center justify-between px-4 py-3 bg-federation/5 border border-federation/10 rounded-lg opacity-60">
+                    <label key={label}
+                      className="flex items-center justify-between px-4 py-3 bg-federation/5 border border-federation/10 rounded-lg cursor-pointer hover:border-gold/40 transition-colors duration-200">
+                      <input type="file" accept={accept} className="hidden" disabled={enviando !== null}
+                        onChange={e => { const f = e.target.files?.[0]; if (f) anexar(campo, f) }} />
                       <span className="font-body text-gray-soft text-sm">{label}</span>
-                      <span className="font-body text-gray-soft text-xs">não enviado</span>
-                    </div>
+                      <span className="font-body text-gold text-xs flex items-center gap-1.5">
+                        <Upload size={12} />{enviando === campo ? 'enviando...' : 'Anexar'}
+                      </span>
+                    </label>
                   ))}
                 </div>
               </div>
@@ -481,6 +697,22 @@ function CadastrarAtletaPage({ onSuccess }: { onSuccess: () => void }) {
   const [status, setStatus] = useState<'idle'|'loading'|'error'>('idle')
   const [errMessage, setErrMessage] = useState('')
 
+  const menor = isMenorDeIdade(form.dataNascimento)
+  const steps = menor ? STEPS_MENOR : STEPS_ADULTO
+  // A etapa do responsável entra/sai conforme a data de nascimento — o índice fica preso ao fim.
+  const stepIdx = Math.min(step, steps.length - 1)
+  const etapa = steps[stepIdx]
+  const ultimaEtapa = stepIdx === steps.length - 1
+
+  // Espelha as validações server-side: bloqueia o avanço em vez de deixar o backend recusar.
+  const respCpfValido = form.responsavelCpf.replace(/\D/g, '').length === 11 && validateCPF(form.responsavelCpf)
+  const responsavelOk = !menor || (
+    form.responsavelNome.trim() !== '' && respCpfValido && form.responsavelParentesco !== ''
+    && (form.responsavelEmail.trim() !== '' || form.responsavelTelefone.trim() !== '')
+    && form.consentimentoCadastro
+  )
+  const podeEnviar = rgDoc !== null && responsavelOk
+
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
     const { name, value } = e.target
     if (name === 'cpf') {
@@ -490,6 +722,8 @@ function CadastrarAtletaPage({ onSuccess }: { onSuccess: () => void }) {
       else setCpfErr('')
       return
     }
+    if (name === 'responsavelCpf') { setForm(p => ({ ...p, responsavelCpf: maskCPF(value) })); return }
+    if (name === 'responsavelTelefone') { setForm(p => ({ ...p, responsavelTelefone: maskPhone(value) })); return }
     if (name === 'telefone') { setForm(p => ({ ...p, telefone: maskPhone(value) })); return }
     if (name === 'cep') {
       const fmt = maskCEP(value)
@@ -536,6 +770,15 @@ function CadastrarAtletaPage({ onSuccess }: { onSuccess: () => void }) {
       data.append('categoria', form.categoria)
       data.append('isTransferencia', String(form.transferencia))
       if (form.transferencia) data.append('clubeAnterior', form.clubeAnterior)
+      if (menor) {
+        data.append('responsavelNome', form.responsavelNome)
+        data.append('responsavelCpf', form.responsavelCpf)
+        data.append('responsavelParentesco', form.responsavelParentesco)
+        data.append('responsavelEmail', form.responsavelEmail)
+        data.append('responsavelTelefone', form.responsavelTelefone)
+        data.append('consentimentoCadastro', String(form.consentimentoCadastro))
+      }
+      data.append('consentimentoImagem', String(form.consentimentoImagem))
       if (foto) data.append('foto', foto)
       if (rgDoc) data.append('rgDoc', rgDoc)
       if (compRes) data.append('comprovanteResidencia', compRes)
@@ -553,10 +796,10 @@ function CadastrarAtletaPage({ onSuccess }: { onSuccess: () => void }) {
     <div>
       <h2 className="font-display text-fht-white text-3xl mb-6">CADASTRAR ATLETA</h2>
       <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-6">
-        <StepBar step={step} />
+        <StepBar steps={steps} step={stepIdx} />
 
         {/* Etapa 1 */}
-        {step === 0 && (
+        {etapa === 'pessoais' && (
           <div className="flex flex-col gap-4">
             <div>
               <span className={lbl}>Nome completo *</span>
@@ -567,6 +810,11 @@ function CadastrarAtletaPage({ onSuccess }: { onSuccess: () => void }) {
               <div>
                 <span className={lbl}>Data de nascimento *</span>
                 <input required type="date" name="dataNascimento" value={form.dataNascimento} onChange={handleChange} className={inp} />
+                {menor && (
+                  <p className="font-body text-gold text-xs mt-1.5">
+                    Atleta menor de idade — será pedido o responsável legal
+                  </p>
+                )}
               </div>
               <div>
                 <span className={lbl}>Sexo *</span>
@@ -608,7 +856,7 @@ function CadastrarAtletaPage({ onSuccess }: { onSuccess: () => void }) {
         )}
 
         {/* Etapa 2 */}
-        {step === 1 && (
+        {etapa === 'contato' && (
           <div className="flex flex-col gap-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -654,7 +902,7 @@ function CadastrarAtletaPage({ onSuccess }: { onSuccess: () => void }) {
         )}
 
         {/* Etapa 3 */}
-        {step === 2 && (
+        {etapa === 'esportivos' && (
           <div className="flex flex-col gap-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -689,12 +937,83 @@ function CadastrarAtletaPage({ onSuccess }: { onSuccess: () => void }) {
           </div>
         )}
 
-        {/* Etapa 4 */}
-        {step === 3 && (
+        {/* Etapa do responsável — só para menores (LGPD art. 14) */}
+        {etapa === 'responsavel' && (
           <div className="flex flex-col gap-4">
-            <FileBtn file={foto} onChange={setFoto} label="Foto 3x4 digital" accept="image/*" />
-            <FileBtn file={rgDoc} onChange={setRgDoc} label="RG digitalizado (PDF ou imagem)" accept=".pdf,image/*" />
-            <FileBtn file={compRes} onChange={setCompRes} label="Comprovante de residência (PDF ou imagem)" accept=".pdf,image/*" />
+            <div className="bg-federation/10 border border-federation/30 rounded-lg px-4 py-3">
+              <p className="font-body text-gray-soft text-xs leading-relaxed">
+                O atleta é <span className="text-fht-white">menor de 18 anos</span>. Pela LGPD (Lei 13.709/2018, art. 14),
+                a filiação depende dos dados e do aceite de <span className="text-fht-white">um dos pais ou do responsável legal</span>.
+              </p>
+            </div>
+
+            <div>
+              <span className={lbl}>Nome do responsável legal *</span>
+              <input required name="responsavelNome" value={form.responsavelNome} onChange={handleChange}
+                placeholder="Nome completo do responsável" className={inp} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <span className={lbl}>CPF do responsável *</span>
+                <input required name="responsavelCpf" value={form.responsavelCpf} onChange={handleChange}
+                  placeholder="000.000.000-00"
+                  className={`${inp} ${form.responsavelCpf && !respCpfValido ? 'border-red-500' : ''}`} />
+                {form.responsavelCpf && !respCpfValido && (
+                  <p className="font-body text-red-400 text-xs mt-1">CPF inválido</p>
+                )}
+              </div>
+              <div>
+                <span className={lbl}>Parentesco *</span>
+                <select required name="responsavelParentesco" value={form.responsavelParentesco} onChange={handleChange} className={sel}>
+                  <option value="" disabled>Selecione</option>
+                  {PARENTESCOS.map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <span className={lbl}>E-mail do responsável</span>
+                <input type="email" name="responsavelEmail" value={form.responsavelEmail} onChange={handleChange}
+                  placeholder="responsavel@email.com" className={inp} />
+              </div>
+              <div>
+                <span className={lbl}>Telefone do responsável</span>
+                <input name="responsavelTelefone" value={form.responsavelTelefone} onChange={handleChange}
+                  placeholder="(63) 99999-9999" className={inp} />
+              </div>
+            </div>
+            <p className="font-body text-gray-soft text-xs -mt-2">Informe pelo menos um contato (e-mail ou telefone).</p>
+
+            <div className="flex flex-col gap-3 mt-2">
+              <ConsentBox obrigatorio checked={form.consentimentoCadastro}
+                onChange={v => setForm(p => ({ ...p, consentimentoCadastro: v }))}
+                titulo="Autorização do responsável para a filiação">
+                Declaro ser o responsável legal pelo atleta e autorizo a FHT a tratar os dados pessoais dele
+                (identificação, contato, endereço e documentos) para a finalidade de filiação, participação em
+                competições e cumprimento das obrigações da federação. Posso solicitar acesso, correção ou
+                exclusão dos dados a qualquer momento.
+              </ConsentBox>
+
+              <ConsentBox checked={form.consentimentoImagem}
+                onChange={v => setForm(p => ({ ...p, consentimentoImagem: v }))}
+                titulo="Autorização de uso de imagem (opcional)">
+                Autorizo a publicação da foto e do nome do atleta no site da FHT, na galeria e em notícias.
+                É opcional e pode ser revogada a qualquer momento — <span className="text-fht-white">a filiação
+                continua válida sem esta autorização</span>.
+              </ConsentBox>
+            </div>
+          </div>
+        )}
+
+        {/* Etapa final — documentos e pagamento */}
+        {etapa === 'documentos' && (
+          <div className="flex flex-col gap-4">
+            <FileBtn file={rgDoc} onChange={setRgDoc} obrigatorio
+              label="RG digitalizado (PDF ou imagem)" accept=".pdf,image/*" />
+            <FileBtn file={foto} onChange={setFoto} label="Foto 3x4 digital" accept="image/*"
+              hint="Pode ser anexada depois, pelo painel do clube." />
+            <FileBtn file={compRes} onChange={setCompRes} label="Comprovante de residência (PDF ou imagem)"
+              accept=".pdf,image/*" hint="Pode ser anexado depois, pelo painel do clube." />
 
             {/* QR Code PIX */}
             <div className="bg-gold/5 border border-gold/30 rounded-xl p-5 flex flex-col sm:flex-row items-center gap-5">
@@ -708,7 +1027,35 @@ function CadastrarAtletaPage({ onSuccess }: { onSuccess: () => void }) {
               </div>
             </div>
 
-            <FileBtn file={compPix} onChange={setCompPix} label="Comprovante de pagamento PIX" accept="image/*,.pdf" />
+            <FileBtn file={compPix} onChange={setCompPix} label="Comprovante de pagamento PIX" accept="image/*,.pdf"
+              hint="Se o comprovante ainda não chegou, pode cadastrar sem ele e anexar depois na aba Atletas." />
+
+            {/* Para menores este aceite fica na etapa do responsável, quem tem que consentir é ele. */}
+            {!menor && (
+              <ConsentBox checked={form.consentimentoImagem}
+                onChange={v => setForm(p => ({ ...p, consentimentoImagem: v }))}
+                titulo="Autorização de uso de imagem (opcional)">
+                O atleta autoriza a publicação da foto e do nome no site da FHT, na galeria e em notícias.
+                É opcional e pode ser revogada a qualquer momento — a filiação continua válida sem ela.
+              </ConsentBox>
+            )}
+
+            {!compPix && (
+              <div className="flex items-start gap-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg px-4 py-3">
+                <AlertCircle size={16} className="text-yellow-400 flex-shrink-0 mt-0.5" />
+                <p className="font-body text-yellow-400 text-xs leading-relaxed">
+                  Sem o comprovante, o cadastro fica com <span className="font-display">24 horas</span> para o
+                  pagamento ser anexado. Passado o prazo, ele é apagado automaticamente.
+                </p>
+              </div>
+            )}
+
+            {!rgDoc && (
+              <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3">
+                <AlertCircle size={16} className="text-red-400 flex-shrink-0" />
+                <p className="font-body text-red-400 text-sm">Anexe o RG digitalizado para concluir o cadastro.</p>
+              </div>
+            )}
 
             {status === 'error' && (
               <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3">
@@ -721,17 +1068,17 @@ function CadastrarAtletaPage({ onSuccess }: { onSuccess: () => void }) {
 
         {/* Navegação */}
         <div className="flex items-center justify-between mt-8 pt-6 border-t border-federation/20">
-          <button type="button" onClick={() => setStep(p => p - 1)} disabled={step === 0}
+          <button type="button" onClick={() => setStep(Math.max(0, stepIdx - 1))} disabled={stepIdx === 0}
             className="flex items-center gap-2 font-display text-gray-soft hover:text-fht-white border border-federation/20 hover:border-federation/50 px-5 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250 disabled:opacity-30 disabled:cursor-not-allowed">
             <ChevronLeft size={16} /> ANTERIOR
           </button>
-          {step < 3 ? (
-            <button type="button" onClick={() => setStep(p => p + 1)}
-              className="flex items-center gap-2 font-display text-night bg-gold hover:bg-gold-light px-6 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250">
+          {!ultimaEtapa ? (
+            <button type="button" onClick={() => setStep(stepIdx + 1)} disabled={etapa === 'responsavel' && !responsavelOk}
+              className="flex items-center gap-2 font-display text-night bg-gold hover:bg-gold-light px-6 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250 disabled:opacity-50 disabled:cursor-not-allowed">
               PRÓXIMO <ChevronRight size={16} />
             </button>
           ) : (
-            <button type="button" onClick={handleFinalSubmit} disabled={status === 'loading'}
+            <button type="button" onClick={handleFinalSubmit} disabled={status === 'loading' || !podeEnviar}
               className="font-display text-night bg-gold hover:bg-gold-light px-6 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250 disabled:opacity-50 disabled:cursor-not-allowed">
               {status === 'loading' ? 'CADASTRANDO...' : 'CADASTRAR ATLETA'}
             </button>

@@ -8,7 +8,22 @@ export interface ApiEnvelope<T> {
 }
 
 export type ClubeStatus = 'PENDENTE' | 'ATIVO' | 'REJEITADO' | 'SUSPENSO'
-export type AtletaStatus = 'AGUARDANDO_PAGAMENTO' | 'ATIVO' | 'REJEITADO' | 'SUSPENSO'
+export type AtletaStatus = 'AGUARDANDO_PAGAMENTO' | 'AGUARDANDO_APROVACAO' | 'ATIVO' | 'REJEITADO' | 'SUSPENSO'
+
+/** Finalidades de consentimento LGPD (uma por registro — art. 14, §1) */
+export type FinalidadeConsentimento = 'CADASTRO_ATLETA_MENOR' | 'IMAGEM_PUBLICA'
+
+/** ConsentimentoDTO */
+export interface ConsentimentoDTO {
+  id: string
+  finalidade: FinalidadeConsentimento
+  titularMenor: boolean
+  consentidoPorNome: string | null
+  consentidoPorCpf: string | null
+  textoVersao: string
+  concedidoEm: string
+  revogadoEm: string | null
+}
 
 /** ClubeResponseDTO */
 export interface ClubeDTO {
@@ -70,21 +85,31 @@ export interface AtletaDTO {
   categoria: string
   transferencia: boolean
   clubeAnterior: string | null
+  menorDeIdade: boolean
+  responsavelNome: string | null
+  responsavelCpf: string | null
+  responsavelParentesco: string | null
+  responsavelEmail: string | null
+  responsavelTelefone: string | null
   fotoUrl: string | null
   rgUrl: string | null
   comprovanteResidenciaUrl: string | null
   comprovantePagamentoUrl: string | null
   status: AtletaStatus
   motivoRejeicao: string | null
+  /** Prazo para anexar o comprovante — vencido, o cadastro é apagado */
+  prazoPagamentoAte: string | null
   taxaValor: number | null
   taxaAno: number | null
+  consentimentos: ConsentimentoDTO[]
   createdAt: string
 }
 
 /** GET /api/admin/dashboard */
 export interface AdminDashboardDTO {
   clubes: { total: number; pendentes: number; ativos: number }
-  atletas: { total: number; pendentes: number; ativos: number }
+  /** `pendentes` = falta pagar + aguardando aprovação; `aguardandoAprovacao` é o subconjunto já pago */
+  atletas: { total: number; pendentes: number; aguardandoAprovacao: number; ativos: number }
   usuarios: number
 }
 

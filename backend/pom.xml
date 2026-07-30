@@ -98,6 +98,12 @@
       <artifactId>quarkus-hibernate-validator</artifactId>
     </dependency>
 
+    <!-- Scheduler (expurgo de cadastros nao pagos) -->
+    <dependency>
+      <groupId>io.quarkus</groupId>
+      <artifactId>quarkus-scheduler</artifactId>
+    </dependency>
+
     <!-- AWS SDK v2 S3 (para Cloudflare R2) -->
     <dependency>
       <groupId>software.amazon.awssdk</groupId>

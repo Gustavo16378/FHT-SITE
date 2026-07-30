@@ -20,5 +20,15 @@ public record AtletaUpdateForm(
         String posicao,
         String categoria,
         Boolean transferencia,
-        String clubeAnterior
+        String clubeAnterior,
+
+        /* Responsável legal — permite regularizar um menor cadastrado sem esses dados
+           (cadastros anteriores à V12 ficariam travados: a aprovação exige o consentimento). */
+        @Schema(description = "Nome do responsável legal (menores)") String responsavelNome,
+        @Schema(description = "CPF do responsável legal") String responsavelCpf,
+        @Schema(description = "Parentesco", enumeration = {"Mãe", "Pai", "Tutor legal", "Outro"}) String responsavelParentesco,
+        @Schema(description = "E-mail do responsável legal") String responsavelEmail,
+        @Schema(description = "Telefone do responsável legal") String responsavelTelefone,
+        @Schema(description = "Aceite do termo pelo responsável. Registra o consentimento "
+                + "CADASTRO_ATLETA_MENOR se ainda não houver um ativo.") Boolean consentimentoCadastro
 ) {}

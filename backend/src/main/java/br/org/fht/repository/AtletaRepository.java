@@ -4,6 +4,7 @@ import br.org.fht.model.Atleta;
 import io.quarkus.hibernate.orm.panache.PanacheRepositoryBase;
 import jakarta.enterprise.context.ApplicationScoped;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -25,5 +26,11 @@ public class AtletaRepository implements PanacheRepositoryBase<Atleta, UUID> {
 
     public Optional<Atleta> findByClubeIdAndId(UUID clubeId, UUID atletaId) {
         return find("clubeId = ?1 AND id = ?2", clubeId, atletaId).firstResultOptional();
+    }
+
+    /** Cadastros que estouraram o prazo sem o comprovante de pagamento — alvo do expurgo. */
+    public List<Atleta> findPagamentoExpirado(LocalDateTime agora) {
+        return list("status = ?1 AND prazoPagamentoAte IS NOT NULL AND prazoPagamentoAte < ?2",
+                "AGUARDANDO_PAGAMENTO", agora);
     }
 }

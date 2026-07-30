@@ -26,6 +26,28 @@ VALUES
  ('22222222-2222-2222-2222-222222222222', 'Juliana Martins Prado',  '2001-04-14', 'F', '111.222.333-07', '7234567', 'SSP-TO', 'Araguaína', 'TO', '(63) 98222-0007', 'juliana@email.com', '77800-000', 'Rua das Mangueiras', '100', 'Araguaína', 'TO', 'Armadora Esquerda', 'Adulto', false, NULL, 'https://i.pravatar.cc/150?img=49', NULL, NULL, NULL, 'AGUARDANDO_PAGAMENTO', 35.00, 2026)
 ON CONFLICT (cpf) DO NOTHING;
 
+-- ── Fluxo LGPD/pagamento (V12) ─────────────────────────────────────────
+-- Menor COM responsável e consentimento, já pago: caso "feliz" do fluxo novo.
+-- Pedro Henrique (acima) fica de propósito como menor SEM responsável — é o cadastro
+-- legado que a federação NÃO consegue aprovar, para testar o bloqueio.
+INSERT INTO atletas (id, clube_id, nome_completo, data_nascimento, sexo, cpf, rg, rg_orgao_emissor, naturalidade_cidade, naturalidade_uf, telefone, email, cep, logradouro, numero, cidade, uf_residencia, posicao, categoria, is_transferencia, foto_url, rg_url, comprovante_pagamento_url, responsavel_nome, responsavel_cpf, responsavel_parentesco, responsavel_email, responsavel_telefone, status, taxa_valor, taxa_ano)
+VALUES
+ ('aa000000-0000-0000-0000-0000000000a1', '11111111-1111-1111-1111-111111111111', 'Sofia Almeida Nunes', '2012-02-20', 'F', '111.222.333-08', '8234567', 'SSP-TO', 'Palmas', 'TO', '(63) 98111-0008', NULL, '77000-000', 'Quadra 110 Norte', '42', 'Palmas', 'TO', 'Ponta Direita', 'Sub-14', false, 'https://i.pravatar.cc/150?img=26', 'https://www.africau.edu/images/default/sample.pdf', 'https://www.africau.edu/images/default/sample.pdf', 'Carla Almeida Nunes', '111.222.333-99', 'Mãe', 'carla.nunes@email.com', '(63) 98111-9999', 'AGUARDANDO_APROVACAO', 35.00, 2026)
+ON CONFLICT (cpf) DO NOTHING;
+
+INSERT INTO consentimentos (atleta_id, finalidade, titular_menor, consentido_por_nome, consentido_por_cpf, texto_versao, concedido_em, ip_origem, user_agent)
+VALUES
+ ('aa000000-0000-0000-0000-0000000000a1', 'CADASTRO_ATLETA_MENOR', true, 'Carla Almeida Nunes', '111.222.333-99', '1.0', NOW() - INTERVAL '2 days', '187.0.0.1', 'Mozilla/5.0 (seed de teste)'),
+ ('aa000000-0000-0000-0000-0000000000a1', 'IMAGEM_PUBLICA',        true, 'Carla Almeida Nunes', '111.222.333-99', '1.0', NOW() - INTERVAL '2 days', '187.0.0.1', 'Mozilla/5.0 (seed de teste)')
+ON CONFLICT DO NOTHING;
+
+-- Prazo de pagamento nos cadastros pendentes: um correndo, um já vencido
+-- (o vencido some na próxima rodada do AtletaExpurgoJob — é o comportamento esperado).
+UPDATE atletas SET prazo_pagamento_ate = NOW() + INTERVAL '6 hours'
+ WHERE cpf = '111.222.333-03' AND status = 'AGUARDANDO_PAGAMENTO';
+UPDATE atletas SET prazo_pagamento_ate = NOW() - INTERVAL '1 hour'
+ WHERE cpf = '111.222.333-07' AND status = 'AGUARDANDO_PAGAMENTO';
+
 -- ── Usuário ADMIN_CLUBE de teste (senha: 123456) — vinculado ao Palmas HC ──
 -- (o admin admin@fht.org.br já vem no seed V4). Hash bcrypt de "123456".
 INSERT INTO usuarios (nome, email, senha_hash, role, clube_id, ativo)

@@ -1,13 +1,18 @@
 package br.org.fht.resource;
 
 import br.org.fht.common.ApiResponse;
+import br.org.fht.common.OrigemRequisicao;
+import br.org.fht.dto.atleta.AtletaDocumentosForm;
 import br.org.fht.dto.atleta.AtletaForm;
 import br.org.fht.dto.atleta.AtletaResponseDTO;
 import br.org.fht.dto.atleta.AtletaUpdateForm;
 import br.org.fht.service.AtletaService;
+import io.vertx.core.http.HttpServerRequest;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import org.eclipse.microprofile.jwt.JsonWebToken;
@@ -35,19 +40,47 @@ public class AtletaResource {
     @RolesAllowed("ADMIN_CLUBE")
     @Consumes(MediaType.MULTIPART_FORM_DATA)
     @Operation(summary = "Cadastrar atleta",
-            description = "Cadastra um novo atleta no clube do usuário autenticado. Envia foto, RG, comprovante de residência e Pix.")
+            description = "Cadastra um novo atleta no clube do usuário autenticado. RG digitalizado é obrigatório; "
+                    + "foto e comprovante de residência podem vir depois. Sem o comprovante Pix o cadastro nasce "
+                    + "AGUARDANDO_PAGAMENTO e é apagado ao vencer o prazo. Atleta menor exige dados e consentimento "
+                    + "do responsável legal (LGPD art. 14).")
     @APIResponses({
-            @APIResponse(responseCode = "201", description = "Atleta cadastrado — status AGUARDANDO_PAGAMENTO"),
+            @APIResponse(responseCode = "201", description = "Atleta cadastrado — AGUARDANDO_PAGAMENTO ou AGUARDANDO_APROVACAO"),
             @APIResponse(responseCode = "401", description = "Token ausente ou inválido"),
             @APIResponse(responseCode = "403", description = "Apenas ADMIN_CLUBE"),
             @APIResponse(responseCode = "409", description = "CPF já cadastrado"),
-            @APIResponse(responseCode = "422", description = "CPF inválido")
+            @APIResponse(responseCode = "422", description = "CPF inválido, RG ausente ou responsável legal faltando")
     })
-    public Response cadastrar(@BeanParam AtletaForm form) {
-        AtletaResponseDTO atleta = atletaService.cadastrar(form, jwt);
+    public Response cadastrar(@BeanParam AtletaForm form,
+                              @Context HttpHeaders headers,
+                              @Context HttpServerRequest request) {
+        // IP e user-agent viram evidência do consentimento LGPD registrado no cadastro.
+        var remoto = request.remoteAddress() != null ? request.remoteAddress().hostAddress() : null;
+        AtletaResponseDTO atleta = atletaService.cadastrar(form, jwt, OrigemRequisicao.de(headers, remoto));
         return Response.status(201)
                 .entity(ApiResponse.created(atleta, "Atleta cadastrado com sucesso"))
                 .build();
+    }
+
+    @POST
+    @Path("/{id}/documentos")
+    @RolesAllowed({"ADMIN_FHT", "ADMIN_CLUBE"})
+    @Consumes(MediaType.MULTIPART_FORM_DATA)
+    @Operation(summary = "Anexar documentos a um atleta já cadastrado",
+            description = "Envia os documentos que faltaram no cadastro. Ao anexar o comprovante Pix, o atleta sai de "
+                    + "AGUARDANDO_PAGAMENTO (fora da fila de expurgo) e entra em AGUARDANDO_APROVACAO.")
+    @APIResponses({
+            @APIResponse(responseCode = "200", description = "Documentos anexados"),
+            @APIResponse(responseCode = "401", description = "Token ausente ou inválido"),
+            @APIResponse(responseCode = "403", description = "Sem permissão"),
+            @APIResponse(responseCode = "404", description = "Atleta não encontrado"),
+            @APIResponse(responseCode = "422", description = "Nenhum arquivo enviado")
+    })
+    public Response anexarDocumentos(
+            @Parameter(description = "UUID do atleta", required = true) @PathParam("id") UUID id,
+            @BeanParam AtletaDocumentosForm form) {
+        AtletaResponseDTO atleta = atletaService.anexarDocumentos(id, form, jwt);
+        return Response.ok(ApiResponse.ok(atleta, "Documentos anexados")).build();
     }
 
     @GET

@@ -17,7 +17,8 @@ Cobre: site público one-page, área administrativa da federação, área do clu
 
 **Backend** (`backend/`, package base `br.org.fht`)
 - Java 21 (Temurin) + **Quarkus 3.15.1** (JVM mode) — **não é Spring**
-- Hibernate ORM Panache, PostgreSQL 16, **Flyway** (migrations `V1`–`V4`)
+- Hibernate ORM Panache, PostgreSQL 16, **Flyway** (migrations `V1`–`V12`)
+- **Quarkus Scheduler** (`@Scheduled`) — hoje só o expurgo de cadastros de atleta não pagos
 - **SmallRye JWT** RSA 2048 (JWT próprio — substituiu Keycloak por decisão)
 - Cloudflare **R2** (AWS SDK v2 S3) para uploads de documentos
 - Sentry (monitoramento), MicroProfile OpenAPI + **Swagger UI** em `/swagger`
@@ -63,9 +64,9 @@ Containerização foi feita justamente pra rodar idêntico no PC de mesa e no no
 - `ADMIN_CLUBE` — só o próprio clube; cadastra atletas mas **não** aprova.
 - `ATLETA` (terceiro perfil) — ❌ **DESCARTADO (confirmado jul/2026): NÃO haverá portal/login de atleta.** Toda interação é via o representante do clube (o atleta paga e manda o comprovante pro clube anexar). Motivo: menos usuários, banco menor, custo de hospedagem menor. Alternativa futura, se precisar: **consulta pública por CPF** (sem login). Ver `docs/MODULO-ATLETA-FLUXO.md`.
 
-**Atleta:** CPF, RG, nascimento, endereço, sexo, posição, categoria, status de transferência, taxa de filiação, 4 documentos (Foto 3x4, RG, Comprovante de residência, Comprovante Pix).
+**Atleta:** CPF, RG, nascimento, endereço, sexo, posição, categoria, status de transferência, taxa de filiação, 4 documentos (Foto 3x4, RG, Comprovante de residência, Comprovante Pix) + **dados do responsável legal** (menores).
 **⭐ Regra de anuidade (nova):** a taxa de filiação é **ANUAL** (`taxaAno`). Pagar a anuidade do ano **habilita participar dos eventos/competições daquele ano** → elegibilidade pra competir = anuidade do ano paga; a filiação vence e renova por ano. Amarra Financeiro ↔ Competições. Ver `docs/MODULO-DASHBOARD-FINANCEIRO.md` §4.1.
-**⭐ Fluxo de cadastro/pagamento (a construir de verdade — 📄 `docs/MODULO-ATLETA-FLUXO.md`):** clube cadastra → no fim faz Pix e anexa **comprovante de pagamento** (obrigatório junto com RG; foto/comprovante de residência podem vir depois); **menor** exige dados+consentimento do responsável (LGPD). Cadastro sem pagamento em **~24h → apagado** (rotina `@Scheduled`). **Aprovar só com comprovante de pagamento** anexado. Pré-requisito técnico: **storage com fallback local** (sem isso o upload dá 503 sem R2).
+**⭐ Fluxo de cadastro/pagamento — ✅ FEITO (jul/2026):** clube cadastra (**RG obrigatório**; foto e comprovante de residência podem vir depois) → faz o Pix e anexa o comprovante. **Com** comprovante nasce `AGUARDANDO_APROVACAO`; **sem** comprovante nasce `AGUARDANDO_PAGAMENTO` com **prazo de 24h** — vencido, o `AtletaExpurgoJob` apaga. **Menor de 18** exige dados + consentimento do responsável (LGPD art. 14), validado no servidor. **Aprovar** exige comprovante **e** (se menor) o consentimento do responsável. 📄 `docs/MODULO-ATLETA-FLUXO.md` §8.
 **Clube:** CNPJ, endereço, representante, documentos (Ata, Estatuto), status (`PENDENTE` / aprovado / `SUSPENSO`).
 
 **Frontend — rotas:** `/` (site público one-page), `/login`, `/clube` (protegida `ADMIN_CLUBE`), `/admin` (protegida `ADMIN_FHT`) via `ProtectedRoute` + `AuthContext`.
@@ -91,9 +92,11 @@ Dados ainda **estáticos** em `src/data/*.ts` (clubs, competitions, directors, d
 - **Painel do CLUBE funcional:** login real de clube (era mock — agora tem usuário no banco); lista de atletas **com escopo** (clube vê só os próprios); cadastro multi-step; **detalhe "ver tudo" + edição** dos próprios atletas via `PUT /api/atletas/{id}` (backend com escopo: clube só edita os seus, admin edita qualquer); **gráficos** no dashboard (elenco por categoria = real; desempenho em competições = mock).
 - **Sessão logada (UX):** Navbar da home mostra **"Meu Painel"** (leva ao /admin ou /clube) + "Sair" quando logado; botão **"Ver site"** no rodapé dos painéis → circula painel↔site sem deslogar (token no `localStorage`).
 - **3 bugfixes de backend** (jul/2026): `@Transactional` faltando em `criarUsuarioClube`; query Panache malformada em `findByClubeId`; ambos davam 500 e travavam o fluxo do clube. Achados testando ao vivo.
+- **Fluxo de filiação do atleta com LGPD (jul/2026, 6º módulo mock→real)** — o bloqueador de lançamento. Migration `V12`, entidade `Consentimento`, etapa de **responsável legal** no cadastro do clube (aparece sozinha quando a data de nascimento indica menor), `POST /api/atletas/{id}/documentos` pra anexar o comprovante depois, `AtletaExpurgoJob` (`@Scheduled`) apagando os não pagos, e aprovação bloqueada sem comprovante/consentimento. 📄 `docs/MODULO-ATLETA-FLUXO.md` §8.
 - **Telas de DEMO (mock) do painel admin** (jul/2026, pra reunião): as 7 seções antes em placeholder agora têm telas **navegáveis mock** em `frontend/src/pages/admin/*Page.tsx` (Competições, Financeiro, Notícias, Diretoria, Documentos, Galeria, Usuários/Admins) — self-contained, dados de exemplo, modais/abas/painéis via `useState`, **sem backend**. Dashboard do admin ganhou gráficos (SVG puro). ⚠️ **São mock pra demonstração** — trocar por API real quando cada módulo for implementado no backend. Roteiro da demo em `docs/ROTEIRO-DEMO.md`.
 
 **⚖️ Diretriz transversal — LGPD:** decisão do Gustavo: **tudo é feito com base nas normas da LGPD** (Lei 13.709/2018). O sistema trata dados pessoais de **menores de idade** (atletas Sub-12/14/16/18) → tratamento reforçado (art. 14). Guia prático de conformidade em [`docs/LGPD-CONFORMIDADE.md`](docs/LGPD-CONFORMIDADE.md) (consentimento de responsável, direitos do titular, minimização, log de auditoria, política de privacidade, Encarregado/DPO). Considerar em cada módulo com dado pessoal.
+> ✅ **A maior lacuna (art. 14) foi fechada em jul/2026** — responsável legal + tabela `consentimentos` (um por finalidade, com versão do termo, IP e user-agent) no fluxo de cadastro. **Ainda em aberto** do checklist §5: revogação de consentimento e demais direitos do titular (§5.8), log de auditoria (§5.5), bucket R2 privado com URL assinada (§5.6), Política de Privacidade (§5.2) e os itens organizacionais (§6).
 
 **Pendências / lacunas conhecidas:**
 - **R2 não conectado de verdade** — código pronto, mas falta criar o bucket e preencher `R2_ACCOUNT_ID` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`. Sem isso, upload retorna 503. 🗓️ **DECISÃO: R2 é a ÚLTIMA etapa do projeto** — só conecta quando for pro Cloudflare, praticamente indo pro ar. Consequência: **nada no dev pode depender de R2**. Features com upload (docs de atleta/clube, imagens de notícias) se desenvolvem com URL externa ou storage local como fallback, e trocam pro R2 só no fim.

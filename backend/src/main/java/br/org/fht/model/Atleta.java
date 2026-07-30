@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
@@ -69,6 +70,27 @@ public class Atleta extends DefaultEntity {
 
     @Column(name = "clube_anterior")
     private String clubeAnterior;
+
+    // Responsável legal — obrigatório quando o atleta é menor de 18 (LGPD art. 14).
+    @Column(name = "responsavel_nome")
+    private String responsavelNome;
+
+    @Column(name = "responsavel_cpf", length = 14)
+    private String responsavelCpf;
+
+    @Column(name = "responsavel_parentesco", length = 30)
+    private String responsavelParentesco;
+
+    @Column(name = "responsavel_email")
+    private String responsavelEmail;
+
+    @Column(name = "responsavel_telefone", length = 20)
+    private String responsavelTelefone;
+
+    // Prazo para anexar o comprovante de pagamento. Vencido e ainda sem comprovante,
+    // o cadastro é apagado pelo job de expurgo. Nulo quando o comprovante já chegou.
+    @Column(name = "prazo_pagamento_ate")
+    private LocalDateTime prazoPagamentoAte;
 
     @Column(name = "foto_url")
     private String fotoUrl;
@@ -159,6 +181,29 @@ public class Atleta extends DefaultEntity {
 
     public String getClubeAnterior() { return clubeAnterior; }
     public void setClubeAnterior(String clubeAnterior) { this.clubeAnterior = clubeAnterior; }
+
+    public String getResponsavelNome() { return responsavelNome; }
+    public void setResponsavelNome(String responsavelNome) { this.responsavelNome = responsavelNome; }
+
+    public String getResponsavelCpf() { return responsavelCpf; }
+    public void setResponsavelCpf(String responsavelCpf) { this.responsavelCpf = responsavelCpf; }
+
+    public String getResponsavelParentesco() { return responsavelParentesco; }
+    public void setResponsavelParentesco(String responsavelParentesco) { this.responsavelParentesco = responsavelParentesco; }
+
+    public String getResponsavelEmail() { return responsavelEmail; }
+    public void setResponsavelEmail(String responsavelEmail) { this.responsavelEmail = responsavelEmail; }
+
+    public String getResponsavelTelefone() { return responsavelTelefone; }
+    public void setResponsavelTelefone(String responsavelTelefone) { this.responsavelTelefone = responsavelTelefone; }
+
+    public LocalDateTime getPrazoPagamentoAte() { return prazoPagamentoAte; }
+    public void setPrazoPagamentoAte(LocalDateTime prazoPagamentoAte) { this.prazoPagamentoAte = prazoPagamentoAte; }
+
+    /** Menor de 18 na data de referência — dispara as exigências do art. 14 da LGPD. */
+    public boolean isMenorDeIdade(LocalDate referencia) {
+        return dataNascimento != null && dataNascimento.plusYears(18).isAfter(referencia);
+    }
 
     public String getFotoUrl() { return fotoUrl; }
     public void setFotoUrl(String fotoUrl) { this.fotoUrl = fotoUrl; }

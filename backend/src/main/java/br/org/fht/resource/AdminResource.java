@@ -23,6 +23,7 @@ import org.eclipse.microprofile.openapi.annotations.responses.APIResponses;
 import org.eclipse.microprofile.openapi.annotations.security.SecurityRequirement;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -55,7 +56,11 @@ public class AdminResource {
                         "ativos", clubeRepository.count("status", "ATIVO")),
                 "atletas", Map.of(
                         "total", atletaRepository.count(),
-                        "pendentes", atletaRepository.count("status", "AGUARDANDO_PAGAMENTO"),
+                        // "Pendente" = tudo que ainda não virou ATIVO: falta pagar OU falta a
+                        // federação aprovar. Os dois estados nasceram na V12.
+                        "pendentes", atletaRepository.count("status IN ?1",
+                                List.of("AGUARDANDO_PAGAMENTO", "AGUARDANDO_APROVACAO")),
+                        "aguardandoAprovacao", atletaRepository.count("status", "AGUARDANDO_APROVACAO"),
                         "ativos", atletaRepository.count("status", "ATIVO")),
                 "usuarios", usuarioRepository.count()
         ), "OK")).build();

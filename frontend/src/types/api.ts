@@ -10,6 +10,61 @@ export interface ApiEnvelope<T> {
 export type ClubeStatus = 'PENDENTE' | 'ATIVO' | 'REJEITADO' | 'SUSPENSO'
 export type AtletaStatus = 'AGUARDANDO_PAGAMENTO' | 'AGUARDANDO_APROVACAO' | 'ATIVO' | 'REJEITADO' | 'SUSPENSO'
 
+/**
+ * Status efetivo da competição. EM_BREVE / EM_ANDAMENTO / ENCERRADO são derivados das datas
+ * no backend; os demais só existem como override manual do admin.
+ */
+export type CompeticaoStatus =
+  | 'EM_BREVE' | 'INSCRICOES_ABERTAS' | 'EM_ANDAMENTO' | 'ENCERRADO' | 'ADIADO' | 'CANCELADO'
+
+/** Override manual — subconjunto de CompeticaoStatus (EM_BREVE nunca é setado à mão) */
+export type CompeticaoStatusOverride = Exclude<CompeticaoStatus, 'EM_BREVE'>
+
+export type CompeticaoCategoria =
+  | 'adulto' | 'sub-18' | 'sub-16' | 'sub-14' | 'sub-12' | 'feminino' | 'masculino' | 'master'
+
+/** CompeticaoResponseDTO — visão administrativa */
+export interface CompeticaoDTO {
+  id: string
+  nome: string
+  descricao: string | null
+  categorias: CompeticaoCategoria[]
+  dataInicio: string
+  dataFim: string
+  local: string | null
+  cidade: string | null
+  uf: string | null
+  temporada: number
+  numeroEquipes: number
+  linkInscricao: string | null
+  cor: string
+  regulamentoUrl: string | null
+  status: CompeticaoStatus
+  /** nulo = status automático pelas datas */
+  statusOverride: CompeticaoStatusOverride | null
+  visivelNaHome: boolean
+  createdAt: string
+}
+
+/** CompeticaoPublicaDTO — card do site público (sem campos administrativos) */
+export interface CompeticaoPublicaDTO {
+  id: string
+  nome: string
+  descricao: string | null
+  categorias: CompeticaoCategoria[]
+  dataInicio: string
+  dataFim: string
+  local: string | null
+  cidade: string | null
+  uf: string | null
+  temporada: number
+  numeroEquipes: number
+  linkInscricao: string | null
+  cor: string
+  regulamentoUrl: string | null
+  status: CompeticaoStatus
+}
+
 /** Finalidades de consentimento LGPD (uma por registro — art. 14, §1) */
 export type FinalidadeConsentimento = 'CADASTRO_ATLETA_MENOR' | 'IMAGEM_PUBLICA'
 

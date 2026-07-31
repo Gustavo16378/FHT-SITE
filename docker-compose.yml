@@ -26,6 +26,9 @@ services:
       postgres:
         condition: service_healthy
     environment:
+      # Sem isto o container roda em UTC e "hoje" vira o dia seguinte a partir das 21h de Palmas,
+      # bagunçando toda regra que depende de data (status de competição, prazo de pagamento, idade).
+      TZ: America/Araguaina
       DB_HOST: postgres
       DB_PORT: 5432
       DB_NAME: fht_db

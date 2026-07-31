@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import {
   Trophy,
   Plus,
@@ -22,12 +22,15 @@ import {
   Flag,
   RotateCcw,
   TriangleAlert,
+  EyeOff,
 } from 'lucide-react';
+import { apiDelete, apiGet, apiPatch, apiPostJson, apiPut, ApiError } from '../../services/api';
+import type { CompeticaoCategoria, CompeticaoDTO, CompeticaoStatus } from '../../types/api';
 
 // ————————————————————————————————————————————————————————————
 // Tipos
 // ————————————————————————————————————————————————————————————
-type CompStatus = 'em-andamento' | 'inscricoes-abertas' | 'em-breve' | 'encerrado' | 'adiado';
+type CompStatus = CompeticaoStatus;
 type FiltroStatus = CompStatus | 'todos';
 type PainelAba = 'chaveamento' | 'equipes' | 'checkin' | 'jogos';
 type Posicao = 'Goleiro' | 'Ponta' | 'Armador' | 'Pivô' | 'Central';
@@ -103,37 +106,64 @@ interface DadosOperacionais {
   dataDia: string;
 }
 
-interface Competicao {
-  id: number;
-  nome: string;
-  status: CompStatus;
-  categorias: string[];
-  periodo: string;
-  local: string;
-  numEquipes: number;
-  equipes: Equipe[];
+/**
+ * A competição vem da API (CompeticaoDTO). Os campos operacionais — elencos, chaveamento,
+ * check-in e jogos — chegam nas próximas etapas do módulo; até lá as abas ficam vazias.
+ */
+type Competicao = CompeticaoDTO & {
+  equipes?: Equipe[];
   dados?: DadosOperacionais;
-}
+};
 
 // ————————————————————————————————————————————————————————————
 // Metadados de status
 // ————————————————————————————————————————————————————————————
 const STATUS_META: Record<CompStatus, { label: string; badge: string }> = {
-  'em-andamento': { label: 'Em andamento', badge: 'text-green-400 bg-green-500/10 border-green-500/30' },
-  'inscricoes-abertas': { label: 'Inscrições abertas', badge: 'text-gold bg-gold/10 border-gold/30' },
-  'em-breve': { label: 'Em breve', badge: 'text-blue-300 bg-blue-mid/10 border-blue-400/30' },
-  encerrado: { label: 'Encerrado', badge: 'text-gray-soft bg-gray-soft/10 border-gray-soft/30' },
-  adiado: { label: 'Adiado', badge: 'text-orange-400 bg-orange-500/10 border-orange-500/30' },
+  EM_ANDAMENTO: { label: 'Em andamento', badge: 'text-green-400 bg-green-500/10 border-green-500/30' },
+  INSCRICOES_ABERTAS: { label: 'Inscrições abertas', badge: 'text-gold bg-gold/10 border-gold/30' },
+  EM_BREVE: { label: 'Em breve', badge: 'text-blue-300 bg-blue-mid/10 border-blue-400/30' },
+  ENCERRADO: { label: 'Encerrado', badge: 'text-gray-soft bg-gray-soft/10 border-gray-soft/30' },
+  ADIADO: { label: 'Adiado', badge: 'text-orange-400 bg-orange-500/10 border-orange-500/30' },
+  CANCELADO: { label: 'Cancelado', badge: 'text-red-400 bg-red-500/10 border-red-500/30' },
 };
 
 const FILTROS: { valor: FiltroStatus; label: string }[] = [
   { valor: 'todos', label: 'Todos' },
-  { valor: 'em-andamento', label: 'Em andamento' },
-  { valor: 'inscricoes-abertas', label: 'Inscrições abertas' },
-  { valor: 'em-breve', label: 'Em breve' },
-  { valor: 'adiado', label: 'Adiado' },
-  { valor: 'encerrado', label: 'Encerrado' },
+  { valor: 'EM_ANDAMENTO', label: 'Em andamento' },
+  { valor: 'INSCRICOES_ABERTAS', label: 'Inscrições abertas' },
+  { valor: 'EM_BREVE', label: 'Em breve' },
+  { valor: 'ADIADO', label: 'Adiado' },
+  { valor: 'ENCERRADO', label: 'Encerrado' },
 ];
+
+/** Categorias aceitas pelo backend (CompeticaoServiceImpl.CATEGORIAS_VALIDAS). */
+const CATEGORIAS_DISPONIVEIS: CompeticaoCategoria[] =
+  ['sub-12', 'sub-14', 'sub-16', 'sub-18', 'adulto', 'master', 'feminino', 'masculino'];
+
+function rotuloCategoria(cat: string): string {
+  return cat.charAt(0).toUpperCase() + cat.slice(1);
+}
+
+function fmtData(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const d = new Date(`${iso}T00:00:00`);
+  return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function periodoDe(c: CompeticaoDTO): string {
+  return `${fmtData(c.dataInicio)} — ${fmtData(c.dataFim)}`;
+}
+
+function localDe(c: CompeticaoDTO): string {
+  const cidadeUf = [c.cidade, c.uf].filter(Boolean).join(', ');
+  return [c.local, cidadeUf].filter(Boolean).join(' — ') || 'Local a definir';
+}
+
+function msgErro(e: unknown): string {
+  if (e instanceof ApiError) return e.message;
+  if (e instanceof Error) return e.message;
+  return 'Erro inesperado. Tente novamente.';
+}
 
 const POS_BADGE: Record<Posicao, string> = {
   Goleiro: 'text-gold bg-gold/10 border-gold/30',
@@ -158,292 +188,6 @@ const CLUBES: Record<string, { nome: string; cidade: string }> = {
 };
 
 const nomeClube = (sigla: string): string => CLUBES[sigla]?.nome ?? sigla;
-
-// ————————————————————————————————————————————————————————————
-// Mock — geração determinística de elencos (sem random)
-// ————————————————————————————————————————————————————————————
-const NOMES: string[] = [
-  'Lucas Andrade', 'Gabriel Nunes', 'Matheus Rocha', 'Pedro Henrique Lima', 'João Vitor Souza',
-  'Rafael Carvalho', 'Bruno Teixeira', 'Guilherme Alves', 'Felipe Moraes', 'Thiago Barbosa',
-  'Vinícius Cardoso', 'Diego Fernandes', 'Leonardo Pires', 'André Ribeiro', 'Caio Martins',
-  'Igor Nascimento', 'Rodrigo Campos', 'Marcelo Duarte', 'Henrique Gomes', 'Daniel Farias',
-  'Otávio Mendes', 'Eduardo Ramos', 'Fábio Correia', 'Renan Azevedo', 'Wesley Oliveira',
-  'Murilo Batista', 'Gustavo Freitas', 'Alexandre Pinto', 'Ricardo Lopes', 'Anderson Silva',
-  'Yuri Cavalcante', 'Emerson Dias', 'Luiz Fernando Melo', 'Samuel Araújo', 'Kaique Santana',
-  'Vitor Hugo Costa', 'Danilo Macedo', 'Fernando Tavares', 'Robson Vieira', 'Everton Nogueira',
-  'Jonas Siqueira', 'Cléber Antunes', 'Maicon Reis', 'Elias Furtado', 'Breno Castro',
-  'Douglas Prado', 'Nathan Queiroz', 'Sérgio Bezerra', 'Wallace Monteiro', 'Tiago Peixoto',
-];
-
-const CICLO_POS: Posicao[] = [
-  'Goleiro', 'Armador', 'Central', 'Ponta', 'Pivô', 'Ponta', 'Armador', 'Goleiro', 'Central', 'Ponta',
-];
-
-function montarElenco(sigla: string, offset: number, qtd: number): Elenco {
-  const clube = CLUBES[sigla];
-  const atletas: Atleta[] = Array.from({ length: qtd }, (_, i) => ({
-    id: offset * 100 + i,
-    nome: NOMES[(offset + i) % NOMES.length],
-    posicao: CICLO_POS[i % CICLO_POS.length],
-    categoria: 'Adulto',
-  }));
-  return { sigla, nome: clube.nome, cidade: clube.cidade, atletas };
-}
-
-// 8 elencos completos, sem repetição de nomes entre clubes
-const ELENCOS: Elenco[] = [
-  montarElenco('PLM', 0, 8),
-  montarElenco('ARA', 8, 7),
-  montarElenco('GUR', 15, 6),
-  montarElenco('PNH', 21, 8),
-  montarElenco('TCP', 29, 6),
-  montarElenco('COL', 35, 5),
-  montarElenco('MIR', 40, 5),
-  montarElenco('PAR', 45, 5),
-];
-
-// Documentos fictícios determinísticos (sem random) para as credenciais
-function pad(num: number, len: number): string {
-  return String(Math.abs(num)).padStart(len, '0').slice(-len);
-}
-
-function credencialMock(seed: number): { cpf: string; rg: string; nascimento: string } {
-  const cpf = `${pad(seed * 3 + 137, 3)}.${pad(seed * 7 + 241, 3)}.${pad(seed * 11 + 356, 3)}-${pad(
-    seed * 13 + 10,
-    2,
-  )}`;
-  const rgN = pad(seed * 17 + 10234567, 8);
-  const rg = `${rgN.slice(0, 2)}.${rgN.slice(2, 5)}.${rgN.slice(5, 8)}-${pad(seed % 10, 1)}`;
-  const nascimento = `${pad(((seed * 5) % 27) + 1, 2)}/${pad(((seed * 3) % 12) + 1, 2)}/${1990 + (seed % 15)}`;
-  return { cpf, rg, nascimento };
-}
-
-// Check-in do DIA: todos os atletas escalados de todos os clubes participantes.
-function montarCheckin(siglas: string[]): CheckinAtleta[] {
-  const lista: CheckinAtleta[] = [];
-  let n = 0;
-  ELENCOS.filter((e) => siglas.includes(e.sigla)).forEach((e) => {
-    e.atletas.forEach((a) => {
-      n += 1;
-      const cred = credencialMock(n);
-      lista.push({
-        id: a.id,
-        nome: a.nome,
-        sigla: e.sigla,
-        posicao: a.posicao,
-        categoria: a.categoria,
-        cpf: cred.cpf,
-        rg: cred.rg,
-        nascimento: cred.nascimento,
-        presente: n % 3 === 0,
-      });
-    });
-  });
-  return lista;
-}
-
-// Chaveamento (mata-mata de 8 clubes) — quartas e semis já decididos
-const QUARTAS: Confronto[] = [
-  { id: 'QF1', aSigla: 'PLM', bSigla: 'MIR', placarA: 32, placarB: 21 },
-  { id: 'QF2', aSigla: 'GUR', bSigla: 'TCP', placarA: 30, placarB: 22 },
-  { id: 'QF3', aSigla: 'ARA', bSigla: 'COL', placarA: 28, placarB: 25 },
-  { id: 'QF4', aSigla: 'PNH', bSigla: 'PAR', placarA: 27, placarB: 24 },
-];
-
-const SEMIS: Confronto[] = [
-  { id: 'SF1', aSigla: 'PLM', bSigla: 'GUR', placarA: 29, placarB: 26 },
-  { id: 'SF2', aSigla: 'ARA', bSigla: 'PNH', placarA: 24, placarB: 27 },
-];
-
-const BRACKET_EM_ANDAMENTO: Bracket = {
-  quartas: QUARTAS,
-  semis: SEMIS,
-  final: { id: 'FIN', aSigla: 'PLM', bSigla: 'PNH', placarA: null, placarB: null },
-  campeao: null,
-};
-
-const BRACKET_ENCERRADO: Bracket = {
-  quartas: QUARTAS,
-  semis: SEMIS,
-  final: { id: 'FIN', aSigla: 'PLM', bSigla: 'PNH', placarA: 31, placarB: 28 },
-  campeao: 'PLM',
-};
-
-const JOGOS_ESTADUAL: Jogo[] = [
-  {
-    id: 1, fase: 'Semifinal', mandante: 'PLM', visitante: 'GUR', placarM: 29, placarV: 26,
-    horario: 'Ontem · 19h00', status: 'Encerrado',
-    golsMandante: [
-      { nome: 'Lucas Andrade', gols: 9 },
-      { nome: 'Gabriel Nunes', gols: 7 },
-      { nome: 'Matheus Rocha', gols: 6 },
-      { nome: 'Pedro Henrique Lima', gols: 4 },
-      { nome: 'Rafael Carvalho', gols: 3 },
-    ],
-    golsVisitante: [
-      { nome: 'Igor Nascimento', gols: 8 },
-      { nome: 'Rodrigo Campos', gols: 7 },
-      { nome: 'Marcelo Duarte', gols: 6 },
-      { nome: 'Henrique Gomes', gols: 5 },
-    ],
-  },
-  {
-    id: 2, fase: 'Semifinal', mandante: 'ARA', visitante: 'PNH', placarM: 24, placarV: 27,
-    horario: 'Ontem · 21h00', status: 'Encerrado',
-    golsMandante: [
-      { nome: 'Felipe Moraes', gols: 8 },
-      { nome: 'Thiago Barbosa', gols: 7 },
-      { nome: 'Vinícius Cardoso', gols: 5 },
-      { nome: 'Diego Fernandes', gols: 4 },
-    ],
-    golsVisitante: [
-      { nome: 'Renan Azevedo', gols: 8 },
-      { nome: 'Eduardo Ramos', gols: 7 },
-      { nome: 'Fábio Correia', gols: 6 },
-      { nome: 'Wesley Oliveira', gols: 6 },
-    ],
-  },
-  {
-    id: 3, fase: 'Disputa de 3º lugar', mandante: 'ARA', visitante: 'GUR', placarM: null, placarV: null,
-    horario: 'Hoje · 17h00', status: 'Agendado',
-    golsMandante: [], golsVisitante: [],
-  },
-  {
-    id: 4, fase: 'Final', mandante: 'PLM', visitante: 'PNH', placarM: 18, placarV: 16,
-    horario: 'Hoje · 19h30', status: 'Em andamento',
-    golsMandante: [
-      { nome: 'Lucas Andrade', gols: 6 },
-      { nome: 'Gabriel Nunes', gols: 5 },
-      { nome: 'Matheus Rocha', gols: 4 },
-      { nome: 'Pedro Henrique Lima', gols: 3 },
-    ],
-    golsVisitante: [
-      { nome: 'Renan Azevedo', gols: 5 },
-      { nome: 'Eduardo Ramos', gols: 4 },
-      { nome: 'Fábio Correia', gols: 4 },
-      { nome: 'Wesley Oliveira', gols: 3 },
-    ],
-  },
-];
-
-const JOGOS_LIGA_2024: Jogo[] = [
-  {
-    id: 1, fase: 'Semifinal', mandante: 'PLM', visitante: 'GUR', placarM: 29, placarV: 26,
-    horario: '08 de jun. de 2024', status: 'Encerrado',
-    golsMandante: [
-      { nome: 'Lucas Andrade', gols: 10 },
-      { nome: 'Gabriel Nunes', gols: 7 },
-      { nome: 'Matheus Rocha', gols: 6 },
-      { nome: 'Pedro Henrique Lima', gols: 6 },
-    ],
-    golsVisitante: [
-      { nome: 'Igor Nascimento', gols: 9 },
-      { nome: 'Rodrigo Campos', gols: 7 },
-      { nome: 'Marcelo Duarte', gols: 6 },
-      { nome: 'Henrique Gomes', gols: 4 },
-    ],
-  },
-  {
-    id: 2, fase: 'Semifinal', mandante: 'ARA', visitante: 'PNH', placarM: 24, placarV: 27,
-    horario: '08 de jun. de 2024', status: 'Encerrado',
-    golsMandante: [
-      { nome: 'Felipe Moraes', gols: 8 },
-      { nome: 'Thiago Barbosa', gols: 7 },
-      { nome: 'Vinícius Cardoso', gols: 5 },
-      { nome: 'Diego Fernandes', gols: 4 },
-    ],
-    golsVisitante: [
-      { nome: 'Renan Azevedo', gols: 9 },
-      { nome: 'Eduardo Ramos', gols: 8 },
-      { nome: 'Fábio Correia', gols: 6 },
-      { nome: 'Wesley Oliveira', gols: 4 },
-    ],
-  },
-  {
-    id: 3, fase: 'Final', mandante: 'PLM', visitante: 'PNH', placarM: 31, placarV: 28,
-    horario: '15 de jun. de 2024', status: 'Encerrado',
-    golsMandante: [
-      { nome: 'Lucas Andrade', gols: 11 },
-      { nome: 'Gabriel Nunes', gols: 8 },
-      { nome: 'Matheus Rocha', gols: 7 },
-      { nome: 'Pedro Henrique Lima', gols: 5 },
-    ],
-    golsVisitante: [
-      { nome: 'Renan Azevedo', gols: 9 },
-      { nome: 'Eduardo Ramos', gols: 8 },
-      { nome: 'Fábio Correia', gols: 6 },
-      { nome: 'Wesley Oliveira', gols: 5 },
-    ],
-  },
-];
-
-const TODOS_CLUBES = Object.keys(CLUBES);
-
-const DADOS_ESTADUAL: DadosOperacionais = {
-  bracket: BRACKET_EM_ANDAMENTO,
-  elencos: ELENCOS,
-  checkin: montarCheckin(TODOS_CLUBES),
-  jogos: JOGOS_ESTADUAL,
-  dataDia: 'Sábado, 12 de julho de 2025',
-};
-
-const DADOS_LIGA_2024: DadosOperacionais = {
-  bracket: BRACKET_ENCERRADO,
-  elencos: ELENCOS,
-  checkin: montarCheckin(TODOS_CLUBES).map((c) => ({ ...c, presente: true })),
-  jogos: JOGOS_LIGA_2024,
-  dataDia: 'Domingo, 15 de junho de 2024',
-};
-
-const COMPETICOES: Competicao[] = [
-  {
-    id: 1,
-    nome: 'Campeonato Tocantinense Adulto Masculino',
-    status: 'em-andamento',
-    categorias: ['Adulto'],
-    periodo: '10 de abr. — 28 de jun. de 2025',
-    local: 'Ginásio Ayrton Senna — Palmas/TO',
-    numEquipes: 8,
-    equipes: Object.keys(CLUBES).map((s) => ({ sigla: s, nome: CLUBES[s].nome, cidade: CLUBES[s].cidade })),
-    dados: DADOS_ESTADUAL,
-  },
-  {
-    id: 2,
-    nome: 'Copa TO de Handebol de Base',
-    status: 'inscricoes-abertas',
-    categorias: ['Sub-12', 'Sub-14', 'Sub-16'],
-    periodo: '05 de ago. — 20 de set. de 2025',
-    local: 'Ginásio Municipal — Araguaína/TO',
-    numEquipes: 4,
-    equipes: [
-      { sigla: 'ARA', nome: 'Araguaína HC', cidade: 'Araguaína' },
-      { sigla: 'PLM', nome: 'Palmas HC', cidade: 'Palmas' },
-      { sigla: 'PNH', nome: 'Porto Nacional HC', cidade: 'Porto Nacional' },
-      { sigla: 'GUR', nome: 'Gurupi EC', cidade: 'Gurupi' },
-    ],
-  },
-  {
-    id: 3,
-    nome: 'Taça Tocantins Feminino Sub-18',
-    status: 'em-breve',
-    categorias: ['Sub-18'],
-    periodo: '01 de out. — 30 de nov. de 2025',
-    local: 'Ginásio Poliesportivo — Gurupi/TO',
-    numEquipes: 0,
-    equipes: [],
-  },
-  {
-    id: 4,
-    nome: 'Liga Tocantinense 2024 — Adulto Masculino',
-    status: 'encerrado',
-    categorias: ['Adulto'],
-    periodo: '12 de mar. — 15 de jun. de 2024',
-    local: 'Ginásio Ayrton Senna — Palmas/TO',
-    numEquipes: 8,
-    equipes: Object.keys(CLUBES).map((s) => ({ sigla: s, nome: CLUBES[s].nome, cidade: CLUBES[s].cidade })),
-    dados: DADOS_LIGA_2024,
-  },
-];
 
 // ————————————————————————————————————————————————————————————
 // Helpers de UI
@@ -513,8 +257,24 @@ function CompeticaoCard({
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3 flex-wrap">
           <StatusBadge status={comp.status} />
+          {comp.statusOverride && (
+            <span
+              title="Status definido à mão — não acompanha mais as datas"
+              className="font-body text-[10px] text-orange-400/80 border border-orange-500/30 rounded-full px-2 py-0.5"
+            >
+              manual
+            </span>
+          )}
+          {!comp.visivelNaHome && (
+            <span
+              title="Não aparece no site público"
+              className="font-body text-[10px] text-gray-soft/70 border border-federation/20 rounded-full px-2 py-0.5 flex items-center gap-1"
+            >
+              <EyeOff size={10} /> oculta
+            </span>
+          )}
           {comp.categorias.map((cat) => (
-            <CategoriaTag key={cat} label={cat} />
+            <CategoriaTag key={cat} label={rotuloCategoria(cat)} />
           ))}
         </div>
         <div className="flex items-center gap-1 shrink-0">
@@ -540,20 +300,19 @@ function CompeticaoCard({
       <div className="flex flex-col gap-2">
         <p className="font-body text-gray-soft text-sm flex items-center gap-2">
           <Calendar size={15} className="text-gold shrink-0" />
-          {comp.periodo}
+          {periodoDe(comp)}
         </p>
         <p className="font-body text-gray-soft text-sm flex items-center gap-2">
           <MapPin size={15} className="text-gold shrink-0" />
-          {comp.local}
+          {localDe(comp)}
         </p>
         <p className="font-body text-gray-soft text-sm flex items-center gap-2">
           <Users size={15} className="text-gold shrink-0" />
-          {comp.numEquipes} {comp.numEquipes === 1 ? 'equipe inscrita' : 'equipes inscritas'}
+          {comp.numeroEquipes} {comp.numeroEquipes === 1 ? 'equipe' : 'equipes'}
         </p>
       </div>
 
-      <div className="flex items-center justify-between pt-1">
-        {SELO_DEMO}
+      <div className="flex items-center justify-end pt-1">
         <button
           onClick={() => onGerenciar(comp)}
           className="font-display text-night bg-gold hover:bg-gold-light px-5 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250 flex items-center gap-2"
@@ -1329,16 +1088,50 @@ function PainelFullscreen({
   comp,
   onClose,
   onEditar,
+  onAtualizado,
 }: {
   comp: Competicao;
   onClose: () => void;
   onEditar: () => void;
+  onAtualizado: (c: Competicao) => void;
 }) {
   const [aba, setAba] = useState<PainelAba>('chaveamento');
-  const [status, setStatus] = useState<CompStatus>(comp.status);
   const [confirmarEncerrar, setConfirmarEncerrar] = useState<boolean>(false);
+  const [aplicando, setAplicando] = useState(false);
+  const [erroAcao, setErroAcao] = useState('');
+  const status = comp.status;
   const dados = comp.dados ?? null;
-  const elencos: Elenco[] = dados ? dados.elencos : comp.equipes.map((e) => ({ ...e, atletas: [] }));
+  const elencos: Elenco[] = dados ? dados.elencos : (comp.equipes ?? []).map((e) => ({ ...e, atletas: [] }));
+
+  /** Grava o override de status; `null` devolve a competição ao status automático das datas. */
+  async function aplicarStatus(novo: CompeticaoStatus | null) {
+    setAplicando(true);
+    setErroAcao('');
+    try {
+      const atualizada = novo === null
+        ? await apiPatch<CompeticaoDTO>(`/api/competicoes/${comp.id}/status-automatico`)
+        : await apiPatch<CompeticaoDTO>(`/api/competicoes/${comp.id}/status`, { status: novo });
+      onAtualizado({ ...comp, ...atualizada });
+    } catch (e) {
+      setErroAcao(msgErro(e));
+    } finally {
+      setAplicando(false);
+    }
+  }
+
+  async function alternarVitrine() {
+    setAplicando(true);
+    setErroAcao('');
+    try {
+      const atualizada = await apiPatch<CompeticaoDTO>(
+        `/api/competicoes/${comp.id}/vitrine`, { visivel: !comp.visivelNaHome });
+      onAtualizado({ ...comp, ...atualizada });
+    } catch (e) {
+      setErroAcao(msgErro(e));
+    } finally {
+      setAplicando(false);
+    }
+  }
 
   const btnPrimario =
     'font-display text-night bg-gold hover:bg-gold-light px-5 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250 flex items-center gap-2';
@@ -1360,52 +1153,68 @@ function PainelFullscreen({
           <div className="flex items-center gap-3 flex-wrap">
             <Trophy size={20} className="text-gold shrink-0" />
             <StatusBadge status={status} />
-            {SELO_DEMO}
+            {comp.statusOverride && (
+              <button
+                onClick={() => aplicarStatus(null)}
+                disabled={aplicando}
+                title="Voltar a calcular o status pelas datas"
+                className="font-body text-[10px] text-orange-400/90 border border-orange-500/30 hover:border-orange-500/60 rounded-full px-2 py-0.5 transition-colors duration-150 disabled:opacity-50"
+              >
+                manual · voltar ao automático
+              </button>
+            )}
           </div>
           <h2 className="font-display text-fht-white text-2xl lg:text-3xl tracking-wide leading-none">{comp.nome}</h2>
           <div className="flex items-center gap-4 flex-wrap">
             <p className="font-body text-gray-soft text-xs flex items-center gap-1.5">
               <MapPin size={13} className="text-gold" />
-              {comp.local}
+              {localDe(comp)}
             </p>
             <p className="font-body text-gray-soft text-xs flex items-center gap-1.5">
               <Calendar size={13} className="text-gold" />
-              {comp.periodo}
+              {periodoDe(comp)}
             </p>
           </div>
+          {erroAcao && <p className="font-body text-red-400 text-xs">{erroAcao}</p>}
         </div>
         <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
           {/* Ações de ciclo de vida — variam conforme o status atual */}
-          {status === 'em-breve' && (
-            <button onClick={() => setStatus('inscricoes-abertas')} className={btnPrimario}>
+          {status === 'EM_BREVE' && (
+            <button onClick={() => aplicarStatus('INSCRICOES_ABERTAS')} disabled={aplicando} className={btnPrimario}>
               <Flag size={16} />
               Abrir inscrições
             </button>
           )}
-          {status === 'inscricoes-abertas' && (
-            <button onClick={() => setStatus('em-andamento')} className={btnPrimario}>
+          {status === 'INSCRICOES_ABERTAS' && (
+            <button onClick={() => aplicarStatus('EM_ANDAMENTO')} disabled={aplicando} className={btnPrimario}>
               <Play size={16} />
               Encerrar inscrições e iniciar campeonato
             </button>
           )}
-          {status === 'em-andamento' && (
-            <button onClick={() => setConfirmarEncerrar(true)} className={btnPrimario}>
+          {status === 'EM_ANDAMENTO' && (
+            <button onClick={() => setConfirmarEncerrar(true)} disabled={aplicando} className={btnPrimario}>
               <CircleCheck size={16} />
               Encerrar campeonato
             </button>
           )}
-          {status === 'adiado' && (
-            <button onClick={() => setStatus('em-andamento')} className={btnPrimario}>
+          {(status === 'ADIADO' || status === 'CANCELADO') && (
+            <button onClick={() => aplicarStatus(null)} disabled={aplicando} className={btnPrimario}>
               <RotateCcw size={16} />
               Retomar
             </button>
           )}
-          {status !== 'encerrado' && status !== 'adiado' && (
-            <button onClick={() => setStatus('adiado')} className={btnSecundario}>
+          {status !== 'ENCERRADO' && status !== 'ADIADO' && status !== 'CANCELADO' && (
+            <button onClick={() => aplicarStatus('ADIADO')} disabled={aplicando} className={btnSecundario}>
               <Clock size={16} />
               Adiar
             </button>
           )}
+
+          <button onClick={alternarVitrine} disabled={aplicando} className={btnSecundario}
+            title={comp.visivelNaHome ? 'Deixar de exibir no site público' : 'Exibir no site público'}>
+            {comp.visivelNaHome ? <EyeOff size={16} /> : <Eye size={16} />}
+            {comp.visivelNaHome ? 'Ocultar do site' : 'Mostrar no site'}
+          </button>
 
           <button
             onClick={onEditar}
@@ -1455,7 +1264,7 @@ function PainelFullscreen({
         {aba === 'checkin' && (
           <CheckinTab
             atletas={dados ? dados.checkin : []}
-            local={comp.local}
+            local={localDe(comp)}
             dia={dados ? dados.dataDia : ''}
           />
         )}
@@ -1490,8 +1299,8 @@ function PainelFullscreen({
               </button>
               <button
                 onClick={() => {
-                  setStatus('encerrado');
                   setConfirmarEncerrar(false);
+                  void aplicarStatus('ENCERRADO');
                 }}
                 className={btnPrimario}
               >
@@ -1507,21 +1316,56 @@ function PainelFullscreen({
 }
 
 // ————————————————————————————————————————————————————————————
-// Modal de criação (mantido)
+// Modal de criação / edição — salva na API
 // ————————————————————————————————————————————————————————————
-const CATEGORIAS_DISPONIVEIS = ['Sub-12', 'Sub-14', 'Sub-16', 'Sub-18', 'Adulto'];
+function CriarModal({ editando, onClose, onSalvo }: {
+  editando: Competicao | null;
+  onClose: () => void;
+  onSalvo: () => void;
+}) {
+  const [nome, setNome] = useState<string>(editando?.nome ?? '');
+  const [categorias, setCategorias] = useState<CompeticaoCategoria[]>(editando?.categorias ?? []);
+  const [inicio, setInicio] = useState<string>(editando?.dataInicio ?? '');
+  const [fim, setFim] = useState<string>(editando?.dataFim ?? '');
+  const [local, setLocal] = useState<string>(editando?.local ?? '');
+  const [cidade, setCidade] = useState<string>(editando?.cidade ?? '');
+  const [numeroEquipes, setNumeroEquipes] = useState<string>(String(editando?.numeroEquipes ?? 0));
+  const [descricao, setDescricao] = useState<string>(editando?.descricao ?? '');
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState('');
 
-function CriarModal({ onClose }: { onClose: () => void }) {
-  const [nome, setNome] = useState<string>('');
-  const [categorias, setCategorias] = useState<string[]>([]);
-  const [inicio, setInicio] = useState<string>('');
-  const [fim, setFim] = useState<string>('');
-  const [local, setLocal] = useState<string>('');
-  const [status, setStatus] = useState<CompStatus>('em-breve');
-
-  const toggleCategoria = (cat: string) => {
+  const toggleCategoria = (cat: CompeticaoCategoria) => {
     setCategorias((prev) => (prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]));
   };
+
+  const podeSalvar = nome.trim() !== '' && inicio !== '' && fim !== '' && !salvando;
+
+  async function salvar() {
+    setSalvando(true);
+    setErro('');
+    const corpo = {
+      nome: nome.trim(),
+      descricao: descricao.trim(),
+      categorias,
+      dataInicio: inicio,
+      dataFim: fim,
+      local: local.trim(),
+      cidade: cidade.trim(),
+      numeroEquipes: Number(numeroEquipes) || 0,
+    };
+    try {
+      if (editando) {
+        await apiPut(`/api/competicoes/${editando.id}`, corpo);
+      } else {
+        await apiPostJson('/api/competicoes', corpo);
+      }
+      onSalvo();
+      onClose();
+    } catch (e) {
+      setErro(msgErro(e));
+      setSalvando(false);
+    }
+  }
 
   return (
     <div
@@ -1537,7 +1381,9 @@ function CriarModal({ onClose }: { onClose: () => void }) {
         <div className="p-5 border-b border-federation/20 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Trophy size={18} className="text-gold" />
-            <h3 className="font-display text-fht-white text-xl tracking-wide">NOVA COMPETIÇÃO</h3>
+            <h3 className="font-display text-fht-white text-xl tracking-wide">
+              {editando ? 'EDITAR COMPETIÇÃO' : 'NOVA COMPETIÇÃO'}
+            </h3>
           </div>
           <button
             onClick={onClose}
@@ -1577,7 +1423,7 @@ function CriarModal({ onClose }: { onClose: () => void }) {
                         : 'text-gray-soft bg-gray-soft/5 border-gray-soft/20 hover:border-gray-soft/40'
                     }`}
                   >
-                    {cat}
+                    {rotuloCategoria(cat)}
                   </button>
                 );
               })}
@@ -1605,49 +1451,89 @@ function CriarModal({ onClose }: { onClose: () => void }) {
             </label>
           </div>
 
+          <div className="grid grid-cols-3 gap-3">
+            <label className="block col-span-2">
+              <span className="font-body text-gray-soft text-xs uppercase tracking-wider mb-1 block">Local / ginásio</span>
+              <input
+                value={local}
+                onChange={(e) => setLocal(e.target.value)}
+                placeholder="Ex.: Ginásio Ayrton Senna"
+                className="font-body bg-[#0d1b2a]/80 border border-federation/20 focus:border-gold rounded-lg px-4 py-3 text-fht-white placeholder-gray-soft text-sm outline-none w-full"
+              />
+            </label>
+            <label className="block">
+              <span className="font-body text-gray-soft text-xs uppercase tracking-wider mb-1 block">Cidade</span>
+              <input
+                value={cidade}
+                onChange={(e) => setCidade(e.target.value)}
+                placeholder="Palmas"
+                className="font-body bg-[#0d1b2a]/80 border border-federation/20 focus:border-gold rounded-lg px-4 py-3 text-fht-white placeholder-gray-soft text-sm outline-none w-full"
+              />
+            </label>
+          </div>
+
           <label className="block">
-            <span className="font-body text-gray-soft text-xs uppercase tracking-wider mb-1 block">Local / ginásio</span>
+            <span className="font-body text-gray-soft text-xs uppercase tracking-wider mb-1 block">
+              Número de equipes
+            </span>
             <input
-              value={local}
-              onChange={(e) => setLocal(e.target.value)}
-              placeholder="Ex.: Ginásio Ayrton Senna — Palmas/TO"
+              type="number"
+              min={0}
+              value={numeroEquipes}
+              onChange={(e) => setNumeroEquipes(e.target.value)}
               className="font-body bg-[#0d1b2a]/80 border border-federation/20 focus:border-gold rounded-lg px-4 py-3 text-fht-white placeholder-gray-soft text-sm outline-none w-full"
+            />
+            <span className="font-body text-gray-soft/70 text-[11px] mt-1 block">
+              Informado à mão por enquanto — passa a ser contado pelas inscrições na próxima etapa.
+            </span>
+          </label>
+
+          <label className="block">
+            <span className="font-body text-gray-soft text-xs uppercase tracking-wider mb-1 block">
+              Descrição <span className="normal-case tracking-normal">(opcional)</span>
+            </span>
+            <textarea
+              value={descricao}
+              onChange={(e) => setDescricao(e.target.value)}
+              rows={3}
+              placeholder="Informações gerais sobre a competição"
+              className="font-body bg-[#0d1b2a]/80 border border-federation/20 focus:border-gold rounded-lg px-4 py-3 text-fht-white placeholder-gray-soft text-sm outline-none w-full resize-y"
             />
           </label>
 
-          <label className="block">
-            <span className="font-body text-gray-soft text-xs uppercase tracking-wider mb-1 block">Status</span>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value as CompStatus)}
-              className="font-body bg-[#0d1b2a]/80 border border-federation/20 focus:border-gold rounded-lg px-4 py-3 text-fht-white placeholder-gray-soft text-sm outline-none w-full appearance-none cursor-pointer"
-            >
-              <option value="em-breve">Em breve</option>
-              <option value="inscricoes-abertas">Inscrições abertas</option>
-              <option value="em-andamento">Em andamento</option>
-              <option value="encerrado">Encerrado</option>
-            </select>
-          </label>
+          {/* O status não é escolhido aqui: sai das datas. Ver docs/MODULO-COMPETICOES.md §7. */}
+          <div className="bg-federation/10 border border-federation/30 rounded-lg px-4 py-3">
+            <p className="font-body text-gray-soft text-xs leading-relaxed">
+              O status é calculado automaticamente pelas datas (em breve → em andamento → encerrado).
+              Para abrir inscrições, adiar ou encerrar antes do prazo, use os botões no painel de gerenciamento.
+            </p>
+          </div>
+
+          {erro && (
+            <div className="flex items-start gap-3 bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3">
+              <TriangleAlert size={16} className="text-red-400 shrink-0 mt-0.5" />
+              <p className="font-body text-red-400 text-sm">{erro}</p>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
-        <div className="p-5 border-t border-federation/20 flex items-center justify-between gap-3">
-          {SELO_DEMO}
-          <div className="flex gap-3">
-            <button
-              onClick={onClose}
-              className="font-display text-gray-soft border border-federation/30 hover:border-federation/60 px-5 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={onClose}
-              className="font-display text-night bg-gold hover:bg-gold-light px-5 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250 flex items-center gap-2"
-            >
-              <Check size={16} />
-              Criar
-            </button>
-          </div>
+        <div className="p-5 border-t border-federation/20 flex items-center justify-end gap-3">
+          <button
+            onClick={onClose}
+            disabled={salvando}
+            className="font-display text-gray-soft border border-federation/30 hover:border-federation/60 px-5 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250 disabled:opacity-50"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={salvar}
+            disabled={!podeSalvar}
+            className="font-display text-night bg-gold hover:bg-gold-light px-5 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Check size={16} />
+            {salvando ? 'Salvando...' : editando ? 'Salvar' : 'Criar'}
+          </button>
         </div>
       </div>
     </div>
@@ -1660,20 +1546,56 @@ function CriarModal({ onClose }: { onClose: () => void }) {
 export function CompeticoesPage() {
   const [filtro, setFiltro] = useState<FiltroStatus>('todos');
   const [criarAberto, setCriarAberto] = useState<boolean>(false);
+  const [editando, setEditando] = useState<Competicao | null>(null);
   const [gerenciando, setGerenciando] = useState<Competicao | null>(null);
+  const [deletando, setDeletando] = useState<Competicao | null>(null);
+  const [deletandoAgora, setDeletandoAgora] = useState(false);
+  const [competicoes, setCompeticoes] = useState<Competicao[]>([]);
+  const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState('');
 
-  const listaFiltrada = filtro === 'todos' ? COMPETICOES : COMPETICOES.filter((c) => c.status === filtro);
+  const carregar = useCallback(async () => {
+    try {
+      setCompeticoes(await apiGet<CompeticaoDTO[]>('/api/competicoes'));
+      setErro('');
+    } catch (e) {
+      setErro(msgErro(e));
+    } finally {
+      setCarregando(false);
+    }
+  }, []);
+
+  useEffect(() => { void carregar(); }, [carregar]);
+
+  const listaFiltrada = filtro === 'todos' ? competicoes : competicoes.filter((c) => c.status === filtro);
 
   const contar = (valor: FiltroStatus): number =>
-    valor === 'todos' ? COMPETICOES.length : COMPETICOES.filter((c) => c.status === valor).length;
+    valor === 'todos' ? competicoes.length : competicoes.filter((c) => c.status === valor).length;
 
-  const handleEditar = (_c: Competicao) => {
+  const abrirCriacao = () => {
+    setEditando(null);
     setCriarAberto(true);
   };
 
-  const handleDeletar = (_c: Competicao) => {
-    // mock — ação de demonstração
+  const handleEditar = (c: Competicao) => {
+    setEditando(c);
+    setCriarAberto(true);
   };
+
+  async function confirmarDelecao() {
+    if (!deletando || deletandoAgora) return;
+    setDeletandoAgora(true);
+    try {
+      await apiDelete(`/api/competicoes/${deletando.id}`);
+      setDeletando(null);
+      await carregar();
+    } catch (e) {
+      setErro(msgErro(e));
+      setDeletando(null);
+    } finally {
+      setDeletandoAgora(false);
+    }
+  }
 
   return (
     <>
@@ -1686,13 +1608,20 @@ export function CompeticoesPage() {
           </p>
         </div>
         <button
-          onClick={() => setCriarAberto(true)}
+          onClick={abrirCriacao}
           className="font-display text-night bg-gold hover:bg-gold-light px-5 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250 flex items-center gap-2"
         >
           <Plus size={16} />
           Nova competição
         </button>
       </div>
+
+      {erro && (
+        <div className="flex items-start gap-3 bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 mb-6">
+          <TriangleAlert size={16} className="text-red-400 shrink-0 mt-0.5" />
+          <p className="font-body text-red-400 text-sm">{erro}</p>
+        </div>
+      )}
 
       {/* Filtros por status */}
       <div className="flex items-center gap-2 flex-wrap mb-6">
@@ -1722,10 +1651,20 @@ export function CompeticoesPage() {
       </div>
 
       {/* Lista de competições */}
-      {listaFiltrada.length === 0 ? (
+      {carregando ? (
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+          {[0, 1].map((i) => (
+            <div key={i} className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl h-52 animate-pulse" />
+          ))}
+        </div>
+      ) : listaFiltrada.length === 0 ? (
         <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-10 flex flex-col items-center gap-3">
           <Trophy size={32} className="text-gray-soft/50" />
-          <p className="font-body text-gray-soft text-sm">Nenhuma competição com este status.</p>
+          <p className="font-body text-gray-soft text-sm">
+            {competicoes.length === 0
+              ? 'Nenhuma competição cadastrada. Crie a primeira em "Nova competição".'
+              : 'Nenhuma competição com este status.'}
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
@@ -1735,23 +1674,75 @@ export function CompeticoesPage() {
               comp={comp}
               onGerenciar={setGerenciando}
               onEditar={handleEditar}
-              onDeletar={handleDeletar}
+              onDeletar={setDeletando}
             />
           ))}
         </div>
       )}
 
       {/* Modais / painéis */}
-      {criarAberto && <CriarModal onClose={() => setCriarAberto(false)} />}
+      {criarAberto && (
+        <CriarModal
+          editando={editando}
+          onClose={() => { setCriarAberto(false); setEditando(null); }}
+          onSalvo={carregar}
+        />
+      )}
       {gerenciando && (
         <PainelFullscreen
           comp={gerenciando}
           onClose={() => setGerenciando(null)}
+          onAtualizado={(c) => { setGerenciando(c); void carregar(); }}
           onEditar={() => {
+            setEditando(gerenciando);
             setGerenciando(null);
             setCriarAberto(true);
           }}
         />
+      )}
+
+      {/* Confirmação de exclusão */}
+      {deletando && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+          style={{ backgroundColor: 'rgba(0,0,0,0.78)' }}
+          onClick={() => setDeletando(null)}
+        >
+          <div
+            className="bg-[#0a1628] border border-federation/30 rounded-2xl w-full max-w-sm shadow-2xl p-6 flex flex-col gap-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3">
+              <span className="w-11 h-11 rounded-xl bg-red-500/10 border border-red-500/30 flex items-center justify-center shrink-0">
+                <TriangleAlert size={20} className="text-red-400" />
+              </span>
+              <h3 className="font-display text-fht-white text-xl tracking-wide leading-tight">
+                DELETAR COMPETIÇÃO?
+              </h3>
+            </div>
+            <p className="font-body text-gray-soft text-sm">
+              <span className="text-fht-white">{deletando.nome}</span> será removida permanentemente,
+              junto com tudo que estiver ligado a ela. Esta ação não pode ser desfeita.
+            </p>
+            <div className="flex justify-end gap-3 pt-1">
+              <button
+                onClick={() => setDeletando(null)}
+                disabled={deletandoAgora}
+                className="font-display text-gray-soft border border-federation/30 hover:border-federation/60 px-5 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmarDelecao}
+                disabled={deletandoAgora}
+                className="font-display text-fht-white bg-red-500/20 border border-red-500/40 hover:bg-red-500/30 px-5 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Trash2 size={16} />
+                {deletandoAgora ? 'Deletando...' : 'Deletar'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

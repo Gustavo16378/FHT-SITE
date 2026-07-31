@@ -1,6 +1,7 @@
 package br.org.fht.service;
 
 import br.org.fht.common.CPFValidator;
+import br.org.fht.common.Fuso;
 import br.org.fht.common.OrigemRequisicao;
 import br.org.fht.dto.atleta.AtletaDocumentosForm;
 import br.org.fht.dto.atleta.AtletaForm;
@@ -78,7 +79,7 @@ public class AtletaServiceImpl implements AtletaService {
         }
 
         // LGPD art. 14: atleta menor exige dados e consentimento do responsável legal.
-        boolean menor = nascimento.plusYears(18).isAfter(LocalDate.now());
+        boolean menor = nascimento.plusYears(18).isAfter(Fuso.hoje());
         if (menor) {
             validarResponsavel(form);
         }
@@ -216,7 +217,7 @@ public class AtletaServiceImpl implements AtletaService {
         } catch (java.time.format.DateTimeParseException e) {
             throw new ValidationException("dataNascimento", "Data de nascimento inválida (use AAAA-MM-DD)");
         }
-        if (nascimento.isAfter(LocalDate.now())) {
+        if (nascimento.isAfter(Fuso.hoje())) {
             throw new ValidationException("dataNascimento", "Data de nascimento não pode ser no futuro");
         }
         return nascimento;
@@ -300,7 +301,7 @@ public class AtletaServiceImpl implements AtletaService {
 
         if (!Boolean.TRUE.equals(form.consentimentoCadastro())) return;
 
-        if (!atleta.isMenorDeIdade(LocalDate.now())) {
+        if (!atleta.isMenorDeIdade(Fuso.hoje())) {
             throw new ValidationException("consentimentoCadastro",
                     "Consentimento de responsável só se aplica a atleta menor de idade");
         }
@@ -377,7 +378,7 @@ public class AtletaServiceImpl implements AtletaService {
         }
 
         // Menor sem o consentimento do responsável não pode ser ativado (LGPD art. 14, §1).
-        if (atleta.isMenorDeIdade(LocalDate.now()) && !temConsentimentoCadastro(id)) {
+        if (atleta.isMenorDeIdade(Fuso.hoje()) && !temConsentimentoCadastro(id)) {
             throw new ValidationException("consentimentoCadastro",
                     "Atleta menor de idade sem consentimento do responsável legal — aprovação bloqueada (LGPD art. 14)");
         }

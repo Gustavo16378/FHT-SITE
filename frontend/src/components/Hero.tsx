@@ -1,24 +1,63 @@
 import { useEffect, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
+import { apiGet } from '../services/api'
+import type { ArbitroPublicoDTO, ClubeVitrineDTO, CompeticaoPublicaDTO } from '../types/api'
 
-const stats = [
-  { value: '8', label: 'Clubes Filiados' },
-  { value: '320+', label: 'Atletas Cadastrados' },
-  { value: '4', label: 'Competições Ativas' },
-  { value: '18', label: 'Árbitros Credenciados' },
-]
+/** Rótulos fixos; os números vêm das APIs públicas — nada de contagem inventada aqui. */
+const STAT_LABELS = ['Clubes Filiados', 'Atletas Cadastrados', 'Competições Ativas', 'Árbitros Credenciados']
 
-const nextCompetition = {
-  name: 'Copa FHT Sub-18 Feminino',
-  status: 'Inscrições Abertas',
+const STATUS_LABEL: Partial<Record<CompeticaoPublicaDTO['status'], string>> = {
+  INSCRICOES_ABERTAS: 'Inscrições Abertas',
+  EM_ANDAMENTO: 'Em Andamento',
+  EM_BREVE: 'Em Breve',
+}
+
+/**
+ * A competição em destaque: a que está com inscrições abertas ou em andamento;
+ * na falta das duas, a próxima que ainda vai começar.
+ */
+function competicaoDestaque(comps: CompeticaoPublicaDTO[]): CompeticaoPublicaDTO | null {
+  const emCurso = comps
+    .filter(c => c.status === 'INSCRICOES_ABERTAS' || c.status === 'EM_ANDAMENTO')
+    .sort((a, b) => a.dataInicio.localeCompare(b.dataInicio))
+  if (emCurso.length > 0) return emCurso[0]
+
+  const hoje = new Date().toISOString().slice(0, 10)
+  const futuras = comps
+    .filter(c => c.status === 'EM_BREVE' && c.dataInicio >= hoje)
+    .sort((a, b) => a.dataInicio.localeCompare(b.dataInicio))
+  return futuras[0] ?? null
 }
 
 export default function Hero() {
   const [visible, setVisible] = useState(false)
+  const [stats, setStats] = useState<(number | null)[]>([null, null, null, null])
+  const [destaque, setDestaque] = useState<CompeticaoPublicaDTO | null>(null)
 
   useEffect(() => {
     const t = setTimeout(() => setVisible(true), 100)
     return () => clearTimeout(t)
+  }, [])
+
+  useEffect(() => {
+    let ativo = true
+    // Cada número tem sua própria fonte: se uma API falhar, as outras continuam valendo.
+    // Falha vira `null` (renderiza "—"), nunca 0 — senão o site anunciaria a federação zerada.
+    const clubesP = apiGet<ClubeVitrineDTO[]>('/api/clubes/publico').catch(() => null)
+    const compsP = apiGet<CompeticaoPublicaDTO[]>('/api/competicoes/publico').catch(() => null)
+    const arbitrosP = apiGet<ArbitroPublicoDTO[]>('/api/arbitros/publico').catch(() => null)
+
+    Promise.all([clubesP, compsP, arbitrosP]).then(([clubes, competicoes, arbitros]) => {
+      if (!ativo) return
+      setStats([
+        clubes && clubes.length,
+        clubes && clubes.reduce((soma, c) => soma + (c.totalAtletas ?? 0), 0),
+        competicoes && competicoes.filter(c => c.status === 'EM_ANDAMENTO' || c.status === 'INSCRICOES_ABERTAS').length,
+        arbitros && arbitros.length,
+      ])
+      if (competicoes) setDestaque(competicaoDestaque(competicoes))
+    }).catch(() => { /* já tratado por fonte */ })
+    return () => { ativo = false }
   }, [])
 
   return (
@@ -35,19 +74,24 @@ export default function Hero() {
 
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 sm:pt-24 pb-10 sm:pb-20">
 
-        {/* Badge próxima competição */}
-        <div
-          className={`inline-flex flex-wrap items-center gap-2 bg-federation/30 border border-federation/50 rounded-full px-3 sm:px-4 py-1.5 sm:py-2 mb-4 sm:mb-8 transition-[opacity,transform] duration-700 ${
-            visible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'
-          }`}
-        >
-          <span className="w-2 h-2 rounded-full bg-gold animate-pulse flex-shrink-0" />
-          <span className="font-body text-gray-soft text-xs sm:text-sm">Próxima competição:</span>
-          <span className="font-body text-fht-white text-xs sm:text-sm font-semibold">{nextCompetition.name}</span>
-          <span className="font-body text-gold text-xs font-semibold border border-gold/40 rounded-full px-2 py-0.5 whitespace-nowrap">
-            {nextCompetition.status}
-          </span>
-        </div>
+        {/* Badge da competição em destaque — some quando não há nenhuma cadastrada */}
+        {destaque && (
+          <a
+            href="#competicoes"
+            className={`inline-flex flex-wrap items-center gap-2 bg-federation/30 border border-federation/50 hover:border-gold/50 rounded-full px-3 sm:px-4 py-1.5 sm:py-2 mb-4 sm:mb-8 transition-[opacity,transform,border-color] duration-700 ${
+              visible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-gold animate-pulse flex-shrink-0" />
+            <span className="font-body text-gray-soft text-xs sm:text-sm">
+              {destaque.status === 'EM_ANDAMENTO' ? 'Acontecendo agora:' : 'Próxima competição:'}
+            </span>
+            <span className="font-body text-fht-white text-xs sm:text-sm font-semibold">{destaque.nome}</span>
+            <span className="font-body text-gold text-xs font-semibold border border-gold/40 rounded-full px-2 py-0.5 whitespace-nowrap">
+              {STATUS_LABEL[destaque.status] ?? 'Confira'}
+            </span>
+          </a>
+        )}
 
         {/* Título */}
         <h1
@@ -96,10 +140,12 @@ export default function Hero() {
             visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
           }`}
         >
-          {stats.map((stat, i) => (
-            <div key={i} className="border-l-2 border-gold/50 pl-4">
-              <p className="font-display text-gold text-3xl sm:text-5xl leading-none">{stat.value}</p>
-              <p className="font-body text-gray-soft text-xs mt-1">{stat.label}</p>
+          {STAT_LABELS.map((label, i) => (
+            <div key={label} className="border-l-2 border-gold/50 pl-4">
+              <p className="font-display text-gold text-3xl sm:text-5xl leading-none">
+                {stats[i] ?? '—'}
+              </p>
+              <p className="font-body text-gray-soft text-xs mt-1">{label}</p>
             </div>
           ))}
         </div>

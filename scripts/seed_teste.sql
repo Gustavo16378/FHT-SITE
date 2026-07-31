@@ -147,3 +147,48 @@ VALUES
  ('eeeeeeee-0000-0000-0000-000000000004', 'Fábio Martins Rocha', '222.333.444-10', '1988-06-15', 'Masculino', '(63) 98333-1010', 'fabio.arb@email.com', 'Palmas', 'TO', 'https://i.pravatar.cc/150?img=12', false, true, true, NULL, NULL, NULL, NULL, 'PENDENTE', NOW(), NOW()),
  ('eeeeeeee-0000-0000-0000-000000000005', 'Patrícia Gomes Lima', '222.333.444-11', '1990-12-01', 'Feminino', '(63) 98333-1011', 'patricia.arb@email.com', 'Araguaína', 'TO', 'https://i.pravatar.cc/150?img=44', true, true, false, 'Regional', 'ARB-TO-0055', '2019', 'Curso de Formação CBHb 2019', 'SUSPENSO', NOW(), NOW())
 ON CONFLICT (id) DO NOTHING;
+
+-- ── Competições (V13) — cobre os status derivados e o override manual ───
+-- O status NÃO é gravado: sai das datas. Por isso as datas são relativas a NOW(),
+-- pra o seed continuar cobrindo os 3 estados independente de quando for rodado.
+INSERT INTO competicoes (id, nome, descricao, data_inicio, data_fim, local, cidade, uf, temporada, numero_equipes, cor, status_override, visivel_na_home)
+VALUES
+ -- futura → deriva EM_BREVE
+ ('cccccccc-0000-0000-0000-000000000001', 'Campeonato Tocantinense Adulto',
+  'Principal competição do estado, disputada em turno e returno.',
+  (NOW() + INTERVAL '40 days')::date, (NOW() + INTERVAL '120 days')::date,
+  'Ginásio Ayrton Senna', 'Palmas', 'TO', EXTRACT(YEAR FROM NOW())::int, 8, '#1A3A8F', NULL, TRUE),
+ -- acontecendo → deriva EM_ANDAMENTO
+ ('cccccccc-0000-0000-0000-000000000002', 'Copa FHT Sub-18 Feminino',
+  'Competição de base feminina, categoria Sub-18.',
+  (NOW() - INTERVAL '10 days')::date, (NOW() + INTERVAL '20 days')::date,
+  'Centro Esportivo Governador', 'Palmas', 'TO', EXTRACT(YEAR FROM NOW())::int, 6, '#1E4DB7', NULL, TRUE),
+ -- futura, mas com override manual → INSCRICOES_ABERTAS vence a derivação
+ ('cccccccc-0000-0000-0000-000000000003', 'Festival de Handebol Sub-14 e Sub-12',
+  'Festival de base, sem caráter competitivo.',
+  (NOW() + INTERVAL '25 days')::date, (NOW() + INTERVAL '27 days')::date,
+  'Ginásio Municipal', 'Araguaína', 'TO', EXTRACT(YEAR FROM NOW())::int, 10, '#1A3A8F', 'INSCRICOES_ABERTAS', TRUE),
+ -- passada → deriva ENCERRADO
+ ('cccccccc-0000-0000-0000-000000000004', 'Campeonato Estadual Adulto Feminino',
+  'Edição do ano passado, mantida para consulta dos resultados.',
+  (NOW() - INTERVAL '380 days')::date, (NOW() - INTERVAL '300 days')::date,
+  'Ginásio Ayrton Senna', 'Palmas', 'TO', (EXTRACT(YEAR FROM NOW()) - 1)::int, 6, '#1A3A8F', NULL, TRUE),
+ -- oculta da home → só o admin enxerga
+ ('cccccccc-0000-0000-0000-000000000005', 'Circuito Interior Sub-16 (rascunho)',
+  'Ainda sendo montado — não deve aparecer no site.',
+  (NOW() + INTERVAL '60 days')::date, (NOW() + INTERVAL '90 days')::date,
+  'Diversas cidades', 'Palmas', 'TO', EXTRACT(YEAR FROM NOW())::int, 0, '#1E4DB7', NULL, FALSE)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO competicao_categorias (competicao_id, categoria)
+VALUES
+ ('cccccccc-0000-0000-0000-000000000001', 'adulto'),
+ ('cccccccc-0000-0000-0000-000000000001', 'masculino'),
+ ('cccccccc-0000-0000-0000-000000000002', 'sub-18'),
+ ('cccccccc-0000-0000-0000-000000000002', 'feminino'),
+ ('cccccccc-0000-0000-0000-000000000003', 'sub-14'),
+ ('cccccccc-0000-0000-0000-000000000003', 'sub-12'),
+ ('cccccccc-0000-0000-0000-000000000004', 'adulto'),
+ ('cccccccc-0000-0000-0000-000000000004', 'feminino'),
+ ('cccccccc-0000-0000-0000-000000000005', 'sub-16')
+ON CONFLICT DO NOTHING;

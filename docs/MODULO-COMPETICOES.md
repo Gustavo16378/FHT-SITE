@@ -260,3 +260,75 @@ Entidades novas (package `br.org.fht.model`), com migrations Flyway `V6+`:
 6. Check-in de atletas por jogo (`PartidaAtleta`).
 7. ~~Perfil ATLETA + tela "minhas partidas / jogos do clube"~~ → **em suspenso** (ver §7: análise de
    custo/peso). Não fazer agora. Se voltar, avaliar versão sem login.
+
+---
+
+## 9. ✅ FATIA 1 IMPLEMENTADA (jul/2026 — 7º módulo mock→real)
+
+O módulo foi **fatiado em 6** porque não cabe inteiro no prazo de agosto/2026. A **Fatia 1 está
+pronta e validada**; as demais seguem no papel. O fatiamento saiu de um mapeamento com 6 agentes
+sobre o doc, o mock do admin, o site público, o padrão dos módulos já convertidos e as integrações.
+
+| # | Fatia | Estado |
+|---|---|---|
+| **1** | **CRUD de competição + vitrine pública real** | ✅ **feito** |
+| 2 | Equipes participantes + jogos + placares + modal público de detalhes | pendente |
+| 3 | Inscrição pelo clube + escalação com elegibilidade (anuidade) | pendente |
+| 4 | Check-in do dia + painel operacional ao vivo | pendente |
+| 5 | Agregados/históricos (mata os mocks restantes dos painéis) | pendente |
+| 6 | Chaveamento, classificação, artilharia, troca de atleta | pendente |
+
+### O que a Fatia 1 entrega
+A federação cadastra competições de verdade e elas aparecem no site. **Competições era o último
+consumidor de `src/data/*.ts`** — com esta fatia, nenhuma tela do site público depende mais de
+arquivo estático.
+
+### Status derivado — a decisão do §7 virou código
+Não existe coluna `status`. `Competicao.getStatusEfetivo()` calcula:
+
+```
+sem override:  hoje < dataInicio → EM_BREVE
+               dataInicio ≤ hoje ≤ dataFim → EM_ANDAMENTO
+               hoje > dataFim → ENCERRADO
+com override:  o override vence sempre
+```
+
+`status_override` só aceita `INSCRICOES_ABERTAS`, `EM_ANDAMENTO`, `ENCERRADO`, `ADIADO`, `CANCELADO`
+(CHECK na migration + validação no service). O admin volta ao automático com um clique — é o
+`PATCH /status-automatico`, que limpa o override.
+
+### Backend (migration V13)
+- `competicoes` + `competicao_categorias` (tabela auxiliar, não CSV — o filtro por categoria pode
+  descer pro banco quando precisar).
+- `CompeticaoResource`: `POST` / `GET` / `GET /{id}` / `PUT` / `DELETE` (ADMIN_FHT),
+  `PATCH /{id}/status`, `PATCH /{id}/status-automatico`, `PATCH /{id}/vitrine` (ADMIN_FHT),
+  e os públicos `GET /publico` e `GET /publico/{id}`.
+- Os caminhos literais (`/publico`) são declarados **antes** dos path params — o cuidado que
+  Notícias precisou ter para não colidir.
+- `CompeticaoPublicaDTO` é enxuto de propósito: sem `statusOverride`, `visivelNaHome` nem timestamps.
+- Competição **cancelada** ou **oculta** não sai no público (nem na lista nem no detalhe).
+- `numeroEquipes` é informado à mão nesta fatia; na Fatia 2 passa a ser `count(participacoes)`.
+
+### Frontend
+- `Competitions.tsx` consome a API, com estados de **carregando / erro / vazio**, e cobre os **6**
+  status (o mapa antigo só previa 4 — status novo renderizaria badge em branco).
+- `Hero.tsx` parou de mentir: clubes, atletas, competições ativas e árbitros vêm das APIs públicas,
+  e o badge de competição em destaque some quando não há nenhuma cadastrada.
+- `CompeticoesPage.tsx` (admin): lista/criar/editar/deletar/ciclo de vida na API real. Foram
+  **removidas 285 linhas de dados fictícios** — dado falso não vai pro ar. Os componentes de UI das
+  fatias 2-4 (chaveamento, check-in, jogos) ficaram no arquivo e hoje exibem estado vazio.
+- `frontend/src/data/competitions.ts` **deletado**.
+
+### Validado rodando (Docker + Postgres)
+Migration aplicada; os 3 status derivados corretos (futura/atual/passada); override vencendo a
+derivação e voltando ao automático; validações retornando 422 (data fim < início, categoria
+inválida, nome vazio, status inválido); vitrine escondendo do público mas não do admin; cancelada
+fora do site; `PUT` parcial preservando os campos não enviados; e as permissões (401 sem token,
+403 para ADMIN_CLUBE em todos os endpoints administrativos).
+
+### Pendências conhecidas desta fatia
+- O card público **ainda não é clicável** — o modal de detalhes é Fatia 2 (precisa de jogos e equipes).
+- O CTA "INSCREVER EQUIPE" leva ao `/login` quando não há link externo cadastrado; a inscrição pelo
+  sistema é Fatia 3. **Decisão ainda pendente** (§7): botão público cria solicitação ou o admin
+  adiciona os clubes na mão?
+- `regulamentoUrl` existe na tabela e nos DTOs, mas o upload do arquivo é Fatia 2.

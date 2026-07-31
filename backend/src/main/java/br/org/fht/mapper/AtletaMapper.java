@@ -1,11 +1,11 @@
 package br.org.fht.mapper;
 
+import br.org.fht.common.Fuso;
 import br.org.fht.dto.atleta.AtletaResponseDTO;
 import br.org.fht.dto.atleta.ConsentimentoDTO;
 import br.org.fht.model.Atleta;
 import br.org.fht.model.Consentimento;
 
-import java.time.LocalDate;
 import java.util.List;
 
 public class AtletaMapper {
@@ -33,7 +33,7 @@ public class AtletaMapper {
                 a.getCategoria(),
                 a.isTransferencia(),
                 a.getClubeAnterior(),
-                a.isMenorDeIdade(LocalDate.now()),
+                a.isMenorDeIdade(Fuso.hoje()),
                 a.getResponsavelNome(),
                 a.getResponsavelCpf(),
                 a.getResponsavelParentesco(),

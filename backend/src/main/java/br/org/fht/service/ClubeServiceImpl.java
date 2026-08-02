@@ -1,5 +1,6 @@
 package br.org.fht.service;
 
+import br.org.fht.common.Escopo;
 import br.org.fht.dto.clube.AtletaVitrineDTO;
 import br.org.fht.dto.clube.ClubeForm;
 import br.org.fht.dto.clube.ClubeResponseDTO;
@@ -78,12 +79,9 @@ public class ClubeServiceImpl implements ClubeService {
         Clube clube = clubeRepository.findByIdOptional(id)
                 .orElseThrow(() -> new WebApplicationException("Clube não encontrado", 404));
 
-        String role = jwt.getClaim("role");
-        if ("ADMIN_CLUBE".equals(role)) {
-            String clubeIdJwt = jwt.getClaim("clubeId");
-            if (!id.toString().equals(clubeIdJwt)) {
-                throw new WebApplicationException("Acesso negado", 403);
-            }
+        // Allowlist: só a federação alcança qualquer clube; os demais, apenas o próprio.
+        if (!Escopo.ehAdminFederacao(jwt) && !id.equals(Escopo.clubeDoToken(jwt))) {
+            throw new WebApplicationException("Acesso negado", 403);
         }
 
         return ClubeMapper.toResponse(clube);
@@ -95,12 +93,9 @@ public class ClubeServiceImpl implements ClubeService {
         Clube clube = clubeRepository.findByIdOptional(id)
                 .orElseThrow(() -> new WebApplicationException("Clube não encontrado", 404));
 
-        // Escopo: ADMIN_CLUBE só edita o próprio clube; ADMIN_FHT edita qualquer um.
-        if ("ADMIN_CLUBE".equals((String) jwt.getClaim("role"))) {
-            String clubeIdJwt = jwt.getClaim("clubeId");
-            if (!id.toString().equals(clubeIdJwt)) {
-                throw new WebApplicationException("Acesso negado", 403);
-            }
+        // Escopo: só ADMIN_FHT edita qualquer clube; os demais, apenas o próprio.
+        if (!Escopo.ehAdminFederacao(jwt) && !id.equals(Escopo.clubeDoToken(jwt))) {
+            throw new WebApplicationException("Acesso negado", 403);
         }
 
         // Atualização parcial — não mexe em status, documentos nem filiação.

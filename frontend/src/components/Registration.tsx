@@ -79,9 +79,24 @@ export default function Registration() {
     if (cpfErr || cnpjErr || !agreed) return
     setStatus('loading')
     try {
+      // Mapeamento EXPLÍCITO para os nomes que o ClubeForm do backend espera. Antes isto era
+      // um Object.entries cego sobre o estado do form, e as chaves não batiam com nenhum campo
+      // do backend (nomeClube vs nome, nomeRepresentante vs representanteNome, ataFundacao vs
+      // ata...): todos os campos obrigatórios chegavam nulos e o endpoint devolvia 500.
       const data = new FormData()
-      Object.entries(form).forEach(([k, v]) => { if (v) data.append(k, v) })
-      if (ata) data.append('ataFundacao', ata)
+      const campos: Record<string, string> = {
+        nome: form.nomeClube,
+        sigla: form.sigla,
+        cidade: form.cidade,
+        uf: form.uf,
+        cnpj: form.cnpj,
+        representanteNome: form.nomeRepresentante,
+        representanteEmail: form.emailRepresentante,
+        representanteTelefone: form.telefoneRepresentante,
+        representanteCargo: form.cargo,
+      }
+      Object.entries(campos).forEach(([k, v]) => { if (v) data.append(k, v) })
+      if (ata) data.append('ata', ata)
       if (estatuto) data.append('estatuto', estatuto)
 
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/clubes/solicitar`, {

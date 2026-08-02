@@ -41,17 +41,6 @@ const statusLabel: Record<AtletaStatus, string> = {
   SUSPENSO: 'Suspenso',
 }
 
-/** Quanto falta para o cadastro ser apagado por falta de comprovante. */
-function prazoRestante(iso: string | null): { texto: string; vencido: boolean } | null {
-  if (!iso) return null
-  const alvo = new Date(iso).getTime()
-  if (isNaN(alvo)) return null
-  const restanteMs = alvo - Date.now()
-  if (restanteMs <= 0) return { texto: 'prazo vencido', vencido: true }
-  const horas = Math.floor(restanteMs / 3_600_000)
-  const minutos = Math.floor((restanteMs % 3_600_000) / 60_000)
-  return { texto: horas > 0 ? `${horas}h${minutos.toString().padStart(2, '0')}` : `${minutos} min`, vencido: false }
-}
 
 const clubeStatusBadge: Record<ClubeStatus, string> = {
   ATIVO: 'text-green-400 bg-green-500/10 border-green-500/30',
@@ -402,14 +391,12 @@ function AtletaDetailPanel({ atleta, onClose, onSaved }: {
     </div>
   )
 
+  // O comprovante de pagamento saiu daqui: agora é um só, do lote pago pelo clube.
   const docs = [
     { label: 'Foto 3x4', url: atleta.fotoUrl, campo: 'foto', accept: 'image/*' },
     { label: 'RG digitalizado', url: atleta.rgUrl, campo: 'rgDoc', accept: '.pdf,image/*' },
     { label: 'Comprovante de residência', url: atleta.comprovanteResidenciaUrl, campo: 'comprovanteResidencia', accept: '.pdf,image/*' },
-    { label: 'Comprovante de pagamento Pix', url: atleta.comprovantePagamentoUrl, campo: 'comprovantePix', accept: '.pdf,image/*' },
   ]
-
-  const prazo = prazoRestante(atleta.prazoPagamentoAte)
 
   return (
     <div className="fixed inset-0 z-50 flex" onClick={onClose}>
@@ -446,18 +433,13 @@ function AtletaDetailPanel({ atleta, onClose, onSaved }: {
           )}
 
           {atleta.status === 'AGUARDANDO_PAGAMENTO' && (
-            <div className={`flex items-start gap-3 rounded-lg px-4 py-3 border ${
-              prazo?.vencido ? 'bg-red-500/10 border-red-500/30' : 'bg-yellow-500/10 border-yellow-500/30'
-            }`}>
-              <AlertCircle size={16} className={`flex-shrink-0 mt-0.5 ${prazo?.vencido ? 'text-red-400' : 'text-yellow-400'}`} />
+            <div className="flex items-start gap-3 rounded-lg px-4 py-3 border bg-yellow-500/10 border-yellow-500/30">
+              <AlertCircle size={16} className="flex-shrink-0 mt-0.5 text-yellow-400" />
               <div>
-                <p className={`font-display text-sm ${prazo?.vencido ? 'text-red-400' : 'text-yellow-400'}`}>
-                  Comprovante de pagamento pendente
-                </p>
+                <p className="font-display text-sm text-yellow-400">Anuidade pendente</p>
                 <p className="font-body text-gray-soft text-xs mt-1 leading-relaxed">
-                  {prazo?.vencido
-                    ? 'O prazo venceu — este cadastro será apagado na próxima limpeza automática. Anexe o comprovante o quanto antes.'
-                    : `Faltam ${prazo?.texto ?? '—'} para o cadastro ser apagado automaticamente. Anexe o comprovante Pix em Documentos, abaixo.`}
+                  Este atleta entra no próximo pagamento do clube. Use o botão de pagamento na aba
+                  <span className="text-fht-white"> Meus Atletas</span> para quitar a anuidade de todos de uma vez.
                 </p>
               </div>
             </div>
@@ -693,7 +675,6 @@ function CadastrarAtletaPage({ onSuccess }: { onSuccess: () => void }) {
   const [foto, setFoto] = useState<File | null>(null)
   const [rgDoc, setRgDoc] = useState<File | null>(null)
   const [compRes, setCompRes] = useState<File | null>(null)
-  const [compPix, setCompPix] = useState<File | null>(null)
   const [status, setStatus] = useState<'idle'|'loading'|'error'>('idle')
   const [errMessage, setErrMessage] = useState('')
 
@@ -782,7 +763,6 @@ function CadastrarAtletaPage({ onSuccess }: { onSuccess: () => void }) {
       if (foto) data.append('foto', foto)
       if (rgDoc) data.append('rgDoc', rgDoc)
       if (compRes) data.append('comprovanteResidencia', compRes)
-      if (compPix) data.append('comprovantePix', compPix)
 
       await apiPostForm('/api/atletas', data)
       onSuccess()
@@ -1015,21 +995,6 @@ function CadastrarAtletaPage({ onSuccess }: { onSuccess: () => void }) {
             <FileBtn file={compRes} onChange={setCompRes} label="Comprovante de residência (PDF ou imagem)"
               accept=".pdf,image/*" hint="Pode ser anexado depois, pelo painel do clube." />
 
-            {/* QR Code PIX */}
-            <div className="bg-gold/5 border border-gold/30 rounded-xl p-5 flex flex-col sm:flex-row items-center gap-5">
-              <div className="w-28 h-28 bg-fht-white rounded-lg flex items-center justify-center flex-shrink-0">
-                <span className="font-body text-night text-xs text-center px-2">QR Code PIX FHT aqui</span>
-              </div>
-              <div>
-                <p className="font-display text-gold text-lg leading-none mb-1">TAXA DE CADASTRO</p>
-                <p className="font-display text-fht-white text-3xl mb-2">R$ 35,00 <span className="text-gray-soft text-base font-body font-normal">/ atleta / ano</span></p>
-                <p className="font-body text-gray-soft text-xs leading-relaxed">Pague via PIX e anexe o comprovante abaixo. A FHT irá validar e ativar o atleta em até 2 dias úteis.</p>
-              </div>
-            </div>
-
-            <FileBtn file={compPix} onChange={setCompPix} label="Comprovante de pagamento PIX" accept="image/*,.pdf"
-              hint="Se o comprovante ainda não chegou, pode cadastrar sem ele e anexar depois na aba Atletas." />
-
             {/* Para menores este aceite fica na etapa do responsável, quem tem que consentir é ele. */}
             {!menor && (
               <ConsentBox checked={form.consentimentoImagem}
@@ -1040,15 +1005,14 @@ function CadastrarAtletaPage({ onSuccess }: { onSuccess: () => void }) {
               </ConsentBox>
             )}
 
-            {!compPix && (
-              <div className="flex items-start gap-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg px-4 py-3">
-                <AlertCircle size={16} className="text-yellow-400 flex-shrink-0 mt-0.5" />
-                <p className="font-body text-yellow-400 text-xs leading-relaxed">
-                  Sem o comprovante, o cadastro fica com <span className="font-display">24 horas</span> para o
-                  pagamento ser anexado. Passado o prazo, ele é apagado automaticamente.
-                </p>
-              </div>
-            )}
+            <div className="flex items-start gap-3 bg-federation/10 border border-federation/30 rounded-lg px-4 py-3">
+              <AlertCircle size={16} className="text-gold flex-shrink-0 mt-0.5" />
+              <p className="font-body text-gray-soft text-xs leading-relaxed">
+                Não é preciso pagar agora. Cadastre todos os atletas e, quando quiser, use o
+                <span className="text-fht-white"> botão de pagamento</span> na aba Meus Atletas para
+                quitar a anuidade de todos de uma vez, com um comprovante só.
+              </p>
+            </div>
 
             {!rgDoc && (
               <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3">

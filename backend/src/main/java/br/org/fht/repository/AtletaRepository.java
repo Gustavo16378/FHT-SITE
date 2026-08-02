@@ -28,9 +28,12 @@ public class AtletaRepository implements PanacheRepositoryBase<Atleta, UUID> {
         return find("clubeId = ?1 AND id = ?2", clubeId, atletaId).firstResultOptional();
     }
 
-    /** Cadastros que estouraram o prazo sem o comprovante de pagamento — alvo do expurgo. */
-    public List<Atleta> findPagamentoExpirado(LocalDateTime agora) {
-        return list("status = ?1 AND prazoPagamentoAte IS NOT NULL AND prazoPagamentoAte < ?2",
-                "AGUARDANDO_PAGAMENTO", agora);
+    /**
+     * Cadastros abandonados: nunca foram pagos e já passaram do prazo de tolerância.
+     * Conta do cadastro, não de um prazo por atleta — o pagamento agora é em lote, quando o
+     * clube puder. Alvo do AtletaExpurgoJob.
+     */
+    public List<Atleta> findAguardandoPagamentoAntesDe(LocalDateTime limite) {
+        return list("status = ?1 AND createdAt < ?2", "AGUARDANDO_PAGAMENTO", limite);
     }
 }

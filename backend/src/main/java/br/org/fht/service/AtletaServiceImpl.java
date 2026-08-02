@@ -1,6 +1,7 @@
 package br.org.fht.service;
 
 import br.org.fht.common.CPFValidator;
+import br.org.fht.common.Escopo;
 import br.org.fht.common.Fuso;
 import br.org.fht.common.OrigemRequisicao;
 import br.org.fht.dto.atleta.AtletaDocumentosForm;
@@ -19,7 +20,6 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.WebApplicationException;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 import org.jboss.resteasy.reactive.multipart.FileUpload;
 
@@ -42,10 +42,6 @@ public class AtletaServiceImpl implements AtletaService {
     @Inject ClubeRepository clubeRepository;
     @Inject ConsentimentoRepository consentimentoRepository;
     @Inject R2StorageService r2;
-
-    /** Prazo para anexar o comprovante de pagamento antes do cadastro ser apagado. */
-    @ConfigProperty(name = "atleta.pagamento.prazo-horas", defaultValue = "24")
-    long prazoPagamentoHoras;
 
     @Override
     @Transactional
@@ -127,14 +123,10 @@ public class AtletaServiceImpl implements AtletaService {
             atleta.setComprovantePagamentoUrl(r2.upload(baseKey + "/pix_" + form.comprovantePix.fileName(), form.comprovantePix));
         }
 
-        // Com comprovante, já entra na fila de aprovação da federação. Sem comprovante,
-        // o cadastro tem prazo para pagar — vencido, é apagado pelo job de expurgo.
-        if (atleta.getComprovantePagamentoUrl() != null) {
-            atleta.setStatus(STATUS_AGUARDANDO_APROVACAO);
-        } else {
-            atleta.setStatus(STATUS_AGUARDANDO_PAGAMENTO);
-            atleta.setPrazoPagamentoAte(LocalDateTime.now().plusHours(prazoPagamentoHoras));
-        }
+        // O pagamento nao e mais no ato do cadastro: o clube junta os atletas e paga tudo num lote
+        // quando puder. Por isso o cadastro nasce sempre AGUARDANDO_PAGAMENTO e sem prazo — quem
+        // libera e a baixa do lote pela federacao.
+        atleta.setStatus(STATUS_AGUARDANDO_PAGAMENTO);
 
         atletaRepository.persist(atleta);
 
@@ -237,14 +229,10 @@ public class AtletaServiceImpl implements AtletaService {
 
     @Override
     public List<AtletaResponseDTO> listar(JsonWebToken jwt) {
-        String role = jwt.getClaim("role");
-        List<Atleta> atletas;
-        if ("ADMIN_CLUBE".equals(role)) {
-            UUID clubeId = UUID.fromString((String) jwt.getClaim("clubeId"));
-            atletas = atletaRepository.findByClubeId(clubeId);
-        } else {
-            atletas = atletaRepository.listAllOrdered();
-        }
+        // Allowlist: só a federação vê todos. Qualquer outro papel fica preso ao próprio clube.
+        List<Atleta> atletas = Escopo.ehAdminFederacao(jwt)
+                ? atletaRepository.listAllOrdered()
+                : atletaRepository.findByClubeId(Escopo.clubeDoToken(jwt));
 
         // Os painéis abrem o detalhe com o objeto da lista, então os consentimentos precisam vir
         // já aqui — carregados numa query só para não virar N+1.
@@ -356,14 +344,13 @@ public class AtletaServiceImpl implements AtletaService {
         return AtletaMapper.toResponse(atleta, consentimentoRepository.findByAtletaId(id));
     }
 
-    /** ADMIN_CLUBE só alcança atleta do próprio clube; ADMIN_FHT alcança qualquer um. */
+    /** Só ADMIN_FHT alcança qualquer atleta; qualquer outro papel fica preso ao próprio clube. */
     private Atleta buscarComEscopo(UUID id, JsonWebToken jwt) {
-        if ("ADMIN_CLUBE".equals((String) jwt.getClaim("role"))) {
-            UUID clubeId = UUID.fromString((String) jwt.getClaim("clubeId"));
-            return atletaRepository.findByClubeIdAndId(clubeId, id)
+        if (Escopo.ehAdminFederacao(jwt)) {
+            return atletaRepository.findByIdOptional(id)
                     .orElseThrow(() -> new WebApplicationException("Atleta não encontrado", 404));
         }
-        return atletaRepository.findByIdOptional(id)
+        return atletaRepository.findByClubeIdAndId(Escopo.clubeDoToken(jwt), id)
                 .orElseThrow(() -> new WebApplicationException("Atleta não encontrado", 404));
     }
 

@@ -100,6 +100,45 @@ export interface ClubeDTO {
   updatedAt: string
 }
 
+/* ── Pagamento da anuidade em lote ── */
+
+export type PagamentoLoteStatus = 'AGUARDANDO_BAIXA' | 'CONFIRMADO' | 'REJEITADO'
+
+/** Alimenta o botão de pagamento do clube: quem está devendo e quanto dá */
+export interface PagamentoPendentesDTO {
+  ano: number
+  valorUnitario: number
+  valorTotal: number
+  atletas: { id: string; nome: string; categoria: string; valor: number }[]
+}
+
+/** Um pagamento em lote: N atletas cobertos por 1 comprovante */
+export interface PagamentoLoteDTO {
+  id: string
+  clubeId: string
+  clubeNome: string | null
+  protocolo: string
+  ano: number
+  valorTotal: number
+  quantidadeAtletas: number
+  comprovanteUrl: string | null
+  status: PagamentoLoteStatus
+  observacao: string | null
+  motivoRejeicao: string | null
+  enviadoEm: string
+  baixadoEm: string | null
+  baixadoPor: string | null
+  /** atletaId é nulo se o atleta foi removido depois — o nome fica no snapshot */
+  itens: { atletaId: string | null; atletaNome: string; valor: number }[]
+}
+
+/** Resultado da baixa: quem foi ativado e quem continua barrado pela documentação */
+export interface BaixaResultadoDTO {
+  lote: PagamentoLoteDTO
+  ativados: string[]
+  bloqueados: { atletaNome: string; motivo: string }[]
+}
+
 /** Função da pessoa dentro do clube */
 export type FuncaoPessoa = 'REPRESENTANTE' | 'TECNICO' | 'AUXILIAR'
 

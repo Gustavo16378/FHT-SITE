@@ -1,475 +1,340 @@
-import { useState } from 'react';
-import type { ReactNode } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  Download,
-  DollarSign,
-  Check,
-  Clock,
-  TrendingUp,
-  X,
-  Lock,
-  Search,
+  DollarSign, Check, Clock, X, Search, AlertCircle, FileText, Users,
 } from 'lucide-react';
+import { apiGet, apiPatch, ApiError, fileUrl } from '../../services/api';
+import type { BaixaResultadoDTO, PagamentoLoteDTO, PagamentoLoteStatus } from '../../types/api';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Tipos
-// ─────────────────────────────────────────────────────────────────────────────
+const STATUS_META: Record<PagamentoLoteStatus, { label: string; badge: string }> = {
+  AGUARDANDO_BAIXA: { label: 'Aguardando baixa', badge: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30' },
+  CONFIRMADO: { label: 'Confirmado', badge: 'text-green-400 bg-green-500/10 border-green-500/30' },
+  REJEITADO: { label: 'Rejeitado', badge: 'text-red-400 bg-red-500/10 border-red-500/30' },
+};
 
-type StatusPagamento = 'PAGO' | 'PENDENTE';
-type FiltroStatus = 'TODOS' | StatusPagamento;
-
-interface Pagamento {
-  id: number;
-  atleta: string;
-  clube: string;
-  ano: number;
-  valor: number;
-  status: StatusPagamento;
-  data: string; // vazio quando pendente
-}
-
-interface MesReceita {
-  mes: string;
-  valor: number;
-}
-
-interface LinhaBalanco {
-  descricao: string;
-  valor: number;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Mock
-// ─────────────────────────────────────────────────────────────────────────────
-
-const RECEITA_MESES: MesReceita[] = [
-  { mes: 'JAN', valor: 1225 },
-  { mes: 'FEV', valor: 2870 },
-  { mes: 'MAR', valor: 4165 },
-  { mes: 'ABR', valor: 3080 },
-  { mes: 'MAI', valor: 5390 },
-  { mes: 'JUN', valor: 4620 },
-  { mes: 'JUL', valor: 2555 },
-  { mes: 'AGO', valor: 0 },
-  { mes: 'SET', valor: 0 },
-  { mes: 'OUT', valor: 0 },
-  { mes: 'NOV', valor: 0 },
-  { mes: 'DEZ', valor: 0 },
+const FILTROS: { valor: PagamentoLoteStatus | 'TODOS'; label: string }[] = [
+  { valor: 'AGUARDANDO_BAIXA', label: 'Aguardando baixa' },
+  { valor: 'CONFIRMADO', label: 'Confirmados' },
+  { valor: 'REJEITADO', label: 'Rejeitados' },
+  { valor: 'TODOS', label: 'Todos' },
 ];
 
-const ENTRADAS: LinhaBalanco[] = [
-  { descricao: 'Anuidades de atletas', valor: 23905 },
-  { descricao: 'Taxas de filiação de clube', valor: 7200 },
-  { descricao: 'Patrocínios', valor: 12000 },
-];
+const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-const SAIDAS: LinhaBalanco[] = [
-  { descricao: 'Custos de competição', valor: 14350 },
-  { descricao: 'Material esportivo', valor: 6800 },
-  { descricao: 'Administrativo', valor: 4120 },
-];
-
-const PAGAMENTOS: Pagamento[] = [
-  { id: 1, atleta: 'Lucas Ferreira Lima', clube: 'Palmas HC', ano: 2026, valor: 35, status: 'PAGO', data: '12/02/2026' },
-  { id: 2, atleta: 'Ana Beatriz Souza', clube: 'Araguaína HC', ano: 2026, valor: 35, status: 'PAGO', data: '03/03/2026' },
-  { id: 3, atleta: 'Pedro Henrique Alves', clube: 'Gurupi EC', ano: 2026, valor: 35, status: 'PENDENTE', data: '' },
-  { id: 4, atleta: 'Mariana Costa Reis', clube: 'Porto Nacional HC', ano: 2026, valor: 35, status: 'PAGO', data: '18/03/2026' },
-  { id: 5, atleta: 'Gabriel Oliveira Rocha', clube: 'Palmas HC', ano: 2026, valor: 35, status: 'PENDENTE', data: '' },
-  { id: 6, atleta: 'Juliana Martins Dias', clube: 'Tocantinópolis Hand', ano: 2026, valor: 35, status: 'PAGO', data: '05/05/2026' },
-  { id: 7, atleta: 'Rafael Nunes Carvalho', clube: 'Colinas HC', ano: 2026, valor: 35, status: 'PENDENTE', data: '' },
-  { id: 8, atleta: 'Camila Ribeiro Gomes', clube: 'Araguaína HC', ano: 2026, valor: 35, status: 'PAGO', data: '21/06/2026' },
-];
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-function brl(valor: number): string {
-  return valor.toLocaleString('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-    minimumFractionDigits: 2,
-  });
+function fmtData(iso: string | null): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
-function brlCompacto(valor: number): string {
-  return valor.toLocaleString('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-    maximumFractionDigits: 0,
-  });
+function msgErro(e: unknown): string {
+  if (e instanceof ApiError) return e.message;
+  if (e instanceof Error) return e.message;
+  return 'Erro inesperado.';
 }
 
-const TOTAL_ENTRADAS = ENTRADAS.reduce((s, e) => s + e.valor, 0);
-const TOTAL_SAIDAS = SAIDAS.reduce((s, e) => s + e.valor, 0);
-const SALDO = TOTAL_ENTRADAS - TOTAL_SAIDAS;
-const RECEITA_ANO = RECEITA_MESES.reduce((s, m) => s + m.valor, 0);
-const QTD_PAGAS = PAGAMENTOS.filter((p) => p.status === 'PAGO').length;
-const QTD_PENDENTES = PAGAMENTOS.filter((p) => p.status === 'PENDENTE').length;
-const INADIMPLENCIA = Math.round((QTD_PENDENTES / PAGAMENTOS.length) * 100);
-const MAX_RECEITA = Math.max(...RECEITA_MESES.map((m) => m.valor));
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Sub-componentes
-// ─────────────────────────────────────────────────────────────────────────────
-
-function SeloDemo() {
+/** Resultado da baixa: mostra quem foi ativado e quem ficou barrado pela documentação. */
+function ResultadoBaixa({ r, onClose }: { r: BaixaResultadoDTO; onClose: () => void }) {
   return (
-    <span className="font-body text-[10px] text-gray-soft/60 border border-federation/20 rounded-full px-2 py-0.5">
-      demonstração
-    </span>
-  );
-}
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+      style={{ backgroundColor: 'rgba(0,0,0,0.8)' }} onClick={onClose}>
+      <div className="bg-[#0a1628] border border-federation/30 rounded-2xl w-full max-w-md p-6 flex flex-col gap-4"
+        onClick={e => e.stopPropagation()}>
+        <h3 className="font-display text-fht-white text-xl">BAIXA REGISTRADA</h3>
 
-interface KpiCardProps {
-  rotulo: string;
-  valor: string;
-  icone: ReactNode;
-  detalhe: string;
-  acento: string;
-}
+        {r.ativados.length > 0 && (
+          <div>
+            <p className="font-display text-green-400 text-xs tracking-widest mb-2">
+              {r.ativados.length} ATLETA(S) ATIVADO(S)
+            </p>
+            <div className="flex flex-col gap-1">
+              {r.ativados.map(n => (
+                <p key={n} className="font-body text-gray-soft text-sm flex items-center gap-2">
+                  <Check size={13} className="text-green-400 flex-shrink-0" /> {n}
+                </p>
+              ))}
+            </div>
+          </div>
+        )}
 
-function KpiCard({ rotulo, valor, icone, detalhe, acento }: KpiCardProps) {
-  return (
-    <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-5">
-      <div className="flex items-start justify-between mb-3">
-        <p className="font-body text-gray-soft text-xs uppercase tracking-wider">{rotulo}</p>
-        <span className={acento}>{icone}</span>
+        {r.bloqueados.length > 0 && (
+          <div>
+            <p className="font-display text-yellow-400 text-xs tracking-widest mb-2">
+              {r.bloqueados.length} AGUARDANDO DOCUMENTAÇÃO
+            </p>
+            <p className="font-body text-gray-soft text-xs mb-2 leading-relaxed">
+              O pagamento foi aceito, mas estes atletas não podem ser ativados enquanto a
+              documentação não estiver em ordem.
+            </p>
+            <div className="flex flex-col gap-2">
+              {r.bloqueados.map(b => (
+                <div key={b.atletaNome} className="bg-yellow-500/5 border border-yellow-500/20 rounded-lg px-3 py-2">
+                  <p className="font-body text-fht-white text-sm">{b.atletaNome}</p>
+                  <p className="font-body text-yellow-400/90 text-xs mt-0.5">{b.motivo}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <button onClick={onClose}
+          className="font-display text-night bg-gold hover:bg-gold-light py-2.5 rounded-lg text-sm tracking-wider mt-1">
+          ENTENDI
+        </button>
       </div>
-      <p className="font-display text-fht-white text-3xl leading-none">{valor}</p>
-      <p className="font-body text-gray-soft text-xs mt-2">{detalhe}</p>
     </div>
   );
 }
 
-interface StatusBadgeProps {
-  status: StatusPagamento;
-}
-
-function StatusBadge({ status }: StatusBadgeProps) {
-  if (status === 'PAGO') {
-    return (
-      <span className="font-body text-xs px-2.5 py-1 rounded-full border text-green-400 bg-green-500/10 border-green-500/30">
-        Pago
-      </span>
-    );
-  }
-  return (
-    <span className="font-body text-xs px-2.5 py-1 rounded-full border text-gold bg-gold/10 border-gold/30">
-      Pendente
-    </span>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Componente principal
-// ─────────────────────────────────────────────────────────────────────────────
-
 export function FinanceiroPage() {
-  const [filtro, setFiltro] = useState<FiltroStatus>('TODOS');
-  const [busca, setBusca] = useState<string>('');
-  const [gerandoPdf, setGerandoPdf] = useState<boolean>(false);
+  const [lotes, setLotes] = useState<PagamentoLoteDTO[]>([]);
+  const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState('');
+  const [filtro, setFiltro] = useState<PagamentoLoteStatus | 'TODOS'>('AGUARDANDO_BAIXA');
+  const [busca, setBusca] = useState('');
+  const [detalhe, setDetalhe] = useState<PagamentoLoteDTO | null>(null);
+  const [rejeitando, setRejeitando] = useState<PagamentoLoteDTO | null>(null);
+  const [motivo, setMotivo] = useState('');
+  const [resultado, setResultado] = useState<BaixaResultadoDTO | null>(null);
+  const [processando, setProcessando] = useState(false);
 
-  const pagamentosFiltrados = PAGAMENTOS.filter((p) => {
-    const casaStatus = filtro === 'TODOS' || p.status === filtro;
-    const termo = busca.trim().toLowerCase();
-    const casaBusca =
-      termo === '' ||
-      p.atleta.toLowerCase().includes(termo) ||
-      p.clube.toLowerCase().includes(termo);
-    return casaStatus && casaBusca;
-  });
+  const carregar = useCallback(async () => {
+    try {
+      setLotes(await apiGet<PagamentoLoteDTO[]>('/api/pagamentos'));
+      setErro('');
+    } catch (e) { setErro(msgErro(e)); } finally { setCarregando(false); }
+  }, []);
 
-  const filtros: { chave: FiltroStatus; rotulo: string }[] = [
-    { chave: 'TODOS', rotulo: 'Todos' },
-    { chave: 'PAGO', rotulo: 'Pagos' },
-    { chave: 'PENDENTE', rotulo: 'Pendentes' },
-  ];
+  useEffect(() => { void carregar(); }, [carregar]);
 
-  function baixarBalanco() {
-    setGerandoPdf(true);
+  const filtrados = lotes
+    .filter(l => filtro === 'TODOS' || l.status === filtro)
+    .filter(l => {
+      const t = busca.toLowerCase();
+      return !t || (l.clubeNome ?? '').toLowerCase().includes(t) || l.protocolo.toLowerCase().includes(t);
+    });
+
+  const aguardando = lotes.filter(l => l.status === 'AGUARDANDO_BAIXA');
+  const totalAguardando = aguardando.reduce((s, l) => s + l.valorTotal, 0);
+  const confirmados = lotes.filter(l => l.status === 'CONFIRMADO');
+  const totalRecebido = confirmados.reduce((s, l) => s + l.valorTotal, 0);
+
+  async function darBaixa(lote: PagamentoLoteDTO) {
+    setProcessando(true);
+    try {
+      const r = await apiPatch<BaixaResultadoDTO>(`/api/pagamentos/${lote.id}/baixar`);
+      setDetalhe(null);
+      setResultado(r);
+      await carregar();
+    } catch (e) { setErro(msgErro(e)); } finally { setProcessando(false); }
   }
+
+  async function confirmarRejeicao() {
+    if (!rejeitando) return;
+    setProcessando(true);
+    try {
+      await apiPatch(`/api/pagamentos/${rejeitando.id}/rejeitar`, { motivo });
+      setRejeitando(null); setMotivo(''); setDetalhe(null);
+      await carregar();
+    } catch (e) { setErro(msgErro(e)); } finally { setProcessando(false); }
+  }
+
+  const cards = [
+    { label: 'Aguardando baixa', valor: brl(totalAguardando), sub: `${aguardando.length} pagamento(s)`, cor: 'border-yellow-500/30', Icon: Clock },
+    { label: 'Recebido (confirmado)', valor: brl(totalRecebido), sub: `${confirmados.length} pagamento(s)`, cor: 'border-green-500/30', Icon: Check },
+    { label: 'Atletas quitados', valor: String(confirmados.reduce((s, l) => s + l.quantidadeAtletas, 0)), sub: 'anuidades confirmadas', cor: 'border-federation/30', Icon: Users },
+  ];
 
   return (
     <div>
-      {/* Cabeçalho */}
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-        <div className="flex items-center gap-3 flex-wrap">
-          <h2 className="font-display text-fht-white text-3xl">FINANCEIRO</h2>
-          <span className="font-body text-xs px-2.5 py-1 rounded-full border text-red-400 bg-red-500/10 border-red-500/30 flex items-center gap-1.5">
-            <Lock size={12} />
-            Dir. Financeira · restrito
-          </span>
-          <SeloDemo />
-        </div>
-        <button
-          onClick={baixarBalanco}
-          className="font-display text-night bg-gold hover:bg-gold-light px-5 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250 flex items-center gap-2"
-        >
-          <Download size={16} />
-          BAIXAR BALANÇO
-        </button>
+      <div className="mb-6">
+        <h2 className="font-display text-fht-white text-3xl">FINANCEIRO</h2>
+        <p className="font-body text-gray-soft text-sm mt-1">
+          Pagamentos de anuidade enviados pelos clubes. Confira o comprovante e dê baixa —
+          os atletas do lote são ativados automaticamente.
+        </p>
       </div>
 
-      {/* Regra de negócio */}
-      <div className="bg-gold/5 border border-gold/30 rounded-xl p-5 mb-6 flex items-start gap-3">
-        <span className="text-gold mt-0.5">
-          <DollarSign size={20} />
-        </span>
-        <div>
-          <p className="font-display text-gold text-xs tracking-widest mb-1">REGRA DA ANUIDADE</p>
-          <p className="font-body text-fht-white text-sm">
-            A anuidade é <span className="text-gold font-semibold">ANUAL (R$ 35,00 por atleta)</span>.
-            Pagar a anuidade do ano habilita o atleta a competir naquele ano — a filiação vence e
-            renova a cada ano.
+      {erro && (
+        <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/30 text-red-300 rounded-lg px-4 py-3 mb-5 font-body text-sm">
+          <AlertCircle size={16} /> {erro}
+        </div>
+      )}
+
+      <div className="grid sm:grid-cols-3 gap-4 mb-6">
+        {cards.map(c => (
+          <div key={c.label} className={`bg-[#0d1b2a]/60 border ${c.cor} rounded-xl p-5`}>
+            <div className="flex items-center gap-2 mb-2">
+              <c.Icon size={15} className="text-gold" />
+              <p className="font-body text-gray-soft text-xs uppercase tracking-wider">{c.label}</p>
+            </div>
+            <p className="font-display text-fht-white text-3xl leading-none">{c.valor}</p>
+            <p className="font-body text-gray-soft text-xs mt-1">{c.sub}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex items-center gap-2 flex-wrap mb-4">
+        {FILTROS.map(f => (
+          <button key={f.valor} onClick={() => setFiltro(f.valor)}
+            className={`font-body text-xs px-3.5 py-1.5 rounded-full border transition-colors duration-150 ${
+              filtro === f.valor ? 'text-gold bg-gold/10 border-gold/40'
+                : 'text-gray-soft bg-gray-soft/5 border-gray-soft/20 hover:border-gray-soft/40'}`}>
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="relative mb-5">
+        <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-soft" />
+        <input value={busca} onChange={e => setBusca(e.target.value)}
+          placeholder="Buscar por clube ou protocolo..."
+          className="font-body bg-[#0d1b2a]/80 border border-federation/20 focus:border-gold rounded-lg pl-10 pr-4 py-3 text-fht-white placeholder-gray-soft text-sm outline-none w-full" />
+      </div>
+
+      {carregando ? (
+        <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-10 text-center font-body text-gray-soft text-sm">
+          Carregando pagamentos...
+        </div>
+      ) : filtrados.length === 0 ? (
+        <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-10 flex flex-col items-center gap-3">
+          <DollarSign size={32} className="text-gray-soft/50" />
+          <p className="font-body text-gray-soft text-sm">
+            {lotes.length === 0 ? 'Nenhum pagamento recebido ainda.' : 'Nenhum pagamento com este filtro.'}
           </p>
         </div>
-      </div>
-
-      {/* KPIs */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-        <KpiCard
-          rotulo="Receita 2026"
-          valor={brlCompacto(RECEITA_ANO)}
-          icone={<TrendingUp size={18} />}
-          detalhe="Acumulado jan → jul"
-          acento="text-green-400"
-        />
-        <KpiCard
-          rotulo="Anuidades pagas"
-          valor={String(QTD_PAGAS)}
-          icone={<Check size={18} />}
-          detalhe="Atletas habilitados a competir"
-          acento="text-blue-300"
-        />
-        <KpiCard
-          rotulo="Pendentes"
-          valor={String(QTD_PENDENTES)}
-          icone={<Clock size={18} />}
-          detalhe="Aguardando pagamento"
-          acento="text-gold"
-        />
-        <KpiCard
-          rotulo="Inadimplência"
-          valor={`${INADIMPLENCIA}%`}
-          icone={<DollarSign size={18} />}
-          detalhe="Sobre o total cadastrado"
-          acento="text-red-400"
-        />
-      </div>
-
-      {/* Gráfico de receita + Balanço */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-6">
-        {/* Receita por mês */}
-        <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-5 lg:col-span-3">
-          <div className="flex items-center justify-between mb-4">
-            <p className="font-display text-gold text-xs tracking-widest">RECEITA POR MÊS · 2026</p>
-            <span className="font-body text-gray-soft text-xs">{brl(RECEITA_ANO)}</span>
-          </div>
-          <div className="flex items-end justify-between gap-1.5 h-48">
-            {RECEITA_MESES.map((m) => {
-              const altura = MAX_RECEITA > 0 ? (m.valor / MAX_RECEITA) * 100 : 0;
-              const vazio = m.valor === 0;
-              return (
-                <div key={m.mes} className="flex-1 flex flex-col items-center justify-end h-full gap-2 group">
-                  <span className="font-body text-[10px] text-gray-soft opacity-0 group-hover:opacity-100 transition-opacity duration-150 whitespace-nowrap">
-                    {vazio ? '—' : brlCompacto(m.valor)}
-                  </span>
-                  <div
-                    className={
-                      vazio
-                        ? 'w-full rounded-t-sm bg-federation/15 min-h-[4px]'
-                        : 'w-full rounded-t-sm bg-gradient-to-t from-federation to-gold min-h-[4px] group-hover:from-blue-mid group-hover:to-gold-light transition-colors duration-150'
-                    }
-                    style={{ height: `${Math.max(altura, vazio ? 3 : 6)}%` }}
-                  />
-                  <span className="font-body text-[10px] text-gray-soft uppercase tracking-wider">
-                    {m.mes}
-                  </span>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {filtrados.map(l => (
+            <div key={l.id} className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-5">
+              <div className="flex items-start justify-between gap-4 flex-wrap">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                    <span className={`font-body text-xs px-2.5 py-1 rounded-full border ${STATUS_META[l.status].badge}`}>
+                      {STATUS_META[l.status].label}
+                    </span>
+                    <span className="font-body text-gray-soft text-xs">{l.protocolo}</span>
+                  </div>
+                  <p className="font-display text-fht-white text-xl leading-tight">{l.clubeNome ?? '—'}</p>
+                  <p className="font-body text-gray-soft text-sm mt-1">
+                    {l.quantidadeAtletas} {l.quantidadeAtletas === 1 ? 'atleta' : 'atletas'} · anuidade {l.ano} · enviado em {fmtData(l.enviadoEm)}
+                  </p>
+                  {l.observacao && (
+                    <p className="font-body text-gray-soft/80 text-xs mt-1 italic">"{l.observacao}"</p>
+                  )}
+                  {l.motivoRejeicao && (
+                    <p className="font-body text-red-400 text-xs mt-1">Rejeitado: {l.motivoRejeicao}</p>
+                  )}
                 </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Balanço */}
-        <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-5 lg:col-span-2">
-          <p className="font-display text-gold text-xs tracking-widest mb-4">
-            BALANÇO 2026 · ENTRADAS × SAÍDAS
-          </p>
-
-          <div className="mb-4">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="w-2 h-2 rounded-full bg-green-400" />
-              <span className="font-body text-green-400 text-xs uppercase tracking-wider">Entradas</span>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              {ENTRADAS.map((e) => (
-                <div key={e.descricao} className="flex items-center justify-between">
-                  <span className="font-body text-gray-soft text-sm">{e.descricao}</span>
-                  <span className="font-body text-fht-white text-sm">{brl(e.valor)}</span>
+                <div className="text-right flex-shrink-0">
+                  <p className="font-display text-gold text-2xl leading-none">{brl(l.valorTotal)}</p>
+                  <button onClick={() => setDetalhe(l)}
+                    className="font-body text-gold text-xs hover:underline mt-2">
+                    Ver atletas e comprovante →
+                  </button>
                 </div>
-              ))}
-              <div className="flex items-center justify-between pt-1.5 mt-1 border-t border-federation/20">
-                <span className="font-body text-fht-white text-sm font-semibold">Total entradas</span>
-                <span className="font-body text-green-400 text-sm font-semibold">{brl(TOTAL_ENTRADAS)}</span>
               </div>
             </div>
-          </div>
+          ))}
+        </div>
+      )}
 
-          <div className="mb-4">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="w-2 h-2 rounded-full bg-red-400" />
-              <span className="font-body text-red-400 text-xs uppercase tracking-wider">Saídas</span>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              {SAIDAS.map((e) => (
-                <div key={e.descricao} className="flex items-center justify-between">
-                  <span className="font-body text-gray-soft text-sm">{e.descricao}</span>
-                  <span className="font-body text-fht-white text-sm">− {brl(e.valor)}</span>
-                </div>
-              ))}
-              <div className="flex items-center justify-between pt-1.5 mt-1 border-t border-federation/20">
-                <span className="font-body text-fht-white text-sm font-semibold">Total saídas</span>
-                <span className="font-body text-red-400 text-sm font-semibold">− {brl(TOTAL_SAIDAS)}</span>
+      {/* Detalhe: a lista nominal é o que a federação confere para dar baixa */}
+      {detalhe && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+          style={{ backgroundColor: 'rgba(0,0,0,0.78)' }} onClick={() => setDetalhe(null)}>
+          <div className="bg-[#0a1628] border border-federation/30 rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}>
+            <div className="p-5 border-b border-federation/20 flex items-start justify-between">
+              <div>
+                <h3 className="font-display text-fht-white text-xl tracking-wide">{detalhe.protocolo}</h3>
+                <p className="font-body text-gray-soft text-sm mt-0.5">{detalhe.clubeNome}</p>
               </div>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between bg-gold/10 border border-gold/30 rounded-lg px-4 py-3">
-            <span className="font-display text-gold text-sm tracking-widest">SALDO</span>
-            <span className="font-display text-gold-light text-2xl leading-none">{brl(SALDO)}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Tabela de pagamentos */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
-        <p className="font-display text-fht-white text-xl tracking-wider">PAGAMENTOS DE ANUIDADE</p>
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Busca */}
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-soft">
-              <Search size={15} />
-            </span>
-            <input
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
-              placeholder="Buscar atleta ou clube…"
-              className="font-body bg-[#0d1b2a]/80 border border-federation/20 focus:border-gold rounded-lg pl-9 pr-4 py-2 text-fht-white placeholder-gray-soft text-sm outline-none w-56"
-            />
-          </div>
-          {/* Filtro pills */}
-          <div className="flex items-center gap-2">
-            {filtros.map((f) => {
-              const ativo = filtro === f.chave;
-              return (
-                <button
-                  key={f.chave}
-                  onClick={() => setFiltro(f.chave)}
-                  className={
-                    ativo
-                      ? 'font-body text-xs px-3 py-1.5 rounded-full border text-gold bg-gold/10 border-gold/40 transition-colors duration-150'
-                      : 'font-body text-xs px-3 py-1.5 rounded-full border text-gray-soft bg-gray-soft/5 border-federation/20 hover:border-federation/50 transition-colors duration-150'
-                  }
-                >
-                  {f.rotulo}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl overflow-x-auto">
-        <table className="w-full min-w-[640px]">
-          <thead>
-            <tr className="border-b border-federation/20">
-              <th className="font-body text-gray-soft text-xs uppercase tracking-wider px-4 py-3 text-left">Atleta</th>
-              <th className="font-body text-gray-soft text-xs uppercase tracking-wider px-4 py-3 text-left">Clube</th>
-              <th className="font-body text-gray-soft text-xs uppercase tracking-wider px-4 py-3 text-left">Ano</th>
-              <th className="font-body text-gray-soft text-xs uppercase tracking-wider px-4 py-3 text-left">Valor</th>
-              <th className="font-body text-gray-soft text-xs uppercase tracking-wider px-4 py-3 text-left">Status</th>
-              <th className="font-body text-gray-soft text-xs uppercase tracking-wider px-4 py-3 text-left">Data</th>
-            </tr>
-          </thead>
-          <tbody>
-            {pagamentosFiltrados.map((p) => (
-              <tr
-                key={p.id}
-                className="border-b border-federation/10 hover:bg-federation/5 transition-colors duration-150"
-              >
-                <td className="px-4 py-3 font-body text-fht-white text-sm">{p.atleta}</td>
-                <td className="px-4 py-3 font-body text-gray-soft text-sm">{p.clube}</td>
-                <td className="px-4 py-3 font-body text-gray-soft text-sm">{p.ano}</td>
-                <td className="px-4 py-3 font-body text-fht-white text-sm">{brl(p.valor)}</td>
-                <td className="px-4 py-3">
-                  <StatusBadge status={p.status} />
-                </td>
-                <td className="px-4 py-3 font-body text-gray-soft text-sm">{p.data || '—'}</td>
-              </tr>
-            ))}
-            {pagamentosFiltrados.length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-4 py-8 text-center font-body text-gray-soft text-sm">
-                  Nenhum pagamento encontrado para o filtro atual.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      <p className="font-body text-gray-soft/60 text-xs mt-3">
-        Exibindo {pagamentosFiltrados.length} de {PAGAMENTOS.length} registros.
-      </p>
-
-      {/* Modal: gerando PDF */}
-      {gerandoPdf && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ backgroundColor: 'rgba(0,0,0,0.75)' }}
-          onClick={() => setGerandoPdf(false)}
-        >
-          <div
-            className="bg-[#0a1628] border border-federation/30 rounded-xl w-full max-w-lg shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-5 border-b border-federation/20 flex items-center justify-between">
-              <p className="font-display text-gold text-sm tracking-widest flex items-center gap-2">
-                <Download size={16} />
-                GERANDO BALANÇO
-              </p>
-              <button
-                onClick={() => setGerandoPdf(false)}
-                className="text-gray-soft hover:text-fht-white transition-colors duration-150"
-              >
+              <button onClick={() => setDetalhe(null)} className="text-gray-soft hover:text-fht-white p-1.5 rounded-lg">
                 <X size={18} />
               </button>
             </div>
+
             <div className="p-5 flex flex-col gap-4">
-              <p className="font-body text-fht-white text-sm">
-                Gerando PDF do balanço financeiro de 2026…
-              </p>
-              <div className="w-full h-2 bg-federation/15 rounded-full overflow-hidden">
-                <div className="h-full w-2/3 bg-gradient-to-r from-federation to-gold rounded-full" />
+              <div className="flex items-center justify-between bg-federation/10 border border-federation/20 rounded-lg px-4 py-3">
+                <span className="font-body text-gray-soft text-sm">Total do pagamento</span>
+                <span className="font-display text-gold text-2xl">{brl(detalhe.valorTotal)}</span>
               </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-body text-gray-soft">Saldo consolidado: {brl(SALDO)}</span>
-                <SeloDemo />
+
+              {detalhe.comprovanteUrl && (
+                <a href={fileUrl(detalhe.comprovanteUrl)} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center justify-between px-4 py-3 bg-federation/10 border border-federation/20 rounded-lg hover:border-gold/40 transition-colors duration-200">
+                  <span className="font-body text-fht-white text-sm flex items-center gap-2">
+                    <FileText size={15} className="text-gold" /> Comprovante enviado
+                  </span>
+                  <span className="font-body text-gray-soft text-xs">Abrir →</span>
+                </a>
+              )}
+
+              <div>
+                <p className="font-display text-gold text-xs tracking-widest mb-2">
+                  ATLETAS COBERTOS ({detalhe.itens.length})
+                </p>
+                <div className="flex flex-col gap-1.5 max-h-64 overflow-y-auto">
+                  {detalhe.itens.map((i, idx) => (
+                    <div key={idx} className="flex items-center justify-between px-4 py-2.5 bg-federation/5 border border-federation/10 rounded-lg">
+                      <span className="font-body text-fht-white text-sm">{i.atletaNome}</span>
+                      <span className="font-body text-gray-soft text-sm">{brl(i.valor)}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
+
+              {detalhe.status === 'CONFIRMADO' && (
+                <p className="font-body text-green-400 text-xs">
+                  Baixa dada em {fmtData(detalhe.baixadoEm)}{detalhe.baixadoPor ? ` por ${detalhe.baixadoPor}` : ''}.
+                </p>
+              )}
             </div>
-            <div className="p-5 flex gap-3 justify-end border-t border-federation/20">
-              <button
-                onClick={() => setGerandoPdf(false)}
-                className="font-display text-gray-soft border border-federation/30 hover:border-federation/60 px-5 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250"
-              >
-                FECHAR
+
+            {detalhe.status === 'AGUARDANDO_BAIXA' && (
+              <div className="p-5 border-t border-federation/20 flex justify-end gap-3">
+                <button onClick={() => { setRejeitando(detalhe); setMotivo(''); }} disabled={processando}
+                  className="font-display text-fht-white bg-red-500/20 border border-red-500/40 hover:bg-red-500/30 px-5 py-2.5 rounded-lg text-sm tracking-wider disabled:opacity-50">
+                  Rejeitar
+                </button>
+                <button onClick={() => darBaixa(detalhe)} disabled={processando}
+                  className="font-display text-night bg-green-500 hover:bg-green-400 px-5 py-2.5 rounded-lg text-sm tracking-wider disabled:opacity-50 flex items-center gap-2">
+                  <Check size={16} /> {processando ? 'Processando...' : 'Dar baixa'}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {rejeitando && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+          style={{ backgroundColor: 'rgba(0,0,0,0.8)' }} onClick={() => setRejeitando(null)}>
+          <div className="bg-[#0a1628] border border-federation/30 rounded-2xl w-full max-w-sm p-6 flex flex-col gap-4"
+            onClick={e => e.stopPropagation()}>
+            <h3 className="font-display text-fht-white text-xl">REJEITAR PAGAMENTO?</h3>
+            <p className="font-body text-gray-soft text-sm">
+              Os {rejeitando.quantidadeAtletas} atleta(s) voltam para a fila de pendentes e o clube
+              poderá enviar um novo comprovante.
+            </p>
+            <input value={motivo} onChange={e => setMotivo(e.target.value)}
+              placeholder="Motivo (ex.: comprovante ilegível)"
+              className="font-body bg-[#0d1b2a]/80 border border-federation/20 focus:border-gold rounded-lg px-4 py-3 text-fht-white placeholder-gray-soft text-sm outline-none w-full" />
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setRejeitando(null)}
+                className="font-display text-gray-soft border border-federation/30 px-5 py-2.5 rounded-lg text-sm tracking-wider">
+                Cancelar
+              </button>
+              <button onClick={confirmarRejeicao} disabled={processando}
+                className="font-display text-fht-white bg-red-500/20 border border-red-500/40 hover:bg-red-500/30 px-5 py-2.5 rounded-lg text-sm tracking-wider disabled:opacity-50">
+                Rejeitar
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {resultado && <ResultadoBaixa r={resultado} onClose={() => setResultado(null)} />}
     </div>
   );
 }

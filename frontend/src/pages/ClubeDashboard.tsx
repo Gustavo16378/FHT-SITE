@@ -11,6 +11,7 @@ import { UFS } from '../utils/ufs'
 import { apiGet, apiPostForm, apiPostJson, apiPut, apiDelete, ApiError } from '../services/api'
 import type {
   AtletaDTO, AtletaStatus, ClubeDTO, ClubeStatus, ClubePessoaDTO, FuncaoPessoa,
+  PagamentoPendentesDTO, PagamentoLoteDTO,
 } from '../types/api'
 
 /* ── tipos ───────────────────────────────────────────────── */
@@ -267,9 +268,209 @@ function DashboardPage({ atletas }: { atletas: AtletaDTO[] }) {
   )
 }
 
+const brl = (v: number) =>
+  v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+
+/**
+ * Barra de pagamento da anuidade. Some quando não há pendência.
+ * O clube escolhe quem entra no lote — pagar parcial é comum quando o caixa não dá para todos.
+ */
+function BarraPagamento({ onPago }: { onPago: () => void }) {
+  const [pendentes, setPendentes] = useState<PagamentoPendentesDTO | null>(null)
+  const [aberto, setAberto] = useState(false)
+
+  const carregar = useCallback(async () => {
+    try { setPendentes(await apiGet<PagamentoPendentesDTO>('/api/pagamentos/pendentes')) }
+    catch { setPendentes(null) }
+  }, [])
+
+  useEffect(() => { void carregar() }, [carregar])
+
+  if (!pendentes || pendentes.atletas.length === 0) return null
+
+  return (
+    <>
+      <div className="bg-gold/5 border border-gold/30 rounded-xl p-5 mb-6 flex flex-col sm:flex-row sm:items-center gap-4">
+        <div className="flex-1">
+          <p className="font-display text-gold text-sm tracking-widest">ANUIDADE {pendentes.ano} PENDENTE</p>
+          <p className="font-body text-gray-soft text-sm mt-1">
+            <span className="font-display text-fht-white text-2xl">{brl(pendentes.valorTotal)}</span>
+            {' '}· {pendentes.atletas.length} {pendentes.atletas.length === 1 ? 'atleta' : 'atletas'} aguardando pagamento
+          </p>
+        </div>
+        <button onClick={() => setAberto(true)}
+          className="font-display text-night bg-gold hover:bg-gold-light px-6 py-3 rounded-lg text-sm tracking-wider transition-colors duration-250 whitespace-nowrap">
+          PAGAR ANUIDADE
+        </button>
+      </div>
+
+      {aberto && (
+        <PagamentoModal pendentes={pendentes}
+          onClose={() => setAberto(false)}
+          onEnviado={() => { void carregar(); onPago() }} />
+      )}
+    </>
+  )
+}
+
+function PagamentoModal({ pendentes, onClose, onEnviado }: {
+  pendentes: PagamentoPendentesDTO; onClose: () => void; onEnviado: () => void
+}) {
+  // Todos marcados por padrão: o caso comum é pagar tudo.
+  const [marcados, setMarcados] = useState<Set<string>>(new Set(pendentes.atletas.map(a => a.id)))
+  const [comprovante, setComprovante] = useState<File | null>(null)
+  const [observacao, setObservacao] = useState('')
+  const [enviando, setEnviando] = useState(false)
+  const [erro, setErro] = useState('')
+  const [protocolo, setProtocolo] = useState('')
+
+  const total = pendentes.valorUnitario * marcados.size
+
+  function alternar(id: string) {
+    setMarcados(prev => {
+      const s = new Set(prev)
+      if (s.has(id)) s.delete(id); else s.add(id)
+      return s
+    })
+  }
+
+  async function enviar() {
+    if (marcados.size === 0) { setErro('Selecione ao menos um atleta.'); return }
+    if (!comprovante) { setErro('Anexe o comprovante do Pix.'); return }
+    setEnviando(true); setErro('')
+    try {
+      const fd = new FormData()
+      fd.append('atletaIds', [...marcados].join(','))
+      if (observacao.trim()) fd.append('observacao', observacao.trim())
+      fd.append('comprovante', comprovante)
+      const lote = await apiPostForm<PagamentoLoteDTO>('/api/pagamentos', fd)
+      setProtocolo(lote.protocolo)
+      onEnviado()
+    } catch (e) { setErro(errMsg(e)); setEnviando(false) }
+  }
+
+  // Depois de enviar, a tela vira recibo: o protocolo é o que o clube cita com a federação.
+  if (protocolo) {
+    return (
+      <div className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+        style={{ backgroundColor: 'rgba(0,0,0,0.78)' }} onClick={onClose}>
+        <div className="bg-[#0a1628] border border-green-500/30 rounded-2xl w-full max-w-md p-6 flex flex-col gap-4 text-center"
+          onClick={e => e.stopPropagation()}>
+          <CheckCircle size={44} className="text-green-400 mx-auto" />
+          <h3 className="font-display text-fht-white text-2xl">PAGAMENTO ENVIADO</h3>
+          <p className="font-body text-gray-soft text-sm leading-relaxed">
+            Protocolo <span className="font-display text-gold">{protocolo}</span><br />
+            A FHT vai conferir o comprovante e dar baixa. Os atletas ficam ativos assim que a
+            federação confirmar.
+          </p>
+          <button onClick={onClose}
+            className="font-display text-night bg-gold hover:bg-gold-light py-2.5 rounded-lg text-sm tracking-wider mt-2">
+            ENTENDI
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+      style={{ backgroundColor: 'rgba(0,0,0,0.78)' }} onClick={onClose}>
+      <div className="bg-[#0a1628] border border-federation/30 rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
+        onClick={e => e.stopPropagation()}>
+        <div className="p-5 border-b border-federation/20 flex items-center justify-between">
+          <h3 className="font-display text-fht-white text-xl tracking-wide">PAGAR ANUIDADE {pendentes.ano}</h3>
+          <button onClick={onClose} className="text-gray-soft hover:text-fht-white p-1.5 rounded-lg">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="p-5 flex flex-col gap-4">
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <span className={lbl}>Atletas neste pagamento</span>
+              <button onClick={() => setMarcados(marcados.size === pendentes.atletas.length
+                ? new Set() : new Set(pendentes.atletas.map(a => a.id)))}
+                className="font-body text-gold text-xs hover:underline">
+                {marcados.size === pendentes.atletas.length ? 'Desmarcar todos' : 'Marcar todos'}
+              </button>
+            </div>
+            <div className="flex flex-col gap-2 max-h-56 overflow-y-auto">
+              {pendentes.atletas.map(a => (
+                <label key={a.id}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-lg border cursor-pointer transition-colors duration-150 ${
+                    marcados.has(a.id) ? 'border-gold/50 bg-gold/5' : 'border-federation/20 bg-[#0d1b2a]/40'
+                  }`}>
+                  <input type="checkbox" checked={marcados.has(a.id)} onChange={() => alternar(a.id)}
+                    className="w-4 h-4 accent-gold cursor-pointer flex-shrink-0" />
+                  <span className="flex-1">
+                    <span className="font-body text-fht-white text-sm block">{a.nome}</span>
+                    <span className="font-body text-gray-soft text-xs">{a.categoria}</span>
+                  </span>
+                  <span className="font-body text-gray-soft text-sm">{brl(a.valor)}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* QR Code PIX da federação */}
+          <div className="bg-gold/5 border border-gold/30 rounded-xl p-5 flex flex-col sm:flex-row items-center gap-5">
+            <div className="w-24 h-24 bg-fht-white rounded-lg flex items-center justify-center flex-shrink-0">
+              <span className="font-body text-night text-[10px] text-center px-2">QR Code PIX FHT</span>
+            </div>
+            <div>
+              <p className="font-body text-gray-soft text-xs uppercase tracking-wider">Total a pagar</p>
+              <p className="font-display text-fht-white text-3xl leading-none my-1">{brl(total)}</p>
+              <p className="font-body text-gray-soft text-xs">
+                {marcados.size} {marcados.size === 1 ? 'atleta' : 'atletas'} × {brl(pendentes.valorUnitario)}
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <span className={lbl}>Comprovante do Pix *</span>
+            <label className={`flex items-center gap-3 px-4 py-3 rounded-lg border text-sm font-body cursor-pointer transition-colors duration-250 ${
+              comprovante ? 'border-green-500/50 bg-green-500/10 text-green-400' : 'border-federation/20 bg-[#0d1b2a]/80 text-gray-soft hover:border-gold/40'
+            }`}>
+              <input type="file" accept="image/*,.pdf" className="hidden"
+                onChange={e => setComprovante(e.target.files?.[0] ?? null)} />
+              {comprovante
+                ? <><CheckCircle size={16} /><span className="truncate">{comprovante.name}</span></>
+                : <><Upload size={16} /><span>Selecionar comprovante</span></>}
+            </label>
+          </div>
+
+          <div>
+            <span className={lbl}>Observação <span className="normal-case tracking-normal">(opcional)</span></span>
+            <input value={observacao} onChange={e => setObservacao(e.target.value)}
+              className={inp} placeholder="Ex.: pagamento parcial, restante mês que vem" />
+          </div>
+
+          {erro && (
+            <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3">
+              <AlertCircle size={16} className="text-red-400 flex-shrink-0" />
+              <p className="font-body text-red-400 text-sm">{erro}</p>
+            </div>
+          )}
+        </div>
+
+        <div className="p-5 border-t border-federation/20 flex justify-end gap-3">
+          <button onClick={onClose} disabled={enviando}
+            className="font-display text-gray-soft border border-federation/30 px-5 py-2.5 rounded-lg text-sm tracking-wider disabled:opacity-50">
+            Cancelar
+          </button>
+          <button onClick={enviar} disabled={enviando || marcados.size === 0 || !comprovante}
+            className="font-display text-night bg-gold hover:bg-gold-light px-5 py-2.5 rounded-lg text-sm tracking-wider disabled:opacity-50 disabled:cursor-not-allowed">
+            {enviando ? 'Enviando...' : `Enviar ${brl(total)}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ── Meus Atletas ────────────────────────────────────────── */
-function AtletasPage({ atletas, onCadastrar, onVer }: {
-  atletas: AtletaDTO[]; onCadastrar: () => void; onVer: (a: AtletaDTO) => void
+function AtletasPage({ atletas, onCadastrar, onVer, onPago }: {
+  atletas: AtletaDTO[]; onCadastrar: () => void; onVer: (a: AtletaDTO) => void; onPago: () => void
 }) {
   return (
     <div>
@@ -280,6 +481,8 @@ function AtletasPage({ atletas, onCadastrar, onVer }: {
           + CADASTRAR
         </button>
       </div>
+
+      <BarraPagamento onPago={onPago} />
       <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl overflow-x-auto">
         <table className="w-full min-w-[600px]">
           <thead>
@@ -1820,7 +2023,10 @@ export default function ClubeDashboard() {
           ) : (
             <>
               {page === 'dashboard' && <DashboardPage atletas={atletas} />}
-              {page === 'atletas' && <AtletasPage atletas={atletas} onCadastrar={() => setPage('cadastrar')} onVer={setAtletaDetalhe} />}
+              {page === 'atletas' && (
+                <AtletasPage atletas={atletas} onCadastrar={() => setPage('cadastrar')}
+                  onVer={setAtletaDetalhe} onPago={() => { reload(true).catch(() => {}) }} />
+              )}
               {page === 'cadastrar' && <CadastrarAtletaPage onSuccess={handleAtletaSuccess} />}
               {page === 'inscricoes' && <InscricoesPage atletas={atletas} />}
               {page === 'equipe' && <EquipePage />}

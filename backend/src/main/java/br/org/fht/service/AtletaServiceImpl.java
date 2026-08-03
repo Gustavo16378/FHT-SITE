@@ -15,6 +15,7 @@ import br.org.fht.model.Consentimento;
 import br.org.fht.repository.AtletaRepository;
 import br.org.fht.repository.ClubeRepository;
 import br.org.fht.repository.ConsentimentoRepository;
+import br.org.fht.repository.PagamentoLoteItemRepository;
 import br.org.fht.storage.R2StorageService;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -41,6 +42,7 @@ public class AtletaServiceImpl implements AtletaService {
     @Inject AtletaRepository atletaRepository;
     @Inject ClubeRepository clubeRepository;
     @Inject ConsentimentoRepository consentimentoRepository;
+    @Inject PagamentoLoteItemRepository loteItemRepository;
     @Inject R2StorageService r2;
 
     @Override
@@ -360,14 +362,21 @@ public class AtletaServiceImpl implements AtletaService {
         Atleta atleta = atletaRepository.findByIdOptional(id)
                 .orElseThrow(() -> new WebApplicationException("Atleta não encontrado", 404));
 
-        if (atleta.getComprovantePagamentoUrl() == null || atleta.getComprovantePagamentoUrl().isBlank()) {
-            throw new ValidationException("comprovantePagamento", "Comprovante de pagamento não enviado — aprovação bloqueada");
+        // PORTÃO DOCUMENTAL — RG e, se menor, o consentimento do responsável (LGPD art. 14, §1).
+        if (atleta.getRgUrl() == null || atleta.getRgUrl().isBlank()) {
+            throw new ValidationException("rgDoc", "RG digitalizado não enviado — aprovação bloqueada");
         }
-
-        // Menor sem o consentimento do responsável não pode ser ativado (LGPD art. 14, §1).
         if (atleta.isMenorDeIdade(Fuso.hoje()) && !temConsentimentoCadastro(id)) {
             throw new ValidationException("consentimentoCadastro",
                     "Atleta menor de idade sem consentimento do responsável legal — aprovação bloqueada (LGPD art. 14)");
+        }
+
+        // PORTÃO FINANCEIRO — a anuidade do ano tem que ter baixa confirmada. Antes isso era
+        // "tem comprovante Pix individual?", que deixou de existir: o pagamento agora é do lote.
+        int ano = Fuso.hoje().getYear();
+        if (!loteItemRepository.temPagamentoConfirmado(id, ano)) {
+            throw new ValidationException("pagamento",
+                    "Anuidade de " + ano + " sem baixa confirmada — aprovação bloqueada");
         }
 
         atleta.setStatus(STATUS_ATIVO);

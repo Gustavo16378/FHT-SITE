@@ -31,6 +31,9 @@ public class Clube extends DefaultEntity {
     @Column(name = "representante_cargo")
     private String representanteCargo;
 
+    @Column(name = "representante_cpf", length = 14)
+    private String representanteCpf;
+
     @Column(name = "ata_fundacao_url")
     private String ataFundacaoUrl;
 
@@ -74,6 +77,9 @@ public class Clube extends DefaultEntity {
 
     public String getRepresentanteCargo() { return representanteCargo; }
     public void setRepresentanteCargo(String representanteCargo) { this.representanteCargo = representanteCargo; }
+
+    public String getRepresentanteCpf() { return representanteCpf; }
+    public void setRepresentanteCpf(String representanteCpf) { this.representanteCpf = representanteCpf; }
 
     public String getAtaFundacaoUrl() { return ataFundacaoUrl; }
     public void setAtaFundacaoUrl(String ataFundacaoUrl) { this.ataFundacaoUrl = ataFundacaoUrl; }

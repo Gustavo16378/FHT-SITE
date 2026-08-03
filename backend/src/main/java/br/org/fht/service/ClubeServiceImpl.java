@@ -1,6 +1,8 @@
 package br.org.fht.service;
 
+import br.org.fht.common.CPFValidator;
 import br.org.fht.common.Escopo;
+import br.org.fht.exception.ValidationException;
 import br.org.fht.dto.clube.AtletaVitrineDTO;
 import br.org.fht.dto.clube.ClubeForm;
 import br.org.fht.dto.clube.ClubeResponseDTO;
@@ -10,9 +12,11 @@ import br.org.fht.dto.clube.ClubeVitrineDetalheDTO;
 import br.org.fht.mapper.ClubeMapper;
 import br.org.fht.model.Atleta;
 import br.org.fht.model.Clube;
+import br.org.fht.model.ClubePessoa;
 import br.org.fht.model.Role;
 import br.org.fht.model.Usuario;
 import br.org.fht.repository.AtletaRepository;
+import br.org.fht.repository.ClubePessoaRepository;
 import br.org.fht.repository.ClubeRepository;
 import br.org.fht.repository.UsuarioRepository;
 import br.org.fht.storage.R2StorageService;
@@ -37,21 +41,49 @@ public class ClubeServiceImpl implements ClubeService {
     @Inject ClubeRepository clubeRepository;
     @Inject UsuarioRepository usuarioRepository;
     @Inject AtletaRepository atletaRepository;
+    @Inject ClubePessoaRepository clubePessoaRepository;
     @Inject R2StorageService r2;
+
+    /** Mínimo da senha escolhida pelo clube no cadastro público. */
+    private static final int SENHA_MIN = 8;
 
     @Override
     @Transactional
     public ClubeResponseDTO solicitar(ClubeForm form) {
+        if (form == null || branco(form.nome)) {
+            throw new ValidationException("nome", "Nome do clube é obrigatório");
+        }
+        if (branco(form.representanteNome)) {
+            throw new ValidationException("representanteNome", "Nome do representante é obrigatório");
+        }
+        if (branco(form.representanteEmail)) {
+            throw new ValidationException("representanteEmail", "E-mail do representante é obrigatório");
+        }
+        if (branco(form.senha) || form.senha.length() < SENHA_MIN) {
+            throw new ValidationException("senha",
+                    "Escolha uma senha de acesso com pelo menos " + SENHA_MIN + " caracteres");
+        }
+        if (!branco(form.representanteCpf) && !CPFValidator.isValid(form.representanteCpf)) {
+            throw new ValidationException("representanteCpf", "CPF do representante inválido");
+        }
+
+        String email = form.representanteEmail.trim().toLowerCase();
+        // O e-mail vira o login: barrar aqui evita criar um clube que nunca conseguiria entrar.
+        if (usuarioRepository.existsByEmail(email)) {
+            throw new WebApplicationException("Este e-mail já está cadastrado no sistema", 409);
+        }
+
         var clube = new Clube();
-        clube.setNome(form.nome);
+        clube.setNome(form.nome.trim());
         clube.setCidade(form.cidade);
         clube.setUf(form.uf != null ? form.uf : "TO");
         clube.setSigla(form.sigla);
         clube.setCnpj(form.cnpj);
-        clube.setRepresentanteNome(form.representanteNome);
-        clube.setRepresentanteEmail(form.representanteEmail);
+        clube.setRepresentanteNome(form.representanteNome.trim());
+        clube.setRepresentanteEmail(email);
         clube.setRepresentanteTelefone(form.representanteTelefone);
         clube.setRepresentanteCargo(form.representanteCargo);
+        clube.setRepresentanteCpf(form.representanteCpf);
 
         if (form.ata != null && form.ata.size() > 0) {
             String key = "clubes/" + UUID.randomUUID() + "/" + form.ata.fileName();
@@ -63,7 +95,35 @@ public class ClubeServiceImpl implements ClubeService {
         }
 
         clubeRepository.persist(clube);
+
+        // A conta nasce JUNTO com a solicitação, com a senha que o próprio clube escolheu, porém
+        // INATIVA — o login já recusa usuário inativo com 403. Aprovar vira só liberar o acesso.
+        var usuario = new Usuario();
+        usuario.setNome(clube.getRepresentanteNome());
+        usuario.setEmail(email);
+        usuario.setSenhaHash(BcryptUtil.bcryptHash(form.senha));
+        usuario.setRole(Role.ADMIN_CLUBE);
+        usuario.setClubeId(clube.getId());
+        usuario.setAtivo(false);
+        usuarioRepository.persist(usuario);
+
+        // O representante do formulário é a primeira pessoa do clube (a principal).
+        var principal = new ClubePessoa();
+        principal.setClubeId(clube.getId());
+        principal.setNome(clube.getRepresentanteNome());
+        principal.setCpf(form.representanteCpf);
+        principal.setFuncao(ClubePessoa.FUNCAO_REPRESENTANTE);
+        principal.setCargo(form.representanteCargo);
+        principal.setEmail(email);
+        principal.setTelefone(form.representanteTelefone);
+        principal.setPrincipal(true);
+        clubePessoaRepository.persist(principal);
+
         return ClubeMapper.toResponse(clube);
+    }
+
+    private static boolean branco(String s) {
+        return s == null || s.isBlank();
     }
 
     @Override
@@ -125,16 +185,10 @@ public class ClubeServiceImpl implements ClubeService {
         clube.setStatus("ATIVO");
         clube.setMotivoRejeicao(null);
 
-        if (!usuarioRepository.existsByEmail(clube.getRepresentanteEmail())) {
-            String senhaTemporaria = UUID.randomUUID().toString().substring(0, 8);
-            var usuario = new Usuario();
-            usuario.setNome(clube.getRepresentanteNome());
-            usuario.setEmail(clube.getRepresentanteEmail());
-            usuario.setSenhaHash(BcryptUtil.bcryptHash(senhaTemporaria));
-            usuario.setRole(Role.ADMIN_CLUBE);
-            usuario.setClubeId(clube.getId());
-            usuarioRepository.persist(usuario);
-        }
+        // Aprovar agora é LIBERAR O ACESSO: a conta já foi criada na solicitação, com a senha que
+        // o próprio clube escolheu. Antes, aprovar gerava uma senha aleatória que nunca era
+        // exibida nem enviada a ninguém — a conta nascia inutilizável.
+        definirAcesso(clube, true);
     }
 
     @Override
@@ -145,6 +199,7 @@ public class ClubeServiceImpl implements ClubeService {
 
         clube.setStatus("REJEITADO");
         clube.setMotivoRejeicao(motivo);
+        definirAcesso(clube, false);
     }
 
     @Override
@@ -158,6 +213,14 @@ public class ClubeServiceImpl implements ClubeService {
         }
 
         clube.setStatus("SUSPENSO");
+        // Clube suspenso não opera: sem isso o representante continuaria entrando e cadastrando.
+        definirAcesso(clube, false);
+    }
+
+    /** Liga/desliga o login do representante junto com o status do clube. */
+    private void definirAcesso(Clube clube, boolean liberado) {
+        usuarioRepository.findByEmail(clube.getRepresentanteEmail())
+                .ifPresent(u -> u.setAtivo(liberado));
     }
 
     @Override
@@ -171,6 +234,7 @@ public class ClubeServiceImpl implements ClubeService {
         }
 
         clube.setStatus("ATIVO");
+        definirAcesso(clube, true);
     }
 
     @Override

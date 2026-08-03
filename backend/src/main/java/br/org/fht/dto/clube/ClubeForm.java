@@ -43,6 +43,18 @@ public class ClubeForm {
     @Schema(description = "Cargo do representante no clube", example = "Presidente")
     public String representanteCargo;
 
+    @RestForm
+    @Schema(description = "CPF do representante legal", example = "123.456.789-00")
+    public String representanteCpf;
+
+    /**
+     * Senha de acesso escolhida pelo proprio clube. A conta ja e criada aqui, INATIVA;
+     * a aprovacao pela federacao apenas libera o acesso. Nunca e devolvida em nenhum DTO.
+     */
+    @RestForm
+    @Schema(description = "Senha de acesso ao painel do clube (mínimo 8 caracteres)", required = true)
+    public String senha;
+
     @RestForm("ata")
     @Schema(description = "Ata de fundação (PDF, máx. 10 MB)", required = true)
     public FileUpload ata;

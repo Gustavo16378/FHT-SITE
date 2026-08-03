@@ -16,6 +16,7 @@ const CARGOS = ['Presidente', 'Diretor', 'Secretário', 'Outro']
 const blank = {
   nomeClube: '', sigla: '', cidade: '', uf: 'TO', cnpj: '',
   nomeRepresentante: '', cpfRepresentante: '', cargo: '', emailRepresentante: '', telefoneRepresentante: '',
+  senha: '', senhaConfirma: '',
 }
 
 const inp = 'font-body bg-night/60 border border-federation/20 focus:border-gold rounded-lg px-4 py-3 text-fht-white placeholder-gray-soft text-sm outline-none transition-colors duration-250 w-full'
@@ -35,6 +36,9 @@ export default function Registration() {
   const [errMsg, setErrMsg] = useState('')
   const ataRef = useRef<HTMLInputElement | null>(null)
   const estatutoRef = useRef<HTMLInputElement | null>(null)
+
+  const senhaDiverge = form.senhaConfirma !== '' && form.senha !== form.senhaConfirma
+  const senhaOk = form.senha.length >= 8 && form.senha === form.senhaConfirma
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
     const { name, value } = e.target
@@ -77,6 +81,11 @@ export default function Registration() {
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     if (cpfErr || cnpjErr || !agreed) return
+    if (!senhaOk) {
+      setStatus('error')
+      setErrMsg('Confira a senha de acesso: mínimo de 8 caracteres e as duas iguais.')
+      return
+    }
     setStatus('loading')
     try {
       // Mapeamento EXPLÍCITO para os nomes que o ClubeForm do backend espera. Antes isto era
@@ -94,6 +103,8 @@ export default function Registration() {
         representanteEmail: form.emailRepresentante,
         representanteTelefone: form.telefoneRepresentante,
         representanteCargo: form.cargo,
+        representanteCpf: form.cpfRepresentante,
+        senha: form.senha,
       }
       Object.entries(campos).forEach(([k, v]) => { if (v) data.append(k, v) })
       if (ata) data.append('ata', ata)
@@ -297,6 +308,37 @@ export default function Registration() {
                         <span className={lbl}>Telefone / WhatsApp *</span>
                         <input required type="tel" name="telefoneRepresentante" value={form.telefoneRepresentante}
                           onChange={handleChange} placeholder="(63) 99999-9999" className={inp} />
+                      </div>
+                    </div>
+                  </fieldset>
+
+                  {/* Seção 3 — Acesso ao sistema */}
+                  <fieldset className="flex flex-col gap-4">
+                    <p className="font-display text-gold text-sm tracking-widest uppercase border-b border-gold/20 pb-2">
+                      3. Acesso ao Sistema
+                    </p>
+                    <p className="font-body text-gray-soft text-xs leading-relaxed -mt-1">
+                      Escolha a senha do painel do clube. O acesso é liberado assim que a FHT aprovar a
+                      filiação — o login será o e-mail informado acima.
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <span className={lbl}>Senha *</span>
+                        <input required type="password" name="senha" value={form.senha} onChange={handleChange}
+                          placeholder="Mínimo 8 caracteres" minLength={8}
+                          className={`${inp} ${form.senha && form.senha.length < 8 ? 'border-red-500' : ''}`} />
+                        {form.senha && form.senha.length < 8 && (
+                          <p className="font-body text-red-400 text-xs mt-1">A senha precisa ter ao menos 8 caracteres</p>
+                        )}
+                      </div>
+                      <div>
+                        <span className={lbl}>Confirmar senha *</span>
+                        <input required type="password" name="senhaConfirma" value={form.senhaConfirma}
+                          onChange={handleChange} placeholder="Repita a senha"
+                          className={`${inp} ${senhaDiverge ? 'border-red-500' : ''}`} />
+                        {senhaDiverge && (
+                          <p className="font-body text-red-400 text-xs mt-1">As senhas não conferem</p>
+                        )}
                       </div>
                     </div>
                   </fieldset>

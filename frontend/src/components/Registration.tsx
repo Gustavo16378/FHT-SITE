@@ -133,8 +133,10 @@ export default function Registration() {
   }) {
     return (
       <div>
-        <span className={lbl}>{lbl2} *</span>
-        <input ref={fRef} type="file" accept=".pdf" required className="hidden"
+        <span className={lbl}>{lbl2}</span>
+        {/* Sem `required`: o input está escondido, e um campo required que o navegador não
+            consegue focar bloqueia o submit em silêncio — o botão parecia não funcionar. */}
+        <input ref={fRef} type="file" accept=".pdf" className="hidden"
           onChange={e => onFile(e.target.files?.[0] ?? null)} />
         <button type="button" onClick={() => fRef.current?.click()}
           className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg border text-sm font-body transition-colors duration-250 ${
@@ -262,7 +264,7 @@ export default function Registration() {
                       <div>
                         <span className={lbl}>CNPJ (opcional)</span>
                         <input name="cnpj" value={form.cnpj} onChange={handleChange}
-                          placeholder="00.000.000/0000-00"
+                          autoComplete="off" placeholder="00.000.000/0000-00"
                           className={`${inp} ${cnpjErr ? 'border-red-500' : ''}`} />
                         {cnpjErr && <p className="font-body text-red-400 text-xs mt-1">{cnpjErr}</p>}
                       </div>
@@ -285,8 +287,10 @@ export default function Registration() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <span className={lbl}>CPF *</span>
+                        {/* autoComplete off nos campos com máscara: o autofill do Chrome injeta o
+                            valor sem passar pela formatação e a validação passa a recusar. */}
                         <input required name="cpfRepresentante" value={form.cpfRepresentante} onChange={handleChange}
-                          placeholder="000.000.000-00"
+                          autoComplete="off" placeholder="000.000.000-00"
                           className={`${inp} ${cpfErr ? 'border-red-500' : ''}`} />
                         {cpfErr && <p className="font-body text-red-400 text-xs mt-1">{cpfErr}</p>}
                       </div>
@@ -307,7 +311,7 @@ export default function Registration() {
                       <div>
                         <span className={lbl}>Telefone / WhatsApp *</span>
                         <input required type="tel" name="telefoneRepresentante" value={form.telefoneRepresentante}
-                          onChange={handleChange} placeholder="(63) 99999-9999" className={inp} />
+                          onChange={handleChange} autoComplete="off" placeholder="(63) 99999-9999" className={inp} />
                       </div>
                     </div>
                   </fieldset>
@@ -324,7 +328,10 @@ export default function Registration() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <span className={lbl}>Senha *</span>
+                        {/* new-password impede o Chrome de injetar uma senha salva de outro site,
+                            que preenchia só este campo e deixava a confirmação divergente. */}
                         <input required type="password" name="senha" value={form.senha} onChange={handleChange}
+                          autoComplete="new-password"
                           placeholder="Mínimo 8 caracteres" minLength={8}
                           className={`${inp} ${form.senha && form.senha.length < 8 ? 'border-red-500' : ''}`} />
                         {form.senha && form.senha.length < 8 && (
@@ -334,7 +341,7 @@ export default function Registration() {
                       <div>
                         <span className={lbl}>Confirmar senha *</span>
                         <input required type="password" name="senhaConfirma" value={form.senhaConfirma}
-                          onChange={handleChange} placeholder="Repita a senha"
+                          onChange={handleChange} autoComplete="new-password" placeholder="Repita a senha"
                           className={`${inp} ${senhaDiverge ? 'border-red-500' : ''}`} />
                         {senhaDiverge && (
                           <p className="font-body text-red-400 text-xs mt-1">As senhas não conferem</p>
@@ -343,9 +350,13 @@ export default function Registration() {
                     </div>
                   </fieldset>
 
-                  {/* Seção 3 — Documentos */}
+                  {/* Seção 4 — Documentos */}
                   <fieldset className="flex flex-col gap-4">
-                    <p className="font-display text-gold text-sm tracking-widest uppercase border-b border-gold/20 pb-2">3. Documentos (PDF)</p>
+                    <p className="font-display text-gold text-sm tracking-widest uppercase border-b border-gold/20 pb-2">4. Documentos (PDF)</p>
+                    <p className="font-body text-gray-soft text-xs leading-relaxed -mt-1">
+                      A FHT precisa dos dois documentos para aprovar a filiação. Se não estiverem em
+                      mãos agora, você pode enviar a solicitação e entregá-los depois à federação.
+                    </p>
                     <div className="grid sm:grid-cols-2 gap-4">
                       <FileBtn file={ata} fRef={ataRef} label="Ata de Fundação" onFile={setAta} />
                       <FileBtn file={estatuto} fRef={estatutoRef} label="Estatuto do Clube" onFile={setEstatuto} />

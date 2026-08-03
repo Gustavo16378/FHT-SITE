@@ -6,9 +6,9 @@ import {
   Building2, FileText, Edit3, Save, Calendar, MapPin, Check, Contact,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { maskCPF, maskCNPJ, maskPhone, maskCEP, validateCPF } from '../utils/masks'
+import { maskCPF, maskCNPJ, maskPhone, validateCPF } from '../utils/masks'
 import { UFS } from '../utils/ufs'
-import { apiGet, apiPostForm, apiPostJson, apiPut, apiDelete, ApiError } from '../services/api'
+import { apiGet, apiPostForm, apiPostJson, apiPut, apiDelete, ApiError, fileUrl } from '../services/api'
 import type {
   AtletaDTO, AtletaStatus, ClubeDTO, ClubeStatus, ClubePessoaDTO, FuncaoPessoa,
   PagamentoPendentesDTO, PagamentoLoteDTO,
@@ -64,17 +64,27 @@ const sel = `${inp} appearance-none cursor-pointer`
 const lbl = 'font-body text-gray-soft text-xs uppercase tracking-wider mb-1 block'
 
 /* ── formulário multi-step ──────────────────────────────── */
-const POSICOES = ['Goleiro','Armador Central','Armador Direito','Armador Esquerdo','Ponta Direita','Ponta Esquerda','Pivô']
+// Posições oficiais definidas pela federação. Um atleta pode ocupar mais de uma
+// (ponta direita e esquerda, por exemplo), por isso a seleção é múltipla.
+const POSICOES = [
+  'Goleiro',
+  'Ponta Direita',
+  'Ponta Esquerda',
+  'Armador Lateral Direito',
+  'Armador Lateral Esquerdo',
+  'Armador Central',
+  'Pivô',
+]
 const CATEGORIAS = ['Sub-12','Sub-14','Sub-16','Sub-18','Adulto']
 const PARENTESCOS = ['Mãe','Pai','Tutor legal','Outro']
 
 /** Etapa "Responsável (LGPD)" só existe quando o atleta é menor de 18 (LGPD art. 14). */
 const STEP_LABEL = {
   pessoais: 'Dados Pessoais',
-  contato: 'Contato e Endereço',
+  contato: 'Contato',
   esportivos: 'Dados Esportivos',
   responsavel: 'Responsável (LGPD)',
-  documentos: 'Documentos e Pagamento',
+  documentos: 'Documentos',
 } as const
 type StepKey = keyof typeof STEP_LABEL
 
@@ -92,10 +102,10 @@ function isMenorDeIdade(nascimentoIso: string): boolean {
 const blankAtleta = {
   // etapa 1
   nomeCompleto:'', dataNascimento:'', sexo:'', cpf:'', rg:'', orgaoEmissor:'', naturalidadeCidade:'', naturalidadeUf:'TO',
-  // etapa 2
-  telefone:'', email:'', cep:'', logradouro:'', numero:'', bairro:'', cidade:'', uf:'TO',
-  // etapa 3
-  posicao:'', categoria:'', transferencia: false, clubeAnterior:'',
+  // etapa 2 — só contato. O endereço do atleta é o do clube, então não é mais pedido aqui.
+  telefone:'', email:'',
+  // etapa 3 — posicoes é lista: o atleta pode jogar em mais de uma
+  posicoes: [] as string[], categoria:'', transferencia: false, clubeAnterior:'',
   // etapa do responsável (só menores)
   responsavelNome:'', responsavelCpf:'', responsavelParentesco:'', responsavelEmail:'', responsavelTelefone:'',
   consentimentoCadastro: false, consentimentoImagem: false,
@@ -206,11 +216,10 @@ function DashboardPage({ atletas }: { atletas: AtletaDTO[] }) {
   const porCategoria = CATEGORIAS.map(c => ({ label: c, value: atletas.filter(a => a.categoria === c).length }))
   const maxCat = Math.max(1, ...porCategoria.map(x => x.value))
 
-  // Desempenho em competições — MOCK (módulo de Competições ainda não existe)
-  const desemp = { vitorias: 12, empates: 3, derrotas: 5, competicoes: 3 }
-  const jogos = desemp.vitorias + desemp.empates + desemp.derrotas
-  const aproveitamento = jogos ? Math.round(((desemp.vitorias * 3 + desemp.empates) / (jogos * 3)) * 100) : 0
-  const mediaVit = (desemp.vitorias / desemp.competicoes).toFixed(1)
+  // Situação da anuidade — dado real do elenco
+  const qtdAtivos = atletas.filter(a => a.status === 'ATIVO').length
+  const qtdPendentes = atletas.filter(a => a.status === 'AGUARDANDO_PAGAMENTO').length
+  const pctQuitado = atletas.length ? Math.round((qtdAtivos / atletas.length) * 100) : 0
 
   return (
     <div>
@@ -235,33 +244,32 @@ function DashboardPage({ atletas }: { atletas: AtletaDTO[] }) {
           </div>
         </div>
 
-        {/* Desempenho em competições (mock) */}
+        {/* Situação da anuidade — dado real, no lugar do desempenho em competições que era mock */}
         <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-6">
-          <div className="flex items-center justify-between mb-5">
-            <p className="font-display text-gold text-xs tracking-widest">DESEMPENHO EM COMPETIÇÕES</p>
-            <span className="font-body text-[10px] text-gray-soft/60 border border-federation/20 rounded-full px-2 py-0.5">demonstração</span>
-          </div>
-          <div className="flex items-center gap-6">
-            <Donut pct={aproveitamento} center={`${aproveitamento}%`} sub="aproveit." />
-            <div className="flex-1 grid grid-cols-3 gap-2 text-center">
-              <div className="bg-green-500/10 border border-green-500/20 rounded-lg py-2">
-                <p className="font-display text-green-400 text-2xl">{desemp.vitorias}</p>
-                <p className="font-body text-gray-soft text-[10px] uppercase">Vitórias</p>
-              </div>
-              <div className="bg-federation/10 border border-federation/20 rounded-lg py-2">
-                <p className="font-display text-fht-white text-2xl">{desemp.empates}</p>
-                <p className="font-body text-gray-soft text-[10px] uppercase">Empates</p>
-              </div>
-              <div className="bg-red-500/10 border border-red-500/20 rounded-lg py-2">
-                <p className="font-display text-red-400 text-2xl">{desemp.derrotas}</p>
-                <p className="font-body text-gray-soft text-[10px] uppercase">Derrotas</p>
-              </div>
-              <div className="col-span-3 flex items-center justify-between bg-gold/5 border border-gold/20 rounded-lg px-3 py-2 mt-1">
-                <span className="font-body text-gray-soft text-xs">Média de vitórias / competição</span>
-                <span className="font-display text-gold text-lg">{mediaVit}</span>
+          <p className="font-display text-gold text-xs tracking-widest mb-5">SITUAÇÃO DA ANUIDADE</p>
+          {atletas.length === 0 ? (
+            <p className="font-body text-gray-soft text-sm py-8 text-center">
+              Cadastre os atletas do clube para acompanhar a situação da anuidade aqui.
+            </p>
+          ) : (
+            <div className="flex items-center gap-6">
+              <Donut pct={pctQuitado} center={`${pctQuitado}%`} sub="quitado" />
+              <div className="flex-1 grid grid-cols-2 gap-2 text-center">
+                <div className="bg-green-500/10 border border-green-500/20 rounded-lg py-2">
+                  <p className="font-display text-green-400 text-2xl">{qtdAtivos}</p>
+                  <p className="font-body text-gray-soft text-[10px] uppercase">Em dia</p>
+                </div>
+                <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg py-2">
+                  <p className="font-display text-yellow-400 text-2xl">{qtdPendentes}</p>
+                  <p className="font-body text-gray-soft text-[10px] uppercase">Pendentes</p>
+                </div>
+                <div className="col-span-2 flex items-center justify-between bg-gold/5 border border-gold/20 rounded-lg px-3 py-2 mt-1">
+                  <span className="font-body text-gray-soft text-xs">Atletas do clube</span>
+                  <span className="font-display text-gold text-lg">{atletas.length}</span>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>
@@ -819,7 +827,7 @@ function AtletaDetailPanel({ atleta, onClose, onSaved }: {
                 <p className="font-display text-gold text-xs tracking-widest mb-4">DOCUMENTOS</p>
                 <div className="flex flex-col gap-2">
                   {docs.map(({ label, url, campo, accept }) => url ? (
-                    <a key={label} href={url} target="_blank" rel="noopener noreferrer"
+                    <a key={label} href={fileUrl(url)} target="_blank" rel="noopener noreferrer"
                       className="flex items-center justify-between px-4 py-3 bg-federation/10 border border-federation/20 rounded-lg hover:border-gold/40 transition-colors duration-200">
                       <span className="font-body text-fht-white text-sm">{label}</span>
                       <span className="font-body text-gray-soft text-xs">Abrir →</span>
@@ -876,7 +884,6 @@ function CadastrarAtletaPage({ onSuccess }: { onSuccess: () => void }) {
   const [step, setStep] = useState(0)
   const [form, setForm] = useState(blankAtleta)
   const [cpfErr, setCpfErr] = useState('')
-  const [cepLoading, setCepLoading] = useState(false)
   const [foto, setFoto] = useState<File | null>(null)
   const [rgDoc, setRgDoc] = useState<File | null>(null)
   const [compRes, setCompRes] = useState<File | null>(null)
@@ -897,7 +904,7 @@ function CadastrarAtletaPage({ onSuccess }: { onSuccess: () => void }) {
     && (form.responsavelEmail.trim() !== '' || form.responsavelTelefone.trim() !== '')
     && form.consentimentoCadastro
   )
-  const podeEnviar = rgDoc !== null && responsavelOk
+  const podeEnviar = rgDoc !== null && responsavelOk && form.posicoes.length > 0 && form.categoria !== ''
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
     const { name, value } = e.target
@@ -911,25 +918,14 @@ function CadastrarAtletaPage({ onSuccess }: { onSuccess: () => void }) {
     if (name === 'responsavelCpf') { setForm(p => ({ ...p, responsavelCpf: maskCPF(value) })); return }
     if (name === 'responsavelTelefone') { setForm(p => ({ ...p, responsavelTelefone: maskPhone(value) })); return }
     if (name === 'telefone') { setForm(p => ({ ...p, telefone: maskPhone(value) })); return }
-    if (name === 'cep') {
-      const fmt = maskCEP(value)
-      setForm(p => ({ ...p, cep: fmt }))
-      if (fmt.replace(/\D/g, '').length === 8) fetchCEP(fmt.replace(/\D/g, ''))
-      return
-    }
     setForm(p => ({ ...p, [name]: value }))
   }
 
-  async function fetchCEP(cep: string) {
-    setCepLoading(true)
-    try {
-      const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`)
-      const data = await res.json()
-      if (!data.erro) {
-        setForm(p => ({ ...p, logradouro: data.logradouro, bairro: data.bairro, cidade: data.localidade, uf: data.uf }))
-      }
-    } catch { /* silently fail */ }
-    setCepLoading(false)
+  function alternarPosicao(pos: string) {
+    setForm(p => ({
+      ...p,
+      posicoes: p.posicoes.includes(pos) ? p.posicoes.filter(x => x !== pos) : [...p.posicoes, pos],
+    }))
   }
 
   async function handleFinalSubmit() {
@@ -947,12 +943,8 @@ function CadastrarAtletaPage({ onSuccess }: { onSuccess: () => void }) {
       data.append('naturalidadeUf', form.naturalidadeUf)
       data.append('telefone', form.telefone)
       data.append('email', form.email)
-      data.append('cep', form.cep)
-      data.append('logradouro', form.logradouro)
-      data.append('numero', form.numero)
-      data.append('cidade', form.cidade)
-      data.append('ufResidencia', form.uf)
-      data.append('posicao', form.posicao)
+      // Endereço do atleta = endereço do clube; não é mais coletado no cadastro.
+      data.append('posicao', form.posicoes.join(', '))
       data.append('categoria', form.categoria)
       data.append('isTransferencia', String(form.transferencia))
       if (form.transferencia) data.append('clubeAnterior', form.clubeAnterior)
@@ -1053,35 +1045,11 @@ function CadastrarAtletaPage({ onSuccess }: { onSuccess: () => void }) {
                 <input type="email" name="email" value={form.email} onChange={handleChange} placeholder="atleta@email.com" className={inp} />
               </div>
             </div>
-            <div>
-              <span className={lbl}>CEP {cepLoading && <span className="text-gold">buscando...</span>}</span>
-              <input name="cep" value={form.cep} onChange={handleChange} placeholder="77000-000" className={inp} />
-            </div>
-            <div>
-              <span className={lbl}>Logradouro</span>
-              <input name="logradouro" value={form.logradouro} onChange={handleChange} placeholder="Rua, Avenida..." className={inp} />
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <span className={lbl}>Número</span>
-                <input name="numero" value={form.numero} onChange={handleChange} placeholder="123" className={inp} />
-              </div>
-              <div className="col-span-2">
-                <span className={lbl}>Bairro</span>
-                <input name="bairro" value={form.bairro} onChange={handleChange} placeholder="Bairro" className={inp} />
-              </div>
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="col-span-2">
-                <span className={lbl}>Cidade</span>
-                <input name="cidade" value={form.cidade} onChange={handleChange} placeholder="Palmas" className={inp} />
-              </div>
-              <div>
-                <span className={lbl}>UF</span>
-                <select name="uf" value={form.uf} onChange={handleChange} className={sel}>
-                  {UFS.map(u => <option key={u} value={u}>{u}</option>)}
-                </select>
-              </div>
+            <div className="flex items-start gap-3 bg-federation/10 border border-federation/30 rounded-lg px-4 py-3">
+              <AlertCircle size={16} className="text-gold flex-shrink-0 mt-0.5" />
+              <p className="font-body text-gray-soft text-xs leading-relaxed">
+                O endereço do atleta é o do próprio clube — não precisa ser informado aqui.
+              </p>
             </div>
           </div>
         )}
@@ -1089,21 +1057,34 @@ function CadastrarAtletaPage({ onSuccess }: { onSuccess: () => void }) {
         {/* Etapa 3 */}
         {etapa === 'esportivos' && (
           <div className="flex flex-col gap-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <span className={lbl}>Posição *</span>
-                <select required name="posicao" value={form.posicao} onChange={handleChange} className={sel}>
-                  <option value="" disabled>Selecione</option>
-                  {POSICOES.map(p => <option key={p} value={p}>{p}</option>)}
-                </select>
+            <div>
+              <span className={lbl}>
+                Posições * <span className="normal-case tracking-normal">(pode marcar mais de uma)</span>
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {POSICOES.map(p => {
+                  const ativo = form.posicoes.includes(p)
+                  return (
+                    <button key={p} type="button" onClick={() => alternarPosicao(p)}
+                      className={`font-body text-xs px-3.5 py-2 rounded-full border transition-colors duration-150 ${
+                        ativo ? 'text-gold bg-gold/10 border-gold/40'
+                              : 'text-gray-soft bg-gray-soft/5 border-gray-soft/20 hover:border-gray-soft/50'
+                      }`}>
+                      {p}
+                    </button>
+                  )
+                })}
               </div>
-              <div>
-                <span className={lbl}>Categoria *</span>
-                <select required name="categoria" value={form.categoria} onChange={handleChange} className={sel}>
-                  <option value="" disabled>Selecione</option>
-                  {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
+              {form.posicoes.length === 0 && (
+                <p className="font-body text-gray-soft/70 text-xs mt-2">Selecione ao menos uma posição.</p>
+              )}
+            </div>
+            <div>
+              <span className={lbl}>Categoria *</span>
+              <select required name="categoria" value={form.categoria} onChange={handleChange} className={sel}>
+                <option value="" disabled>Selecione</option>
+                {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
             </div>
             <div className="flex items-center justify-between bg-[#0d1b2a]/40 border border-federation/20 rounded-lg px-4 py-3">
               <span className="font-body text-fht-white text-sm">É transferência de outro clube?</span>
@@ -1685,7 +1666,7 @@ function MeusDadosPage() {
             </div>
             <div className="flex flex-col gap-2">
               {docs.map(({ label, url }) => hasUrl(url) ? (
-                <a key={label} href={url} target="_blank" rel="noopener noreferrer"
+                <a key={label} href={fileUrl(url)} target="_blank" rel="noopener noreferrer"
                   className="flex items-center justify-between px-4 py-3 bg-federation/10 border border-federation/20 rounded-lg hover:border-gold/40 transition-colors duration-200">
                   <span className="font-body text-fht-white text-sm">{label}</span>
                   <span className="font-body text-gray-soft text-xs">Abrir →</span>

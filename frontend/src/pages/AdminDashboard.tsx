@@ -27,6 +27,7 @@ type StatusArbitro = 'PENDENTE' | 'CREDENCIADO' | 'REJEITADO' | 'SUSPENSO'
 interface Clube {
   id: string; nome: string; sigla: string; cidade: string; uf: string; cnpj: string
   representante: string; representanteEmail: string; representanteTelefone: string
+  representanteCargo: string; representanteCpf: string
   status: StatusClube; data: string; ataUrl: string; estatutoUrl: string
   motivoRejeicao?: string; visivelNaHome: boolean
 }
@@ -68,6 +69,8 @@ function mapClube(d: ClubeDTO): Clube {
     representante: d.representanteNome,
     representanteEmail: d.representanteEmail,
     representanteTelefone: d.representanteTelefone,
+    representanteCargo: d.representanteCargo ?? '',
+    representanteCpf: d.representanteCpf ?? '',
     status: d.status,
     data: formatDate(d.createdAt),
     ataUrl: d.ataFundacaoUrl ?? '#',
@@ -417,11 +420,10 @@ function AtletaDetailPanel({
                 { label: 'Foto 3x4', url: atleta.fotoUrl },
                 { label: 'RG digitalizado', url: atleta.rgUrl },
                 { label: 'Comprovante de residência', url: atleta.comprovanteResidenciaUrl },
-                { label: 'Comprovante de pagamento Pix', url: atleta.comprovanteUrl },
               ].map(({ label, url }) => {
                 const ok = url && url !== '#'
                 return ok ? (
-                  <a key={label} href={url} target="_blank" rel="noopener noreferrer"
+                  <a key={label} href={fileUrl(url)} target="_blank" rel="noopener noreferrer"
                     className="flex items-center justify-between px-4 py-3 bg-federation/10 border border-federation/20 rounded-lg hover:border-gold/40 transition-colors duration-200 group">
                     <div className="flex items-center gap-3">
                       <FileText size={16} className="text-gold/60 group-hover:text-gold transition-colors duration-200" />
@@ -486,12 +488,6 @@ function AtletaDetailPanel({
   )
 }
 
-/* ── competições do clube: mock até o módulo existir ──────────── */
-const competicoesClubeMock = [
-  { id: 'cmp1', nome: 'Campeonato Tocantinense 2025', jogos: 8, vitorias: 5, empates: 1, derrotas: 2, posicao: '2º lugar', atletas: ['Rafael Souza Lima', 'Gabriel Oliveira Melo', 'Mariana Costa Alves', 'Beatriz Santos Rocha'] },
-  { id: 'cmp2', nome: 'Copa FHT 2024', jogos: 5, vitorias: 4, empates: 0, derrotas: 1, posicao: 'Campeão', atletas: ['Beatriz Santos Rocha', 'Mariana Costa Alves', 'Rafael Souza Lima'] },
-]
-
 /* ── Clube Detail Panel ───────────────────────────────────────── */
 function ClubeDetailPanel({
   clube, atletas, onClose, onAprovar, onRejeitar, onSuspender, onReativar, onToggleVitrine, onVerAtleta,
@@ -507,7 +503,6 @@ function ClubeDetailPanel({
   onVerAtleta: (a: Atleta) => void
 }) {
   const atletasDoClube = atletas.filter(a => a.clube === clube.nome)
-  const [compAberta, setCompAberta] = useState<string | null>(null)
 
   const Info = ({ label, value }: { label: string; value: string }) => (
     <div>
@@ -569,10 +564,12 @@ function ClubeDetailPanel({
           {/* representante */}
           <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-5">
             <p className="font-display text-gold text-xs tracking-widest mb-4">REPRESENTANTE LEGAL</p>
-            <div className="grid grid-cols-1 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <Info label="Nome" value={clube.representante} />
-              <Info label="E-mail" value={clube.representanteEmail} />
+              <Info label="Cargo" value={clube.representanteCargo || '—'} />
+              <Info label="CPF" value={clube.representanteCpf || '—'} />
               <Info label="Telefone" value={clube.representanteTelefone} />
+              <Info label="E-mail" value={clube.representanteEmail} />
             </div>
           </div>
 
@@ -586,7 +583,9 @@ function ClubeDetailPanel({
               ].map(({ label, url }) => {
                 const ok = url && url !== '#'
                 return ok ? (
-                  <a key={label} href={url} target="_blank" rel="noopener noreferrer"
+                  // fileUrl: a URL vem relativa ("/api/files/...") e o front roda em outra porta —
+                  // sem prefixar, o link abre no host do site e dá 404.
+                  <a key={label} href={fileUrl(url)} target="_blank" rel="noopener noreferrer"
                     className="flex items-center justify-between px-4 py-3 bg-federation/10 border border-federation/20 rounded-lg hover:border-gold/40 transition-colors duration-200 group">
                     <div className="flex items-center gap-3">
                       <FileText size={16} className="text-gold/60 group-hover:text-gold transition-colors duration-200" />
@@ -606,36 +605,6 @@ function ClubeDetailPanel({
                 )
               })}
             </div>
-          </div>
-
-          {/* competições disputadas (mock até o módulo de Competições existir) */}
-          <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-5">
-            <p className="font-display text-gold text-xs tracking-widest mb-4">COMPETIÇÕES DISPUTADAS</p>
-            <div className="flex flex-col gap-2">
-              {competicoesClubeMock.map(c => (
-                <div key={c.id} className="bg-federation/5 border border-federation/10 rounded-lg overflow-hidden">
-                  <button onClick={() => setCompAberta(compAberta === c.id ? null : c.id)}
-                    className="w-full flex items-center justify-between px-4 py-3 hover:bg-federation/10 transition-colors duration-200 text-left">
-                    <div>
-                      <p className="font-body text-fht-white text-sm">{c.nome}</p>
-                      <p className="font-body text-gray-soft text-xs">{c.jogos}J · {c.vitorias}V {c.empates}E {c.derrotas}D · {c.posicao}</p>
-                    </div>
-                    <span className="font-body text-gold text-xs flex-shrink-0">{compAberta === c.id ? 'Fechar' : 'Ver jogos ›'}</span>
-                  </button>
-                  {compAberta === c.id && (
-                    <div className="px-4 pb-3 pt-2 border-t border-federation/10">
-                      <p className="font-body text-gray-soft text-xs uppercase tracking-wider mb-2">Atletas que jogaram</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {c.atletas.map(nome => (
-                          <span key={nome} className="font-body text-fht-white text-xs bg-federation/10 border border-federation/20 rounded-full px-2.5 py-1">{nome}</span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-            <p className="font-body text-gray-soft/50 text-[10px] mt-3">Dados de demonstração — módulo de Competições ainda não existe.</p>
           </div>
 
           {/* atletas */}

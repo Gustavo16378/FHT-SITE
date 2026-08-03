@@ -16,6 +16,8 @@ public record ClubeResponseDTO(
         @Schema(description = "Nome do representante legal") String representanteNome,
         @Schema(description = "E-mail do representante") String representanteEmail,
         @Schema(description = "Telefone do representante") String representanteTelefone,
+        @Schema(description = "Cargo do representante", example = "Presidente") String representanteCargo,
+        @Schema(description = "CPF do representante") String representanteCpf,
         @Schema(description = "URL da ata de fundação (R2)") String ataFundacaoUrl,
         @Schema(description = "URL do estatuto social (R2)") String estatutoUrl,
         @Schema(description = "Status atual", enumeration = {"PENDENTE", "ATIVO", "REJEITADO", "SUSPENSO"}) String status,

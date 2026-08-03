@@ -91,6 +91,8 @@ export interface ClubeDTO {
   representanteNome: string
   representanteEmail: string
   representanteTelefone: string
+  representanteCargo: string | null
+  representanteCpf: string | null
   ataFundacaoUrl: string | null
   estatutoUrl: string | null
   status: ClubeStatus

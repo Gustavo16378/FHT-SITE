@@ -18,6 +18,8 @@ public class ClubeMapper {
                 c.getRepresentanteNome(),
                 c.getRepresentanteEmail(),
                 c.getRepresentanteTelefone(),
+                c.getRepresentanteCargo(),
+                c.getRepresentanteCpf(),
                 c.getAtaFundacaoUrl(),
                 c.getEstatutoUrl(),
                 c.getStatus(),

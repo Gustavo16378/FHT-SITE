@@ -27,19 +27,57 @@ public class ArbitroResource {
     @Inject ArbitroService arbitroService;
 
     @POST
-    @Path("/solicitar")
+    @RolesAllowed("ADMIN_FHT")
     @Consumes(MediaType.MULTIPART_FORM_DATA)
-    @Operation(summary = "Solicitar cadastro de árbitro",
-            description = "Endpoint público (formulário 'Quero ser árbitro'). Cria com status PENDENTE.")
+    @SecurityRequirement(name = "BearerAuth")
+    @Operation(summary = "Cadastrar árbitro",
+            description = "A comissão de arbitragem da FHT cadastra o árbitro. Nasce CREDENCIADO — "
+                    + "não existe mais solicitação pública para virar árbitro.")
     @APIResponses({
-            @APIResponse(responseCode = "201", description = "Solicitação enviada"),
-            @APIResponse(responseCode = "400", description = "Dados inválidos")
+            @APIResponse(responseCode = "201", description = "Árbitro cadastrado"),
+            @APIResponse(responseCode = "401", description = "Token ausente ou inválido"),
+            @APIResponse(responseCode = "403", description = "Apenas ADMIN_FHT"),
+            @APIResponse(responseCode = "422", description = "Dados inválidos")
     })
-    public Response solicitar(@BeanParam ArbitroForm form) {
-        ArbitroResponseDTO a = arbitroService.solicitar(form);
-        return Response.status(201)
-                .entity(ApiResponse.created(a, "Solicitação enviada. A FHT entrará em contato em breve."))
-                .build();
+    public Response cadastrar(@BeanParam ArbitroForm form) {
+        ArbitroResponseDTO a = arbitroService.cadastrar(form);
+        return Response.status(201).entity(ApiResponse.created(a, "Árbitro cadastrado")).build();
+    }
+
+    @PUT
+    @Path("/{id}")
+    @RolesAllowed("ADMIN_FHT")
+    @Consumes(MediaType.MULTIPART_FORM_DATA)
+    @SecurityRequirement(name = "BearerAuth")
+    @Operation(summary = "Editar ficha do árbitro",
+            description = "Atualização parcial. Arquivos só são trocados quando um novo é enviado.")
+    @APIResponses({
+            @APIResponse(responseCode = "200", description = "Ficha atualizada"),
+            @APIResponse(responseCode = "401", description = "Token ausente ou inválido"),
+            @APIResponse(responseCode = "403", description = "Apenas ADMIN_FHT"),
+            @APIResponse(responseCode = "404", description = "Árbitro não encontrado")
+    })
+    public Response atualizar(
+            @Parameter(description = "UUID do árbitro", required = true) @PathParam("id") UUID id,
+            @BeanParam ArbitroForm form) {
+        return Response.ok(ApiResponse.ok(arbitroService.atualizar(id, form), "Ficha atualizada")).build();
+    }
+
+    @DELETE
+    @Path("/{id}")
+    @RolesAllowed("ADMIN_FHT")
+    @SecurityRequirement(name = "BearerAuth")
+    @Operation(summary = "Remover árbitro")
+    @APIResponses({
+            @APIResponse(responseCode = "200", description = "Árbitro removido"),
+            @APIResponse(responseCode = "401", description = "Token ausente ou inválido"),
+            @APIResponse(responseCode = "403", description = "Apenas ADMIN_FHT"),
+            @APIResponse(responseCode = "404", description = "Árbitro não encontrado")
+    })
+    public Response deletar(
+            @Parameter(description = "UUID do árbitro", required = true) @PathParam("id") UUID id) {
+        arbitroService.deletar(id);
+        return Response.ok(ApiResponse.ok(null, "Árbitro removido")).build();
     }
 
     @GET

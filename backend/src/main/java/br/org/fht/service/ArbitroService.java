@@ -9,8 +9,11 @@ import java.util.UUID;
 
 public interface ArbitroService {
 
-    /** Público: solicitação "quero ser árbitro". Cria com status PENDENTE. */
-    ArbitroResponseDTO solicitar(ArbitroForm form);
+    /** Comissão de arbitragem cadastra o árbitro. Nasce CREDENCIADO. */
+    ArbitroResponseDTO cadastrar(ArbitroForm form);
+
+    /** Edição da ficha (parcial: campos nulos são ignorados). */
+    ArbitroResponseDTO atualizar(UUID id, ArbitroForm form);
 
     /** Admin: todos os árbitros. */
     List<ArbitroResponseDTO> listar();
@@ -25,4 +28,6 @@ public interface ArbitroService {
     void suspender(UUID id);
 
     void reativar(UUID id);
+
+    void deletar(UUID id);
 }

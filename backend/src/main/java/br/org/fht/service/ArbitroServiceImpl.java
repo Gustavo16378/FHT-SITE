@@ -1,6 +1,7 @@
 package br.org.fht.service;
 
 import br.org.fht.dto.arbitro.ArbitroForm;
+import br.org.fht.exception.ValidationException;
 import br.org.fht.dto.arbitro.ArbitroPublicoDTO;
 import br.org.fht.dto.arbitro.ArbitroResponseDTO;
 import br.org.fht.mapper.ArbitroMapper;
@@ -25,9 +26,9 @@ public class ArbitroServiceImpl implements ArbitroService {
 
     @Override
     @Transactional
-    public ArbitroResponseDTO solicitar(ArbitroForm form) {
+    public ArbitroResponseDTO cadastrar(ArbitroForm form) {
         if (form == null || form.nomeCompleto == null || form.nomeCompleto.isBlank()) {
-            throw new WebApplicationException("Nome é obrigatório", 400);
+            throw new ValidationException("nomeCompleto", "Nome é obrigatório");
         }
 
         Arbitro a = new Arbitro();
@@ -42,21 +43,57 @@ public class ArbitroServiceImpl implements ArbitroService {
         a.setCidade(form.cidade);
         a.setUf(form.uf != null && !form.uf.isBlank() ? form.uf : "TO");
 
-        a.setJaArbitro(parseBool(form.jaArbitro));
-        a.setNivelAtual(form.nivelAtual);
-        a.setFederacaoOrigem(form.federacaoOrigem);
-        a.setTemExperiencia(parseBool(form.temExperiencia));
-        a.setDescricaoExperiencia(form.descricaoExperiencia);
-        a.setDisponibilidadeFds(parseBool(form.disponibilidadeFds));
-        a.setCursoInteresse(form.cursoInteresse);
+        a.setNivel(form.nivel);
+        a.setRegistro(form.registro);
+        a.setInicioArbitragem(form.inicioArbitragem);
+        a.setFormacao(form.formacao);
 
         a.setFotoUrl(upload("foto", form.foto));
         a.setRgUrl(upload("rg", form.rgDoc));
-        a.setComprovanteEscolarUrl(upload("escolar", form.compEscolar));
 
-        a.setStatus("PENDENTE");
+        // Quem cadastra é a própria comissão de arbitragem — não há o que aprovar.
+        a.setStatus("CREDENCIADO");
         arbitroRepository.persist(a);
         return ArbitroMapper.toResponse(a);
+    }
+
+    @Override
+    @Transactional
+    public ArbitroResponseDTO atualizar(UUID id, ArbitroForm form) {
+        Arbitro a = buscar(id);
+        if (form == null) {
+            throw new ValidationException("form", "Dados do árbitro ausentes");
+        }
+
+        // Atualização parcial: só sobrescreve o que veio preenchido.
+        if (naoBranco(form.nomeCompleto)) a.setNome(form.nomeCompleto.trim());
+        if (form.cpf != null) a.setCpf(form.cpf);
+        if (form.rg != null) a.setRg(form.rg);
+        if (form.orgaoEmissor != null) a.setOrgaoEmissor(form.orgaoEmissor);
+        if (naoBranco(form.dataNascimento)) a.setDataNascimento(parseData(form.dataNascimento));
+        if (form.sexo != null) a.setSexo(form.sexo);
+        if (form.telefone != null) a.setTelefone(form.telefone);
+        if (form.email != null) a.setEmail(form.email);
+        if (form.cidade != null) a.setCidade(form.cidade);
+        if (naoBranco(form.uf)) a.setUf(form.uf);
+        if (form.nivel != null) a.setNivel(form.nivel);
+        if (form.registro != null) a.setRegistro(form.registro);
+        if (form.inicioArbitragem != null) a.setInicioArbitragem(form.inicioArbitragem);
+        if (form.formacao != null) a.setFormacao(form.formacao);
+
+        // Arquivo só é trocado quando um novo é enviado — não apaga o que já existe.
+        String foto = upload("foto", form.foto);
+        if (foto != null) a.setFotoUrl(foto);
+        String rgDoc = upload("rg", form.rgDoc);
+        if (rgDoc != null) a.setRgUrl(rgDoc);
+
+        return ArbitroMapper.toResponse(a);
+    }
+
+    @Override
+    @Transactional
+    public void deletar(UUID id) {
+        arbitroRepository.delete(buscar(id));
     }
 
     @Override
@@ -127,8 +164,8 @@ public class ArbitroServiceImpl implements ArbitroService {
         return r2.upload(key, file);
     }
 
-    private boolean parseBool(String s) {
-        return "true".equalsIgnoreCase(s);
+    private boolean naoBranco(String s) {
+        return s != null && !s.isBlank();
     }
 
     private LocalDate parseData(String s) {

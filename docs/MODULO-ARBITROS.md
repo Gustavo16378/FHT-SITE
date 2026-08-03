@@ -42,3 +42,43 @@ Definidos pra destravar o cadastro/aprovação. Ajustar com o Gustavo / Dir. de 
 2. Backend `Arbitro` (CRUD + ações de status).
 3. Ligar o painel na API (tirar o mock).
 4. Endpoint público de solicitação + `ArbitroForm`.
+
+---
+
+## ⚠️ MUDANÇA DE REGRA (ago/2026) — cadastro passou a ser INTERNO
+
+A federação informou que **existe uma comissão de arbitragem que cuida disso**. O módulo foi
+invertido:
+
+| Antes | Agora |
+|---|---|
+| Qualquer um pedia pelo site ("Quero ser árbitro") | **Só a comissão da FHT cadastra** |
+| Nascia `PENDENTE`, a FHT credenciava | **Nasce `CREDENCIADO`** |
+| Candidato se auto-declarava (já é árbitro? tem experiência?) | A federação preenche a ficha oficial |
+
+**Árbitro não tem painel próprio** — não é usuário do sistema, é um cadastro que a federação
+mantém e publica no site.
+
+### O que mudou no código
+- **Migration `V14`**: dropou as 8 colunas que só existiam para a petição pública
+  (`ja_arbitro`, `nivel_atual`, `federacao_origem`, `tem_experiencia`, `descricao_experiencia`,
+  `disponibilidade_fds`, `curso_interesse`, `comprovante_escolar_url`).
+- **Saiu** `POST /api/arbitros/solicitar` (era o único endpoint público de escrita do sistema).
+- **Entraram** `POST /api/arbitros`, `PUT /api/arbitros/{id}` e `DELETE /api/arbitros/{id}`,
+  todos `ADMIN_FHT`.
+- **Frontend**: `ArbitroForm.tsx` deletado; em `Referees.tsx` o botão "QUERO SER ÁRBITRO" virou
+  "FALE COM A ARBITRAGEM" (âncora para o contato), com o aviso de que o credenciamento é interno.
+- **Painel admin**: botão "Cadastrar árbitro" + modal de ficha (cadastro e edição), e ação
+  "Editar" na linha de cada árbitro.
+
+### Um bug que a inversão consertou de graça
+`nivel`, `registro`, `inicioArbitragem` e `formacao` existiam no modelo e apareciam na ficha do
+painel, mas **nenhum endpoint os gravava** — não havia `PUT`, e o `/solicitar` não os setava.
+Metade da ficha só podia ser preenchida por SQL. Agora o `PUT` grava tudo.
+
+### Pendências
+- Os status `PENDENTE` e `REJEITADO` continuam existindo só para os registros que vieram do
+  formulário antigo. A migration não os apagou de propósito — quem decide o que fazer com uma
+  solicitação pendurada é a federação, no painel.
+- Os **cursos de arbitragem** exibidos na home seguem estáticos em `src/data/referees.ts` (não há
+  módulo de cursos).

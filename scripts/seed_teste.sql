@@ -41,12 +41,10 @@ VALUES
  ('aa000000-0000-0000-0000-0000000000a1', 'IMAGEM_PUBLICA',        true, 'Carla Almeida Nunes', '111.222.333-99', '1.0', NOW() - INTERVAL '2 days', '187.0.0.1', 'Mozilla/5.0 (seed de teste)')
 ON CONFLICT DO NOTHING;
 
--- Prazo de pagamento nos cadastros pendentes: um correndo, um já vencido
--- (o vencido some na próxima rodada do AtletaExpurgoJob — é o comportamento esperado).
-UPDATE atletas SET prazo_pagamento_ate = NOW() + INTERVAL '6 hours'
- WHERE cpf = '111.222.333-03' AND status = 'AGUARDANDO_PAGAMENTO';
-UPDATE atletas SET prazo_pagamento_ate = NOW() - INTERVAL '1 hour'
- WHERE cpf = '111.222.333-07' AND status = 'AGUARDANDO_PAGAMENTO';
+-- O prazo de pagamento por atleta acabou (ago/2026): agora o clube paga em lote, quando puder,
+-- e o expurgo só apaga cadastro abandonado há 90 dias. Os dois atletas AGUARDANDO_PAGAMENTO do
+-- seed ficam pendentes de propósito — são eles que alimentam a soma do botão de pagamento.
+UPDATE atletas SET prazo_pagamento_ate = NULL WHERE prazo_pagamento_ate IS NOT NULL;
 
 -- ── Usuário ADMIN_CLUBE de teste (senha: 123456) — vinculado ao Palmas HC ──
 -- (o admin admin@fht.org.br já vem no seed V4). Hash bcrypt de "123456".
@@ -139,13 +137,13 @@ ON CONFLICT (id) DO NOTHING;
 
 -- ── Árbitros (status variados; credenciados aparecem no site) ───────────
 -- Limpar depois: DELETE FROM arbitros WHERE id::text LIKE 'eeeeeeee-%';
-INSERT INTO arbitros (id, nome, cpf, data_nascimento, sexo, telefone, email, cidade, uf, foto_url, ja_arbitro, tem_experiencia, disponibilidade_fds, nivel, registro, inicio_arbitragem, formacao, status, created_at, updated_at)
+INSERT INTO arbitros (id, nome, cpf, data_nascimento, sexo, telefone, email, cidade, uf, foto_url, nivel, registro, inicio_arbitragem, formacao, status, created_at, updated_at)
 VALUES
- ('eeeeeeee-0000-0000-0000-000000000001', 'Carlos Eduardo Nunes', '222.333.444-07', '1985-10-08', 'Masculino', '(63) 98333-1007', 'carlos.arb@email.com', 'Gurupi', 'TO', 'https://i.pravatar.cc/150?img=14', true, true, true, 'Nacional', 'ARB-TO-0007', '2008', 'Curso CBHb + Arbitragem Nacional 2018', 'CREDENCIADO', NOW(), NOW()),
- ('eeeeeeee-0000-0000-0000-000000000002', 'Renata Alves Souza', '222.333.444-08', '1992-02-20', 'Feminino', '(63) 98333-1008', 'renata.arb@email.com', 'Porto Nacional', 'TO', 'https://i.pravatar.cc/150?img=48', true, true, true, 'Estadual B', 'ARB-TO-0042', '2013', 'Curso CBHb 2013 + Reciclagem 2020', 'CREDENCIADO', NOW(), NOW()),
- ('eeeeeeee-0000-0000-0000-000000000003', 'Marcos Vinicius Alves', '222.333.444-09', '1990-05-11', 'Masculino', '(63) 98333-1009', 'marcos.arb@email.com', 'Palmas', 'TO', 'https://i.pravatar.cc/150?img=33', true, true, true, 'Estadual A', 'ARB-TO-0021', '2016', 'Curso de Formação CBHb 2016', 'CREDENCIADO', NOW(), NOW()),
- ('eeeeeeee-0000-0000-0000-000000000004', 'Fábio Martins Rocha', '222.333.444-10', '1988-06-15', 'Masculino', '(63) 98333-1010', 'fabio.arb@email.com', 'Palmas', 'TO', 'https://i.pravatar.cc/150?img=12', false, true, true, NULL, NULL, NULL, NULL, 'PENDENTE', NOW(), NOW()),
- ('eeeeeeee-0000-0000-0000-000000000005', 'Patrícia Gomes Lima', '222.333.444-11', '1990-12-01', 'Feminino', '(63) 98333-1011', 'patricia.arb@email.com', 'Araguaína', 'TO', 'https://i.pravatar.cc/150?img=44', true, true, false, 'Regional', 'ARB-TO-0055', '2019', 'Curso de Formação CBHb 2019', 'SUSPENSO', NOW(), NOW())
+ ('eeeeeeee-0000-0000-0000-000000000001', 'Carlos Eduardo Nunes', '222.333.444-07', '1985-10-08', 'Masculino', '(63) 98333-1007', 'carlos.arb@email.com', 'Gurupi', 'TO', 'https://i.pravatar.cc/150?img=14', 'Nacional', 'ARB-TO-0007', '2008', 'Curso CBHb + Arbitragem Nacional 2018', 'CREDENCIADO', NOW(), NOW()),
+ ('eeeeeeee-0000-0000-0000-000000000002', 'Renata Alves Souza', '222.333.444-08', '1992-02-20', 'Feminino', '(63) 98333-1008', 'renata.arb@email.com', 'Porto Nacional', 'TO', 'https://i.pravatar.cc/150?img=48', 'Estadual B', 'ARB-TO-0042', '2013', 'Curso CBHb 2013 + Reciclagem 2020', 'CREDENCIADO', NOW(), NOW()),
+ ('eeeeeeee-0000-0000-0000-000000000003', 'Marcos Vinicius Alves', '222.333.444-09', '1990-05-11', 'Masculino', '(63) 98333-1009', 'marcos.arb@email.com', 'Palmas', 'TO', 'https://i.pravatar.cc/150?img=33', 'Estadual A', 'ARB-TO-0021', '2016', 'Curso de Formação CBHb 2016', 'CREDENCIADO', NOW(), NOW()),
+ ('eeeeeeee-0000-0000-0000-000000000004', 'Fábio Martins Rocha', '222.333.444-10', '1988-06-15', 'Masculino', '(63) 98333-1010', 'fabio.arb@email.com', 'Palmas', 'TO', 'https://i.pravatar.cc/150?img=12', NULL, NULL, NULL, NULL, 'PENDENTE', NOW(), NOW()),
+ ('eeeeeeee-0000-0000-0000-000000000005', 'Patrícia Gomes Lima', '222.333.444-11', '1990-12-01', 'Feminino', '(63) 98333-1011', 'patricia.arb@email.com', 'Araguaína', 'TO', 'https://i.pravatar.cc/150?img=44', 'Regional', 'ARB-TO-0055', '2019', 'Curso de Formação CBHb 2019', 'SUSPENSO', NOW(), NOW())
 ON CONFLICT (id) DO NOTHING;
 
 -- ── Competições (V13) — cobre os status derivados e o override manual ───

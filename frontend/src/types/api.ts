@@ -236,7 +236,12 @@ export interface DocumentoUploadResponse {
   tamanhoBytes: number
 }
 
-export type ArbitroStatus = 'PENDENTE' | 'CREDENCIADO' | 'REJEITADO' | 'SUSPENSO'
+/**
+ * O árbitro é cadastrado pela comissão de arbitragem e já nasce CREDENCIADO.
+ * PENDENTE e REJEITADO só aparecem em registros do antigo formulário público de solicitação,
+ * que não existe mais.
+ */
+export type ArbitroStatus = 'CREDENCIADO' | 'SUSPENSO' | 'PENDENTE' | 'REJEITADO'
 
 /** ArbitroResponseDTO — visão completa (admin) */
 export interface ArbitroDTO {
@@ -253,14 +258,6 @@ export interface ArbitroDTO {
   uf: string | null
   fotoUrl: string | null
   rgUrl: string | null
-  comprovanteEscolarUrl: string | null
-  jaArbitro: boolean
-  nivelAtual: string | null
-  federacaoOrigem: string | null
-  temExperiencia: boolean
-  descricaoExperiencia: string | null
-  disponibilidadeFds: boolean
-  cursoInteresse: string | null
   nivel: string | null
   registro: string | null
   inicioArbitragem: string | null

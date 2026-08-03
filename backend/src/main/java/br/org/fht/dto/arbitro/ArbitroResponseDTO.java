@@ -21,19 +21,13 @@ public record ArbitroResponseDTO(
         String uf,
         String fotoUrl,
         String rgUrl,
-        String comprovanteEscolarUrl,
-        boolean jaArbitro,
-        String nivelAtual,
-        String federacaoOrigem,
-        boolean temExperiencia,
-        String descricaoExperiencia,
-        boolean disponibilidadeFds,
-        String cursoInteresse,
         @Schema(description = "Nível oficial credenciado", enumeration = {"Regional", "Estadual B", "Estadual A", "Nacional"}) String nivel,
         String registro,
         String inicioArbitragem,
         String formacao,
-        @Schema(enumeration = {"PENDENTE", "CREDENCIADO", "REJEITADO", "SUSPENSO"}) String status,
+        @Schema(description = "CREDENCIADO/SUSPENSO no fluxo atual; PENDENTE e REJEITADO só existem "
+                + "em registros do antigo formulário público de solicitação",
+                enumeration = {"CREDENCIADO", "SUSPENSO", "PENDENTE", "REJEITADO"}) String status,
         String motivoRejeicao,
         LocalDateTime createdAt
 ) {}

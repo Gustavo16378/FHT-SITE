@@ -36,32 +36,7 @@ public class Arbitro extends DefaultEntity {
     @Column(name = "rg_url")
     private String rgUrl;
 
-    @Column(name = "comprovante_escolar_url")
-    private String comprovanteEscolarUrl;
-
-    // ---- Solicitação (auto-declarado no formulário público) ----
-    @Column(name = "ja_arbitro")
-    private boolean jaArbitro = false;
-
-    @Column(name = "nivel_atual")
-    private String nivelAtual;
-
-    @Column(name = "federacao_origem")
-    private String federacaoOrigem;
-
-    @Column(name = "tem_experiencia")
-    private boolean temExperiencia = false;
-
-    @Column(name = "descricao_experiencia", columnDefinition = "TEXT")
-    private String descricaoExperiencia;
-
-    @Column(name = "disponibilidade_fds")
-    private boolean disponibilidadeFds = false;
-
-    @Column(name = "curso_interesse")
-    private String cursoInteresse;
-
-    // ---- Credenciamento (definido pela FHT ao aprovar) ----
+    // ---- Credenciamento (preenchido pela comissão de arbitragem) ----
     // Nível oficial: Regional | Estadual B | Estadual A | Nacional
     private String nivel;
     private String registro;
@@ -72,9 +47,11 @@ public class Arbitro extends DefaultEntity {
     private String formacao;
 
     // ---- Status ----
-    // PENDENTE | CREDENCIADO | REJEITADO | SUSPENSO
+    // CREDENCIADO | SUSPENSO — quem cadastra é a própria federação, então nasce credenciado.
+    // PENDENTE e REJEITADO sobrevivem apenas nos registros que vieram do antigo formulário
+    // público de solicitação, que não existe mais.
     @Column(nullable = false, length = 50)
-    private String status = "PENDENTE";
+    private String status = "CREDENCIADO";
 
     @Column(name = "motivo_rejeicao")
     private String motivoRejeicao;
@@ -114,30 +91,6 @@ public class Arbitro extends DefaultEntity {
 
     public String getRgUrl() { return rgUrl; }
     public void setRgUrl(String rgUrl) { this.rgUrl = rgUrl; }
-
-    public String getComprovanteEscolarUrl() { return comprovanteEscolarUrl; }
-    public void setComprovanteEscolarUrl(String comprovanteEscolarUrl) { this.comprovanteEscolarUrl = comprovanteEscolarUrl; }
-
-    public boolean isJaArbitro() { return jaArbitro; }
-    public void setJaArbitro(boolean jaArbitro) { this.jaArbitro = jaArbitro; }
-
-    public String getNivelAtual() { return nivelAtual; }
-    public void setNivelAtual(String nivelAtual) { this.nivelAtual = nivelAtual; }
-
-    public String getFederacaoOrigem() { return federacaoOrigem; }
-    public void setFederacaoOrigem(String federacaoOrigem) { this.federacaoOrigem = federacaoOrigem; }
-
-    public boolean isTemExperiencia() { return temExperiencia; }
-    public void setTemExperiencia(boolean temExperiencia) { this.temExperiencia = temExperiencia; }
-
-    public String getDescricaoExperiencia() { return descricaoExperiencia; }
-    public void setDescricaoExperiencia(String descricaoExperiencia) { this.descricaoExperiencia = descricaoExperiencia; }
-
-    public boolean isDisponibilidadeFds() { return disponibilidadeFds; }
-    public void setDisponibilidadeFds(boolean disponibilidadeFds) { this.disponibilidadeFds = disponibilidadeFds; }
-
-    public String getCursoInteresse() { return cursoInteresse; }
-    public void setCursoInteresse(String cursoInteresse) { this.cursoInteresse = cursoInteresse; }
 
     public String getNivel() { return nivel; }
     public void setNivel(String nivel) { this.nivel = nivel; }

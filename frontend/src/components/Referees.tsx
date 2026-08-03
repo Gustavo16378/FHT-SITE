@@ -4,7 +4,6 @@ import { refereeCourses } from '../data/referees'
 import { useInView } from '../hooks/useInView'
 import { apiGet, fileUrl } from '../services/api'
 import type { ArbitroPublicoDTO } from '../types/api'
-import ArbitroForm from './ArbitroForm'
 
 const levelColors: Record<string, string> = {
   'Nacional': 'text-gold border-gold/40 bg-gold/10',
@@ -28,7 +27,6 @@ function Avatar({ arb }: { arb: ArbitroPublicoDTO }) {
 
 export default function Referees() {
   const ref = useInView()
-  const [showForm, setShowForm] = useState(false)
   const [arbitros, setArbitros] = useState<ArbitroPublicoDTO[]>([])
   const [carregando, setCarregando] = useState(true)
 
@@ -109,12 +107,18 @@ export default function Referees() {
                   </li>
                 ))}
               </ul>
-              <button
-                onClick={() => setShowForm(true)}
+              {/* O cadastro de árbitro é interno: quem inclui na lista é a comissão de
+                  arbitragem da FHT. Quem se interessa procura a federação pelo contato. */}
+              <a
+                href="#contato"
                 className="flex items-center justify-center gap-2 font-display text-night bg-gold hover:bg-gold-light py-3 rounded-lg tracking-wider transition-colors duration-250 w-full"
               >
-                QUERO SER ÁRBITRO <ArrowRight size={16} />
-              </button>
+                FALE COM A ARBITRAGEM <ArrowRight size={16} />
+              </a>
+              <p className="font-body text-gray-soft text-xs text-center mt-3 leading-relaxed">
+                O credenciamento é feito pela comissão de arbitragem da FHT. Entre em contato para
+                saber sobre os próximos cursos de formação.
+              </p>
             </div>
 
             {/* Próximos cursos */}
@@ -140,7 +144,6 @@ export default function Referees() {
         </div>
       </div>
     </section>
-    {showForm && <ArbitroForm onClose={() => setShowForm(false)} />}
     </>
   )
 }

@@ -17,7 +17,7 @@ Cobre: site público one-page, área administrativa da federação, área do clu
 
 **Backend** (`backend/`, package base `br.org.fht`)
 - Java 21 (Temurin) + **Quarkus 3.15.1** (JVM mode) — **não é Spring**
-- Hibernate ORM Panache, PostgreSQL 16, **Flyway** (migrations `V1`–`V13`)
+- Hibernate ORM Panache, PostgreSQL 16, **Flyway** (migrations `V1`–`V14`)
 - **Quarkus Scheduler** (`@Scheduled`) — hoje só o expurgo de cadastros de atleta não pagos
 - **SmallRye JWT** RSA 2048 (JWT próprio — substituiu Keycloak por decisão)
 - Cloudflare **R2** (AWS SDK v2 S3) para uploads de documentos
@@ -45,10 +45,11 @@ Containerização foi feita justamente pra rodar idêntico no PC de mesa e no no
 
 ## Credenciais de teste
 
-- `admin@fht.org.br` / `123456` → **ADMIN_FHT** (existe no seed `V4__seed_admin.sql` e no mock do front)
-- `clube@fht.org.br` / `123456` → **ADMIN_CLUBE** (só no mock do front; ainda sem usuário real no banco)
+- `admin@fht.org.br` / `123456` → **ADMIN_FHT** (seed `V4__seed_admin.sql`)
+- `clube@fht.org.br` / `123456` → **ADMIN_CLUBE** (usuário real no banco, via `scripts/seed_teste.sql`)
 
-`AuthContext.tsx` tenta o mock primeiro e, se não bater, cai pra API real (`POST /api/auth/login`).
+`AuthContext.tsx` usa a **API real**; só cai num mock offline se o backend não responder.
+⚠️ **Esse fallback (`MOCK_USERS`) tem que sair antes do deploy** — são credenciais de admin no bundle JS.
 
 ## Domínio & arquitetura
 
@@ -66,12 +67,13 @@ Containerização foi feita justamente pra rodar idêntico no PC de mesa e no no
 
 **Atleta:** CPF, RG, nascimento, endereço, sexo, posição, categoria, status de transferência, taxa de filiação, 4 documentos (Foto 3x4, RG, Comprovante de residência, Comprovante Pix) + **dados do responsável legal** (menores).
 **⭐ Regra de anuidade (nova):** a taxa de filiação é **ANUAL** (`taxaAno`). Pagar a anuidade do ano **habilita participar dos eventos/competições daquele ano** → elegibilidade pra competir = anuidade do ano paga; a filiação vence e renova por ano. Amarra Financeiro ↔ Competições. Ver `docs/MODULO-DASHBOARD-FINANCEIRO.md` §4.1.
-**⭐ Fluxo de cadastro/pagamento — ✅ FEITO (jul/2026):** clube cadastra (**RG obrigatório**; foto e comprovante de residência podem vir depois) → faz o Pix e anexa o comprovante. **Com** comprovante nasce `AGUARDANDO_APROVACAO`; **sem** comprovante nasce `AGUARDANDO_PAGAMENTO` com **prazo de 24h** — vencido, o `AtletaExpurgoJob` apaga. **Menor de 18** exige dados + consentimento do responsável (LGPD art. 14), validado no servidor. **Aprovar** exige comprovante **e** (se menor) o consentimento do responsável. 📄 `docs/MODULO-ATLETA-FLUXO.md` §8.
+**⭐ Fluxo de cadastro — ✅ FEITO (jul/2026):** clube cadastra (**RG obrigatório**; foto e comprovante de residência podem vir depois). **Menor de 18** exige dados + consentimento do responsável (LGPD art. 14), validado no servidor. 📄 `docs/MODULO-ATLETA-FLUXO.md` §8.
+**⭐ Fluxo de PAGAMENTO — 🔄 MUDOU em ago/2026 (em construção):** o atleta **não paga mais no ato do cadastro**. O clube cadastra à vontade (todos nascem `AGUARDANDO_PAGAMENTO`, sem prazo curto), e depois usa um **botão de pagamento** que soma os pendentes: **um Pix só, um comprovante só, N atletas**. O comprovante chega no painel do admin **com a lista nominal** dos atletas que cobre, e a federação dá baixa. Sem gateway de Pix (sem orçamento) — é conferência manual. O `AtletaExpurgoJob` passou a apagar só cadastro **abandonado há 90 dias** (antes era 24h, o que apagaria quem espera o lote).
 **Clube:** CNPJ, endereço, representante, documentos (Ata, Estatuto), status (`PENDENTE` / aprovado / `SUSPENSO`).
 
 **Frontend — rotas:** `/` (site público one-page), `/login`, `/clube` (protegida `ADMIN_CLUBE`), `/admin` (protegida `ADMIN_FHT`) via `ProtectedRoute` + `AuthContext`.
 Site público (componentes em `src/components/`): Hero, Competitions, Registration, News, About, Clubs, Referees, Gallery, Documents, Contact, Footer, CookieBanner, Navbar (hide-on-scroll), ScrollProgress.
-Dados ainda **estáticos** em `src/data/*.ts` (clubs, competitions, directors, documents, gallery, news, referees). Utils: `masks.ts`, `ufs.ts`.
+✅ **Nada mais é estático no site público.** O único `src/data/*.ts` que sobrou é `referees.ts`, e só guarda os **cursos** de arbitragem (sem módulo). Utils: `masks.ts`, `ufs.ts`.
 
 ## Estado atual (atualizar conforme avança)
 
@@ -113,7 +115,7 @@ Tema comum: quase tudo é "admin/diretoria alimenta conteúdo que hoje é estát
 4. ~~**Clubes — vitrine pública + modal**~~ ✅ **FEITO PONTA A PONTA (jul/2026)** — 2º módulo mock→real. Backend: flag `visivelNaHome` (migration V7) + `GET /api/clubes/publico` (lista, categorias derivadas dos atletas ATIVOS, **sem** CNPJ/docs/contato — LGPD) + `GET /api/clubes/publico/{id}` (modal com elenco) + `PATCH /api/clubes/{id}/vitrine` (admin liga/desliga, não altera status). Front: `Clubs.tsx` real + modal com elenco; toggle "Ocultar/Mostrar na home" no `ClubeDetailPanel` do admin. **Pendente:** aba "competições participadas" no modal (depende do módulo de Competições). 📄 [`docs/MODULO-CLUBES-VITRINE.md`](docs/MODULO-CLUBES-VITRINE.md).
 5. ~~**Galeria ("Momentos que ficam")**~~ ✅ **FEITO PONTA A PONTA (jul/2026)** — 3º módulo mock→real. Backend: `Foto` (model/migration V8/repository), `GET /api/galeria` público + CRUD admin + upload (storage local). Front: `Gallery.tsx` (home) real com **legenda sempre visível** (era só no hover); `GaleriaPage` admin com CRUD real + upload de imagem + `tamanho` (large/medium/small) no mosaico. 📄 [`docs/MODULO-GALERIA.md`](docs/MODULO-GALERIA.md).
 5b. **Dashboard (analytics) + Financeiro** — dashboard ganha gráficos (afiliações no tempo, comparações mensais); **módulo financeiro completo** (taxas/pagamentos — atleta já tem `taxaValor`/`taxaAno`) + exportar **balanço/relatório** (PDF/Excel). Acesso restrito (scope Dir. Financeira). 📄 [`docs/MODULO-DASHBOARD-FINANCEIRO.md`](docs/MODULO-DASHBOARD-FINANCEIRO.md).
-6. ~~**Árbitros**~~ ✅ **FEITO PONTA A PONTA (jul/2026)** — 5º módulo mock→real. Backend: `Arbitro` (model/migration V11/repository), `POST /api/arbitros/solicitar` (público, multipart — o `ArbitroForm` já chamava), `GET /api/arbitros/publico` (só CREDENCIADOS, dados públicos), `GET /api/arbitros` (admin) + PATCH credenciar/rejeitar/suspender/reativar (ciclo `PENDENTE→CREDENCIADO→SUSPENSO`, `REJEITADO`). Front: `Referees.tsx` (home) lista credenciados da API; `ArbitrosPage` do admin ligada na API real (fim do `arbitrosMock`). Cursos de árbitro seguem estáticos (`referees.ts`, sem módulo). 📄 [`docs/MODULO-ARBITROS.md`](docs/MODULO-ARBITROS.md).
+6. ~~**Árbitros**~~ ✅ **FEITO PONTA A PONTA (jul/2026)** — 5º módulo mock→real. **🔄 INVERTIDO em ago/2026:** a federação informou que **existe uma comissão de arbitragem** que cuida do cadastro. Saiu o formulário público "quero ser árbitro" (`ArbitroForm.tsx` deletado, `POST /solicitar` removido) e entrou o cadastro interno (`POST`/`PUT`/`DELETE /api/arbitros`, só ADMIN_FHT) — o árbitro **nasce CREDENCIADO** e **não tem painel próprio**. Migration `V14` dropou as 8 colunas de auto-declaração. Consertou de graça um bug: `nivel`/`registro`/`formacao` apareciam na ficha mas nenhum endpoint os gravava. Cursos de árbitro seguem estáticos (`referees.ts`, sem módulo). 📄 [`docs/MODULO-ARBITROS.md`](docs/MODULO-ARBITROS.md).
 5. **R2 (uploads)** — 🗓️ ÚLTIMA etapa, só no deploy pro Cloudflare. Nada no dev depende disso.
 - Perfil `ATLETA` — **em análise, tendência a NÃO fazer** (custo/peso — ver Roles).
 

@@ -92,3 +92,12 @@ export function apiPostForm<T>(path: string, form: FormData): Promise<T> {
     body: form,
   }).then(r => handle<T>(r))
 }
+
+/** Edição com arquivo junto (mesma regra de Content-Type do apiPostForm). */
+export function apiPutForm<T>(path: string, form: FormData): Promise<T> {
+  return fetch(`${API_URL}${path}`, {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: form,
+  }).then(r => handle<T>(r))
+}

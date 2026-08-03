@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Shield, Users, Star, Trophy, Newspaper,
   FileText, LogOut, Menu, X, AlertCircle, Search,
-  Image as ImageIcon, Contact, UserCog, Wallet, Home,
+  Image as ImageIcon, Contact, UserCog, Wallet, Home, Plus,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { apiGet, apiPatch, ApiError, fileUrl } from '../services/api'
+import { apiGet, apiPatch, apiPostForm, apiPutForm, ApiError, fileUrl } from '../services/api'
+import { UFS } from '../utils/ufs'
 import type { ClubeDTO, AtletaDTO, AdminDashboardDTO, ArbitroDTO, ConsentimentoDTO } from '../types/api'
 import { CompeticoesPage } from './admin/CompeticoesPage'
 import { FinanceiroPage } from './admin/FinanceiroPage'
@@ -1261,6 +1262,136 @@ function ArbitroDetailPanel({
 /* ── Árbitros Page (API real) ─────────────────────────────────── */
 const NIVEIS_APROVACAO = ['Regional', 'Estadual B', 'Estadual A', 'Nacional']
 
+/**
+ * Cadastro/edição da ficha do árbitro — quem preenche é a comissão de arbitragem da FHT.
+ * Substituiu o antigo formulário público "quero ser árbitro".
+ */
+function ArbitroFormModal({ editando, onClose, onSalvo }: {
+  editando: Arbitro | null
+  onClose: () => void
+  onSalvo: () => void
+}) {
+  const [f, setF] = useState({
+    nomeCompleto: editando?.nome ?? '',
+    cpf: editando?.cpf ?? '',
+    dataNascimento: (editando?.dataNascimento ?? '').slice(0, 10),
+    telefone: editando?.telefone ?? '',
+    email: editando?.email ?? '',
+    cidade: editando?.cidade ?? '',
+    uf: editando?.uf || 'TO',
+    nivel: editando?.nivel ?? '',
+    registro: editando?.registro ?? '',
+    inicioArbitragem: editando?.inicioArbitragem ?? '',
+    formacao: editando?.formacao ?? '',
+  })
+  const [foto, setFoto] = useState<File | null>(null)
+  const [salvando, setSalvando] = useState(false)
+  const [erro, setErro] = useState('')
+
+  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setF(p => ({ ...p, [k]: e.target.value }))
+
+  async function salvar() {
+    if (!f.nomeCompleto.trim()) { setErro('Informe o nome do árbitro.'); return }
+    setSalvando(true); setErro('')
+    try {
+      const fd = new FormData()
+      Object.entries(f).forEach(([k, v]) => { if (v) fd.append(k, v) })
+      if (foto) fd.append('foto', foto)
+      if (editando) await apiPutForm(`/api/arbitros/${editando.id}`, fd)
+      else await apiPostForm('/api/arbitros', fd)
+      onSalvo()
+      onClose()
+    } catch (e) {
+      setErro(e instanceof ApiError ? e.message : 'Não foi possível salvar.')
+      setSalvando(false)
+    }
+  }
+
+  const inp = 'font-body bg-[#0d1b2a]/80 border border-federation/20 focus:border-gold rounded-lg px-4 py-3 text-fht-white placeholder-gray-soft text-sm outline-none w-full'
+  const lbl = 'font-body text-gray-soft text-xs uppercase tracking-wider mb-1 block'
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+      style={{ backgroundColor: 'rgba(0,0,0,0.75)' }} onClick={onClose}>
+      <div className="bg-[#0a1628] border border-federation/30 rounded-xl w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto"
+        onClick={e => e.stopPropagation()}>
+        <div className="p-5 border-b border-federation/20 flex items-center justify-between">
+          <h3 className="font-display text-fht-white text-xl tracking-wide">
+            {editando ? 'EDITAR ÁRBITRO' : 'CADASTRAR ÁRBITRO'}
+          </h3>
+          <button onClick={onClose} className="text-gray-soft hover:text-fht-white p-1.5 rounded-lg hover:bg-federation/10">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="p-5 flex flex-col gap-4">
+          <div>
+            <span className={lbl}>Nome completo *</span>
+            <input value={f.nomeCompleto} onChange={set('nomeCompleto')} className={inp} placeholder="Nome do árbitro" />
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div><span className={lbl}>CPF</span><input value={f.cpf} onChange={set('cpf')} className={inp} placeholder="000.000.000-00" /></div>
+            <div><span className={lbl}>Nascimento</span><input type="date" value={f.dataNascimento} onChange={set('dataNascimento')} className={inp} /></div>
+            <div><span className={lbl}>Telefone</span><input value={f.telefone} onChange={set('telefone')} className={inp} placeholder="(63) 99999-9999" /></div>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="col-span-2"><span className={lbl}>E-mail</span><input value={f.email} onChange={set('email')} className={inp} placeholder="arbitro@email.com" /></div>
+            <div>
+              <span className={lbl}>UF</span>
+              <select value={f.uf} onChange={set('uf')} className={`${inp} appearance-none cursor-pointer`}>
+                {UFS.map(u => <option key={u} value={u}>{u}</option>)}
+              </select>
+            </div>
+          </div>
+          <div><span className={lbl}>Cidade</span><input value={f.cidade} onChange={set('cidade')} className={inp} placeholder="Palmas" /></div>
+
+          <div className="pt-3 border-t border-federation/20">
+            <p className="font-display text-gold text-xs tracking-widest mb-3">CREDENCIAMENTO</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <span className={lbl}>Nível</span>
+                <select value={f.nivel} onChange={set('nivel')} className={`${inp} appearance-none cursor-pointer`}>
+                  <option value="">Selecione</option>
+                  {['Regional', 'Estadual B', 'Estadual A', 'Nacional'].map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </div>
+              <div><span className={lbl}>Registro</span><input value={f.registro} onChange={set('registro')} className={inp} placeholder="ARB-TO-0000" /></div>
+            </div>
+            <div className="grid grid-cols-3 gap-3 mt-3">
+              <div><span className={lbl}>Início</span><input value={f.inicioArbitragem} onChange={set('inicioArbitragem')} className={inp} placeholder="2016" /></div>
+              <div className="col-span-2"><span className={lbl}>Formação</span><input value={f.formacao} onChange={set('formacao')} className={inp} placeholder="Curso CBHb 2016" /></div>
+            </div>
+          </div>
+
+          <div>
+            <span className={lbl}>Foto {editando && <span className="normal-case tracking-normal">(só troca se enviar outra)</span>}</span>
+            <input type="file" accept="image/*" onChange={e => setFoto(e.target.files?.[0] ?? null)}
+              className="font-body text-gray-soft text-sm file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-federation/20 file:text-fht-white file:font-display file:text-xs file:cursor-pointer" />
+          </div>
+
+          {erro && (
+            <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/30 text-red-300 rounded-lg px-4 py-3 font-body text-sm">
+              <AlertCircle size={16} /> {erro}
+            </div>
+          )}
+        </div>
+
+        <div className="p-5 border-t border-federation/20 flex justify-end gap-3">
+          <button onClick={onClose} disabled={salvando}
+            className="font-display text-gray-soft border border-federation/30 hover:border-federation/60 px-5 py-2.5 rounded-lg text-sm tracking-wider disabled:opacity-50">
+            Cancelar
+          </button>
+          <button onClick={salvar} disabled={salvando}
+            className="font-display text-night bg-gold hover:bg-gold-light px-5 py-2.5 rounded-lg text-sm tracking-wider disabled:opacity-50">
+            {salvando ? 'Salvando...' : editando ? 'Salvar' : 'Cadastrar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function ArbitrosPage() {
   const [arbitros, setArbitros] = useState<Arbitro[]>([])
   const [carregando, setCarregando] = useState(true)
@@ -1270,6 +1401,8 @@ function ArbitrosPage() {
   const [modal, setModal] = useState<{ type: 'aprovar' | 'rejeitar'; id: string } | null>(null)
   const [nivel, setNivel] = useState('')
   const [motivo, setMotivo] = useState('')
+  const [fichaAberta, setFichaAberta] = useState(false)
+  const [editando, setEditando] = useState<Arbitro | null>(null)
 
   const carregar = useCallback(async () => {
     setCarregando(true); setErro('')
@@ -1308,7 +1441,20 @@ function ArbitrosPage() {
 
   return (
     <div>
-      <h2 className="font-display text-fht-white text-3xl mb-6">ÁRBITROS</h2>
+      <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
+        <div>
+          <h2 className="font-display text-fht-white text-3xl">ÁRBITROS</h2>
+          <p className="font-body text-gray-soft text-sm mt-1">
+            O corpo arbitral é cadastrado pela comissão de arbitragem da FHT.
+          </p>
+        </div>
+        <button
+          onClick={() => { setEditando(null); setFichaAberta(true) }}
+          className="font-display text-night bg-gold hover:bg-gold-light px-5 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250 flex items-center gap-2"
+        >
+          <Plus size={16} /> Cadastrar árbitro
+        </button>
+      </div>
       {erro && (
         <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/30 text-red-300 rounded-lg px-4 py-3 mb-5 font-body text-sm">
           <AlertCircle size={16} /> {erro}
@@ -1339,8 +1485,12 @@ function ArbitrosPage() {
                   <span className={`font-body text-xs px-2.5 py-1 rounded-full border ${arbitroBadge[a.status]}`}>{a.status}</span>
                 </td>
                 <td className="px-4 py-3">
-                  <button onClick={() => setDetalhe(a)}
-                    className="font-body text-gold text-xs hover:underline">Ver mais →</button>
+                  <div className="flex items-center gap-3">
+                    <button onClick={() => setDetalhe(a)}
+                      className="font-body text-gold text-xs hover:underline">Ver mais →</button>
+                    <button onClick={() => { setEditando(a); setFichaAberta(true) }}
+                      className="font-body text-gray-soft text-xs hover:text-fht-white">Editar</button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -1357,6 +1507,14 @@ function ArbitrosPage() {
           onRejeitar={abrirRejeitar}
           onSuspender={handleSuspender}
           onReativar={handleReativar}
+        />
+      )}
+
+      {fichaAberta && (
+        <ArbitroFormModal
+          editando={editando}
+          onClose={() => { setFichaAberta(false); setEditando(null) }}
+          onSalvo={() => { void carregar() }}
         />
       )}
 

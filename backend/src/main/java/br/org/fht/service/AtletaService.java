@@ -22,7 +22,11 @@ public interface AtletaService {
 
     AtletaResponseDTO anexarDocumentos(UUID id, AtletaDocumentosForm form, JsonWebToken jwt);
 
-    void aprovar(UUID id);
+    /**
+     * Ativa o atleta. O portão documental (RG e consentimento do menor) nunca é dispensado;
+     * o financeiro sim, quando a federação confere o comprovante do lote e decide liberar.
+     */
+    void aprovar(UUID id, boolean dispensarPagamento, JsonWebToken jwt);
 
     void rejeitar(UUID id, String motivo);
 

@@ -13,10 +13,15 @@ public class AtletaMapper {
     private AtletaMapper() {}
 
     public static AtletaResponseDTO toResponse(Atleta a) {
-        return toResponse(a, List.of());
+        return toResponse(a, List.of(), false);
     }
 
     public static AtletaResponseDTO toResponse(Atleta a, List<Consentimento> consentimentos) {
+        return toResponse(a, consentimentos, false);
+    }
+
+    public static AtletaResponseDTO toResponse(Atleta a, List<Consentimento> consentimentos,
+                                               boolean anuidadeEmDia) {
         return new AtletaResponseDTO(
                 a.getId(),
                 a.getClubeId(),
@@ -46,6 +51,7 @@ public class AtletaMapper {
                 a.getStatus(),
                 a.getMotivoRejeicao(),
                 a.getPrazoPagamentoAte(),
+                anuidadeEmDia,
                 a.getTaxaValor(),
                 a.getTaxaAno(),
                 consentimentos.stream().map(AtletaMapper::toConsentimento).toList(),

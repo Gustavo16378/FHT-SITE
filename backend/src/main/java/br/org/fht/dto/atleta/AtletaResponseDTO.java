@@ -38,6 +38,8 @@ public record AtletaResponseDTO(
         @Schema(description = "Status atual", enumeration = {"AGUARDANDO_PAGAMENTO", "AGUARDANDO_APROVACAO", "ATIVO", "REJEITADO", "SUSPENSO"}) String status,
         @Schema(description = "Motivo da rejeição") String motivoRejeicao,
         @Schema(description = "Prazo para anexar o comprovante — vencido, o cadastro é apagado") LocalDateTime prazoPagamentoAte,
+        @Schema(description = "Anuidade do ano corrente com baixa confirmada em algum lote de pagamento")
+        boolean anuidadeEmDia,
         @Schema(description = "Valor da taxa de filiação", example = "35.00") BigDecimal taxaValor,
         @Schema(description = "Ano de referência da taxa", example = "2025") Integer taxaAno,
         @Schema(description = "Consentimentos LGPD registrados") List<ConsentimentoDTO> consentimentos,

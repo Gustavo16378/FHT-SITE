@@ -35,6 +35,9 @@ import java.util.stream.Collectors;
 @ApplicationScoped
 public class AtletaServiceImpl implements AtletaService {
 
+    private static final org.jboss.logging.Logger LOG =
+            org.jboss.logging.Logger.getLogger(AtletaServiceImpl.class);
+
     public static final String STATUS_AGUARDANDO_PAGAMENTO = "AGUARDANDO_PAGAMENTO";
     public static final String STATUS_AGUARDANDO_APROVACAO = "AGUARDANDO_APROVACAO";
     public static final String STATUS_ATIVO = "ATIVO";
@@ -242,8 +245,10 @@ public class AtletaServiceImpl implements AtletaService {
                 .findByAtletaIds(atletas.stream().map(Atleta::getId).toList())
                 .stream().collect(Collectors.groupingBy(Consentimento::getAtletaId));
 
+        int ano = Fuso.hoje().getYear();
         return atletas.stream()
-                .map(a -> AtletaMapper.toResponse(a, porAtleta.getOrDefault(a.getId(), List.of())))
+                .map(a -> AtletaMapper.toResponse(a, porAtleta.getOrDefault(a.getId(), List.of()),
+                        loteItemRepository.temPagamentoConfirmado(a.getId(), ano)))
                 .toList();
     }
 
@@ -343,7 +348,8 @@ public class AtletaServiceImpl implements AtletaService {
     @Override
     public AtletaResponseDTO buscarPorId(UUID id, JsonWebToken jwt) {
         Atleta atleta = buscarComEscopo(id, jwt);
-        return AtletaMapper.toResponse(atleta, consentimentoRepository.findByAtletaId(id));
+        return AtletaMapper.toResponse(atleta, consentimentoRepository.findByAtletaId(id),
+                loteItemRepository.temPagamentoConfirmado(id, Fuso.hoje().getYear()));
     }
 
     /** Só ADMIN_FHT alcança qualquer atleta; qualquer outro papel fica preso ao próprio clube. */
@@ -358,11 +364,13 @@ public class AtletaServiceImpl implements AtletaService {
 
     @Override
     @Transactional
-    public void aprovar(UUID id) {
+    public void aprovar(UUID id, boolean dispensarPagamento, JsonWebToken jwt) {
         Atleta atleta = atletaRepository.findByIdOptional(id)
                 .orElseThrow(() -> new WebApplicationException("Atleta não encontrado", 404));
 
-        // PORTÃO DOCUMENTAL — RG e, se menor, o consentimento do responsável (LGPD art. 14, §1).
+        // PORTÃO DOCUMENTAL — INEGOCIÁVEL. RG e, se menor, o consentimento do responsável
+        // (LGPD art. 14, §1). Nenhuma dispensa passa por aqui: a federação não pode abrir mão
+        // da autorização do responsável de um menor por decisão administrativa.
         if (atleta.getRgUrl() == null || atleta.getRgUrl().isBlank()) {
             throw new ValidationException("rgDoc", "RG digitalizado não enviado — aprovação bloqueada");
         }
@@ -371,12 +379,19 @@ public class AtletaServiceImpl implements AtletaService {
                     "Atleta menor de idade sem consentimento do responsável legal — aprovação bloqueada (LGPD art. 14)");
         }
 
-        // PORTÃO FINANCEIRO — a anuidade do ano tem que ter baixa confirmada. Antes isso era
-        // "tem comprovante Pix individual?", que deixou de existir: o pagamento agora é do lote.
+        // PORTÃO FINANCEIRO — DISPENSÁVEL pela federação. Como o pagamento agora é em lote e a
+        // conferência é manual, quem olha o comprovante decide quem liberar: um lote pode cobrir
+        // parcialmente, ou o clube pode ter pago por fora. Sem a dispensa explícita, continua
+        // exigindo a baixa — para ninguém ativar sem pagamento por descuido.
         int ano = Fuso.hoje().getYear();
         if (!loteItemRepository.temPagamentoConfirmado(id, ano)) {
-            throw new ValidationException("pagamento",
-                    "Anuidade de " + ano + " sem baixa confirmada — aprovação bloqueada");
+            if (!dispensarPagamento) {
+                throw new ValidationException("pagamento",
+                        "Anuidade de " + ano + " sem baixa confirmada — aprovação bloqueada");
+            }
+            // Não há tabela de auditoria ainda; o log é o único rastro de quem liberou sem baixa.
+            LOG.warnf("Atleta %s (%s) ativado SEM baixa de pagamento em %d, por decisão de %s",
+                    atleta.getId(), atleta.getNomeCompleto(), ano, jwt.getName());
         }
 
         atleta.setStatus(STATUS_ATIVO);

@@ -135,17 +135,22 @@ public class AtletaResource {
     @RolesAllowed("ADMIN_FHT")
     @Consumes(MediaType.APPLICATION_JSON)
     @Operation(summary = "Aprovar atleta",
-            description = "Muda status para ATIVO. Exige comprovante de pagamento Pix — retorna 422 se ausente.")
+            description = "Muda status para ATIVO. Exige RG e, se menor, o consentimento do responsável — "
+                    + "esses NUNCA são dispensados. Exige também a anuidade do ano com baixa confirmada; "
+                    + "essa a federação pode dispensar com dispensarPagamento=true, ao conferir o "
+                    + "comprovante do lote e decidir liberar o atleta.")
     @APIResponses({
             @APIResponse(responseCode = "200", description = "Atleta aprovado"),
             @APIResponse(responseCode = "401", description = "Token ausente ou inválido"),
             @APIResponse(responseCode = "403", description = "Apenas ADMIN_FHT"),
             @APIResponse(responseCode = "404", description = "Atleta não encontrado"),
-            @APIResponse(responseCode = "422", description = "Comprovante de pagamento não enviado")
+            @APIResponse(responseCode = "422", description = "Documentação pendente ou anuidade sem baixa")
     })
     public Response aprovar(
-            @Parameter(description = "UUID do atleta", required = true) @PathParam("id") UUID id) {
-        atletaService.aprovar(id);
+            @Parameter(description = "UUID do atleta", required = true) @PathParam("id") UUID id,
+            AprovarRequest req) {
+        boolean dispensar = req != null && Boolean.TRUE.equals(req.dispensarPagamento());
+        atletaService.aprovar(id, dispensar, jwt);
         return Response.ok(ApiResponse.ok(null, "Atleta aprovado com sucesso")).build();
     }
 
@@ -223,5 +228,13 @@ public class AtletaResource {
     public record MotivoRequest(
             @Schema(description = "Texto explicando o motivo", example = "Foto ilegível")
             String motivo
+    ) {}
+
+    @Schema(description = "Opções da aprovação")
+    public record AprovarRequest(
+            @Schema(description = "Ativa o atleta mesmo sem baixa da anuidade. Usado quando a "
+                    + "federação confere o comprovante do lote e decide liberar. Não dispensa "
+                    + "a documentação nem o consentimento do responsável.", example = "false")
+            Boolean dispensarPagamento
     ) {}
 }

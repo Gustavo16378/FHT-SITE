@@ -211,6 +211,8 @@ export interface AtletaDTO {
   motivoRejeicao: string | null
   /** Prazo para anexar o comprovante — vencido, o cadastro é apagado */
   prazoPagamentoAte: string | null
+  /** Anuidade do ano com baixa confirmada em algum lote */
+  anuidadeEmDia: boolean
   taxaValor: number | null
   taxaAno: number | null
   consentimentos: ConsentimentoDTO[]

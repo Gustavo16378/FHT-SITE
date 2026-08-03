@@ -39,7 +39,7 @@ interface Atleta {
   fotoUrl: string; rgUrl: string; comprovanteResidenciaUrl: string; comprovanteUrl: string
   motivoRejeicao?: string; taxaValor?: number; taxaAno?: number
   // LGPD art. 14 — responsável legal e consentimentos do menor
-  menorDeIdade: boolean; prazoPagamentoAte: string | null
+  menorDeIdade: boolean; prazoPagamentoAte: string | null; anuidadeEmDia: boolean
   responsavelNome?: string; responsavelCpf?: string; responsavelParentesco?: string
   responsavelEmail?: string; responsavelTelefone?: string
   consentimentos: ConsentimentoDTO[]
@@ -109,6 +109,7 @@ function mapAtleta(d: AtletaDTO, clubeNome: string, clubeStatus?: StatusClube): 
     taxaAno: d.taxaAno ?? undefined,
     menorDeIdade: d.menorDeIdade,
     prazoPagamentoAte: d.prazoPagamentoAte,
+    anuidadeEmDia: d.anuidadeEmDia,
     responsavelNome: d.responsavelNome ?? undefined,
     responsavelCpf: d.responsavelCpf ?? undefined,
     responsavelParentesco: d.responsavelParentesco ?? undefined,
@@ -247,7 +248,8 @@ function AtletaDetailPanel({
 }: {
   atleta: Atleta
   onClose: () => void
-  onAprovar: (id: string) => void
+  /** dispensarPagamento=true ativa mesmo sem baixa da anuidade */
+  onAprovar: (id: string, dispensarPagamento: boolean) => void
   onRejeitar: (id: string) => void
   onSuspender: (id: string) => void
   onReativar: (id: string) => void
@@ -263,15 +265,17 @@ function AtletaDetailPanel({
     ? Math.floor((Date.now() - new Date(atleta.dataNascimento).getTime()) / (1000 * 60 * 60 * 24 * 365.25))
     : null
 
-  // Espelha os bloqueios do backend (AtletaServiceImpl.aprovar) para não mostrar um botão que vai dar erro.
-  const temComprovante = Boolean(atleta.comprovanteUrl && atleta.comprovanteUrl !== '#')
+  // Espelha os portões do backend (AtletaServiceImpl.aprovar).
+  // DOCUMENTAL: bloqueia de verdade — não há dispensa para RG nem para o consentimento do menor.
   const temConsentimentoMenor = atleta.consentimentos.some(
     c => c.finalidade === 'CADASTRO_ATLETA_MENOR' && !c.revogadoEm)
-  const bloqueioAprovacao = !temComprovante
-    ? 'Aprovação bloqueada: comprovante de pagamento Pix não enviado.'
+  const bloqueioAprovacao = !atleta.rgUrl || atleta.rgUrl === '#'
+    ? 'Aprovação bloqueada: RG digitalizado não enviado.'
     : atleta.menorDeIdade && !temConsentimentoMenor
       ? 'Aprovação bloqueada: atleta menor sem consentimento do responsável legal (LGPD art. 14).'
       : null
+  // FINANCEIRO: só avisa. Quem confere o comprovante do lote decide quem liberar.
+  const semAnuidade = !atleta.anuidadeEmDia
 
   return (
     <div className="fixed inset-0 z-50 flex" onClick={onClose}>
@@ -450,11 +454,22 @@ function AtletaDetailPanel({
         <div className="sticky bottom-0 bg-[#0a1628] border-t border-federation/20 p-5 flex flex-wrap gap-3">
           {(atleta.status === 'AGUARDANDO_PAGAMENTO' || atleta.status === 'AGUARDANDO_APROVACAO') && (
             <>
+              {/* Sem baixa da anuidade o botão NÃO trava: a federação confere o comprovante do
+                  lote e libera quem quiser. Só avisa, para a ativação ser uma decisão consciente. */}
+              {semAnuidade && !bloqueioAprovacao && (
+                <div className="w-full flex items-start gap-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg px-4 py-3">
+                  <AlertCircle size={16} className="text-yellow-400 flex-shrink-0 mt-0.5" />
+                  <p className="font-body text-yellow-400 text-xs leading-relaxed">
+                    Anuidade sem baixa registrada. Se o pagamento foi conferido no comprovante do
+                    clube, você pode ativar mesmo assim — a ação fica registrada no seu nome.
+                  </p>
+                </div>
+              )}
               <div className="w-full flex flex-wrap gap-3">
-                <button onClick={() => onAprovar(atleta.id)} disabled={bloqueioAprovacao !== null}
+                <button onClick={() => onAprovar(atleta.id, semAnuidade)} disabled={bloqueioAprovacao !== null}
                   title={bloqueioAprovacao ?? undefined}
                   className="flex-1 font-display text-night bg-green-500 hover:bg-green-400 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-green-500">
-                  APROVAR
+                  {semAnuidade ? 'ATIVAR MESMO ASSIM' : 'APROVAR'}
                 </button>
                 <button onClick={() => onRejeitar(atleta.id)}
                   className="flex-1 font-display text-fht-white bg-red-500/20 border border-red-500/40 hover:bg-red-500/30 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250">
@@ -1020,7 +1035,8 @@ function AtletasPage({ atletas, reload }: {
     }
   }
 
-  const handleAprovar = (id: string) => acao(() => apiPatch(`/api/atletas/${id}/aprovar`))
+  const handleAprovar = (id: string, dispensarPagamento = false) =>
+    acao(() => apiPatch(`/api/atletas/${id}/aprovar`, { dispensarPagamento }))
   const handleSuspender = (id: string) => acao(() => apiPatch(`/api/atletas/${id}/suspender`))
   const handleReativar = (id: string) => acao(() => apiPatch(`/api/atletas/${id}/reativar`))
 

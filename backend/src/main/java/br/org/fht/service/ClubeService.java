@@ -1,6 +1,8 @@
 package br.org.fht.service;
 
 import br.org.fht.dto.clube.ClubeForm;
+import br.org.fht.dto.clube.ClubePessoaDTO;
+import br.org.fht.dto.clube.ClubePessoaForm;
 import br.org.fht.dto.clube.ClubeResponseDTO;
 import br.org.fht.dto.clube.ClubeUpdateForm;
 import br.org.fht.dto.clube.ClubeVitrineDTO;
@@ -36,4 +38,14 @@ public interface ClubeService {
 
     /** Liga/desliga o clube da vitrine da home (não altera status). */
     void definirVitrine(UUID id, boolean visivel);
+
+    /* ── Pessoas do clube: representantes e técnico ── */
+
+    List<ClubePessoaDTO> listarPessoas(UUID clubeId, JsonWebToken jwt);
+
+    ClubePessoaDTO adicionarPessoa(UUID clubeId, ClubePessoaForm form, JsonWebToken jwt);
+
+    ClubePessoaDTO atualizarPessoa(UUID clubeId, UUID pessoaId, ClubePessoaForm form, JsonWebToken jwt);
+
+    void removerPessoa(UUID clubeId, UUID pessoaId, JsonWebToken jwt);
 }

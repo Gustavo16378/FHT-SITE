@@ -3,16 +3,18 @@ import { useNavigate } from 'react-router-dom'
 import {
   Home, Users, UserPlus, Trophy, Settings, LogOut, Menu, X,
   CheckCircle, AlertCircle, Upload, ChevronRight, ChevronLeft,
-  Building2, FileText, Edit3, Save, Calendar, MapPin, Check,
+  Building2, FileText, Edit3, Save, Calendar, MapPin, Check, Contact,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { maskCPF, maskCNPJ, maskPhone, maskCEP, validateCPF } from '../utils/masks'
 import { UFS } from '../utils/ufs'
-import { apiGet, apiPostForm, apiPut, ApiError } from '../services/api'
-import type { AtletaDTO, AtletaStatus, ClubeDTO, ClubeStatus } from '../types/api'
+import { apiGet, apiPostForm, apiPostJson, apiPut, apiDelete, ApiError } from '../services/api'
+import type {
+  AtletaDTO, AtletaStatus, ClubeDTO, ClubeStatus, ClubePessoaDTO, FuncaoPessoa,
+} from '../types/api'
 
 /* ── tipos ───────────────────────────────────────────────── */
-type Page = 'dashboard' | 'atletas' | 'cadastrar' | 'inscricoes' | 'dados'
+type Page = 'dashboard' | 'atletas' | 'cadastrar' | 'inscricoes' | 'equipe' | 'dados'
 
 function fmtDate(iso: string | null): string {
   if (!iso) return '—'
@@ -1053,6 +1055,237 @@ function CadastrarAtletaPage({ onSuccess }: { onSuccess: () => void }) {
   )
 }
 
+/* ── Comissão técnica: representantes e técnico ──────────── */
+const FUNCOES: { valor: FuncaoPessoa; label: string }[] = [
+  { valor: 'REPRESENTANTE', label: 'Representante' },
+  { valor: 'TECNICO', label: 'Técnico' },
+  { valor: 'AUXILIAR', label: 'Auxiliar' },
+]
+const funcaoLabel = (f: string) => FUNCOES.find(x => x.valor === f)?.label ?? f
+
+function EquipePage() {
+  const { user } = useAuth()
+  const clubeId = user?.clubeId
+  const [pessoas, setPessoas] = useState<ClubePessoaDTO[]>([])
+  const [carregando, setCarregando] = useState(true)
+  const [erro, setErro] = useState('')
+  const [modalAberto, setModalAberto] = useState(false)
+  const [editando, setEditando] = useState<ClubePessoaDTO | null>(null)
+  const [removendo, setRemovendo] = useState<ClubePessoaDTO | null>(null)
+
+  const carregar = useCallback(async () => {
+    if (!clubeId) return
+    try {
+      setPessoas(await apiGet<ClubePessoaDTO[]>(`/api/clubes/${clubeId}/pessoas`))
+      setErro('')
+    } catch (e) { setErro(errMsg(e)) } finally { setCarregando(false) }
+  }, [clubeId])
+
+  useEffect(() => { void carregar() }, [carregar])
+
+  async function remover() {
+    if (!removendo || !clubeId) return
+    try {
+      await apiDelete(`/api/clubes/${clubeId}/pessoas/${removendo.id}`)
+      setRemovendo(null)
+      await carregar()
+    } catch (e) { setErro(errMsg(e)); setRemovendo(null) }
+  }
+
+  return (
+    <div>
+      <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
+        <div>
+          <h2 className="font-display text-fht-white text-3xl">COMISSÃO TÉCNICA</h2>
+          <p className="font-body text-gray-soft text-sm mt-1">
+            Representantes e técnico do clube. O técnico é quem define a escalação nas competições.
+          </p>
+        </div>
+        <button onClick={() => { setEditando(null); setModalAberto(true) }}
+          className="font-display text-night bg-gold hover:bg-gold-light px-5 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250 flex items-center gap-2">
+          + ADICIONAR
+        </button>
+      </div>
+
+      {erro && (
+        <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 mb-5">
+          <AlertCircle size={16} className="text-red-400 flex-shrink-0" />
+          <p className="font-body text-red-400 text-sm">{erro}</p>
+        </div>
+      )}
+
+      {carregando ? (
+        <div className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-10 text-center font-body text-gray-soft text-sm">
+          Carregando...
+        </div>
+      ) : (
+        <div className="grid sm:grid-cols-2 gap-4">
+          {pessoas.map(p => (
+            <div key={p.id} className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-5">
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-body text-xs px-2.5 py-1 rounded-full border text-blue-300 bg-blue-mid/10 border-blue-400/30">
+                    {funcaoLabel(p.funcao)}
+                  </span>
+                  {p.principal && (
+                    <span title="Responde pela filiação e é o dono do login"
+                      className="font-body text-xs px-2.5 py-1 rounded-full border text-gold bg-gold/10 border-gold/30">
+                      principal
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button onClick={() => { setEditando(p); setModalAberto(true) }}
+                    className="font-body text-gray-soft text-xs hover:text-fht-white">Editar</button>
+                  {!p.principal && (
+                    <button onClick={() => setRemovendo(p)}
+                      className="font-body text-gray-soft text-xs hover:text-red-400">Remover</button>
+                  )}
+                </div>
+              </div>
+              <p className="font-display text-fht-white text-lg leading-tight">{p.nome}</p>
+              {p.cargo && <p className="font-body text-gray-soft text-sm mt-0.5">{p.cargo}</p>}
+              <div className="flex flex-col gap-1 mt-3">
+                {p.email && <p className="font-body text-gray-soft text-xs">{p.email}</p>}
+                {p.telefone && <p className="font-body text-gray-soft text-xs">{p.telefone}</p>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {modalAberto && clubeId && (
+        <PessoaModal clubeId={clubeId} editando={editando}
+          onClose={() => { setModalAberto(false); setEditando(null) }}
+          onSalvo={carregar} />
+      )}
+
+      {removendo && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+          style={{ backgroundColor: 'rgba(0,0,0,0.78)' }} onClick={() => setRemovendo(null)}>
+          <div className="bg-[#0a1628] border border-federation/30 rounded-2xl w-full max-w-sm p-6 flex flex-col gap-4"
+            onClick={e => e.stopPropagation()}>
+            <h3 className="font-display text-fht-white text-xl">REMOVER DA COMISSÃO?</h3>
+            <p className="font-body text-gray-soft text-sm">
+              <span className="text-fht-white">{removendo.nome}</span> deixa de constar na comissão técnica do clube.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setRemovendo(null)}
+                className="font-display text-gray-soft border border-federation/30 px-5 py-2.5 rounded-lg text-sm tracking-wider">
+                Cancelar
+              </button>
+              <button onClick={remover}
+                className="font-display text-fht-white bg-red-500/20 border border-red-500/40 hover:bg-red-500/30 px-5 py-2.5 rounded-lg text-sm tracking-wider">
+                Remover
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function PessoaModal({ clubeId, editando, onClose, onSalvo }: {
+  clubeId: string; editando: ClubePessoaDTO | null; onClose: () => void; onSalvo: () => void
+}) {
+  const [f, setF] = useState({
+    nome: editando?.nome ?? '',
+    cpf: editando?.cpf ?? '',
+    funcao: (editando?.funcao ?? 'TECNICO') as FuncaoPessoa,
+    cargo: editando?.cargo ?? '',
+    email: editando?.email ?? '',
+    telefone: editando?.telefone ?? '',
+  })
+  const [salvando, setSalvando] = useState(false)
+  const [erro, setErro] = useState('')
+
+  async function salvar() {
+    if (!f.nome.trim()) { setErro('Informe o nome.'); return }
+    setSalvando(true); setErro('')
+    try {
+      if (editando) await apiPut(`/api/clubes/${clubeId}/pessoas/${editando.id}`, f)
+      else await apiPostJson(`/api/clubes/${clubeId}/pessoas`, f)
+      onSalvo()
+      onClose()
+    } catch (e) { setErro(errMsg(e)); setSalvando(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+      style={{ backgroundColor: 'rgba(0,0,0,0.75)' }} onClick={onClose}>
+      <div className="bg-[#0a1628] border border-federation/30 rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
+        onClick={e => e.stopPropagation()}>
+        <div className="p-5 border-b border-federation/20 flex items-center justify-between">
+          <h3 className="font-display text-fht-white text-xl tracking-wide">
+            {editando ? 'EDITAR PESSOA' : 'ADICIONAR À COMISSÃO'}
+          </h3>
+          <button onClick={onClose} className="text-gray-soft hover:text-fht-white p-1.5 rounded-lg">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="p-5 flex flex-col gap-4">
+          <div>
+            <span className={lbl}>Nome completo *</span>
+            <input value={f.nome} onChange={e => setF(p => ({ ...p, nome: e.target.value }))}
+              className={inp} placeholder="Nome" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <span className={lbl}>Função *</span>
+              <select value={f.funcao} onChange={e => setF(p => ({ ...p, funcao: e.target.value as FuncaoPessoa }))}
+                className={sel} disabled={editando?.principal}>
+                {FUNCOES.map(x => <option key={x.valor} value={x.valor}>{x.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <span className={lbl}>Cargo</span>
+              <input value={f.cargo} onChange={e => setF(p => ({ ...p, cargo: e.target.value }))}
+                className={inp} placeholder="Ex.: Técnico principal" />
+            </div>
+          </div>
+          <div>
+            <span className={lbl}>CPF</span>
+            <input value={f.cpf} onChange={e => setF(p => ({ ...p, cpf: maskCPF(e.target.value) }))}
+              className={inp} placeholder="000.000.000-00" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <span className={lbl}>E-mail</span>
+              <input value={f.email} onChange={e => setF(p => ({ ...p, email: e.target.value }))}
+                className={inp} placeholder="email@clube.com" />
+            </div>
+            <div>
+              <span className={lbl}>Telefone</span>
+              <input value={f.telefone} onChange={e => setF(p => ({ ...p, telefone: maskPhone(e.target.value) }))}
+                className={inp} placeholder="(63) 99999-9999" />
+            </div>
+          </div>
+
+          {erro && (
+            <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3">
+              <AlertCircle size={16} className="text-red-400 flex-shrink-0" />
+              <p className="font-body text-red-400 text-sm">{erro}</p>
+            </div>
+          )}
+        </div>
+
+        <div className="p-5 border-t border-federation/20 flex justify-end gap-3">
+          <button onClick={onClose} disabled={salvando}
+            className="font-display text-gray-soft border border-federation/30 px-5 py-2.5 rounded-lg text-sm tracking-wider disabled:opacity-50">
+            Cancelar
+          </button>
+          <button onClick={salvar} disabled={salvando}
+            className="font-display text-night bg-gold hover:bg-gold-light px-5 py-2.5 rounded-lg text-sm tracking-wider disabled:opacity-50">
+            {salvando ? 'Salvando...' : editando ? 'Salvar' : 'Adicionar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ── Meus Dados (dados do clube — REAL, liga na API) ─────── */
 function MeusDadosPage() {
   const { user } = useAuth()
@@ -1466,6 +1699,7 @@ const NAV = [
   { id: 'atletas',   label: 'Meus Atletas',     Icon: Users,    disabled: false },
   { id: 'cadastrar', label: 'Cadastrar Atleta', Icon: UserPlus, disabled: false },
   { id: 'inscricoes',label: 'Inscrições',        Icon: Trophy,   disabled: false },
+  { id: 'equipe',    label: 'Comissão Técnica',  Icon: Contact,  disabled: false },
   { id: 'dados',     label: 'Meus Dados',        Icon: Settings, disabled: false },
 ] as const
 
@@ -1589,6 +1823,7 @@ export default function ClubeDashboard() {
               {page === 'atletas' && <AtletasPage atletas={atletas} onCadastrar={() => setPage('cadastrar')} onVer={setAtletaDetalhe} />}
               {page === 'cadastrar' && <CadastrarAtletaPage onSuccess={handleAtletaSuccess} />}
               {page === 'inscricoes' && <InscricoesPage atletas={atletas} />}
+              {page === 'equipe' && <EquipePage />}
               {page === 'dados' && <MeusDadosPage />}
             </>
           )}

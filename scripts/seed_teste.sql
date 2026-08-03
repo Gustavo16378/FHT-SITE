@@ -190,3 +190,15 @@ VALUES
  ('cccccccc-0000-0000-0000-000000000004', 'feminino'),
  ('cccccccc-0000-0000-0000-000000000005', 'sub-16')
 ON CONFLICT DO NOTHING;
+
+-- ── Comissão técnica do Palmas HC (V15) ────────────────────────────────
+-- O representante principal já vem do backfill da migration. Aqui entram o 2º
+-- representante e o TÉCNICO — que é quem vai definir a escalação quando o módulo
+-- de competições chegar. São dados cadastrais: ninguém aqui tem login próprio.
+INSERT INTO clube_pessoas (id, clube_id, nome, cpf, funcao, cargo, email, telefone, principal)
+VALUES
+ ('bbbbbbbb-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111',
+  'Ana Paula Vice', NULL, 'REPRESENTANTE', 'Vice-presidente', 'ana@palmashc.com', '(63) 98777-2211', FALSE),
+ ('bbbbbbbb-0000-0000-0000-000000000002', '11111111-1111-1111-1111-111111111111',
+  'Sérgio Técnico Silva', NULL, 'TECNICO', 'Técnico principal', 'sergio@palmashc.com', '(63) 98777-1122', FALSE)
+ON CONFLICT (id) DO NOTHING;

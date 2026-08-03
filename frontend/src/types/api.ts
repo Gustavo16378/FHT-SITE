@@ -100,6 +100,22 @@ export interface ClubeDTO {
   updatedAt: string
 }
 
+/** Função da pessoa dentro do clube */
+export type FuncaoPessoa = 'REPRESENTANTE' | 'TECNICO' | 'AUXILIAR'
+
+/** ClubePessoaDTO — representantes e técnico. Ninguém aqui tem login próprio ainda. */
+export interface ClubePessoaDTO {
+  id: string
+  nome: string
+  cpf: string | null
+  funcao: FuncaoPessoa
+  cargo: string | null
+  email: string | null
+  telefone: string | null
+  /** representante que responde pela filiação — é o dono do login */
+  principal: boolean
+}
+
 /** ClubeVitrineDTO — card público da home (só dados públicos) */
 export interface ClubeVitrineDTO {
   id: string

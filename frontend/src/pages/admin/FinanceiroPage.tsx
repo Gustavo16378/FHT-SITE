@@ -85,7 +85,7 @@ function ResultadoBaixa({ r, onClose }: { r: BaixaResultadoDTO; onClose: () => v
   );
 }
 
-export function FinanceiroPage() {
+export function FinanceiroPage({ onAtletasMudaram }: { onAtletasMudaram?: () => void }) {
   const [lotes, setLotes] = useState<PagamentoLoteDTO[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
@@ -125,6 +125,7 @@ export function FinanceiroPage() {
       setDetalhe(null);
       setResultado(r);
       await carregar();
+      onAtletasMudaram?.();
     } catch (e) { setErro(msgErro(e)); } finally { setProcessando(false); }
   }
 
@@ -135,6 +136,7 @@ export function FinanceiroPage() {
       await apiPatch(`/api/pagamentos/${rejeitando.id}/rejeitar`, { motivo });
       setRejeitando(null); setMotivo(''); setDetalhe(null);
       await carregar();
+      onAtletasMudaram?.();
     } catch (e) { setErro(msgErro(e)); } finally { setProcessando(false); }
   }
 

@@ -1662,7 +1662,9 @@ export default function AdminDashboard() {
               {page === 'atletas'     && <AtletasPage atletas={atletas} reload={reload} />}
               {page === 'arbitros'    && <ArbitrosPage />}
               {page === 'competicoes' && <CompeticoesPage />}
-              {page === 'financeiro'  && <FinanceiroPage />}
+              {/* A baixa ativa atletas: sem avisar o pai, a aba Atletas continuaria
+                  mostrando "falta pgto" para quem já foi ativado. */}
+              {page === 'financeiro'  && <FinanceiroPage onAtletasMudaram={() => { void reload(true) }} />}
               {page === 'noticias'    && <NoticiasPage />}
               {page === 'galeria'     && <GaleriaPage />}
               {page === 'diretoria'   && <DiretoriaPage />}

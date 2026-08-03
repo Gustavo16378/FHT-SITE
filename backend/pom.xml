@@ -104,6 +104,12 @@
       <artifactId>quarkus-scheduler</artifactId>
     </dependency>
 
+    <!-- E-mail transacional (avisos de filiacao e pagamento) -->
+    <dependency>
+      <groupId>io.quarkus</groupId>
+      <artifactId>quarkus-mailer</artifactId>
+    </dependency>
+
     <!-- AWS SDK v2 S3 (para Cloudflare R2) -->
     <dependency>
       <groupId>software.amazon.awssdk</groupId>

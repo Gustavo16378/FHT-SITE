@@ -44,6 +44,7 @@ public class ClubeServiceImpl implements ClubeService {
     @Inject UsuarioRepository usuarioRepository;
     @Inject AtletaRepository atletaRepository;
     @Inject ClubePessoaRepository clubePessoaRepository;
+    @Inject EmailService emailService;
     @Inject R2StorageService r2;
 
     /** Mínimo da senha escolhida pelo clube no cadastro público. */
@@ -121,6 +122,10 @@ public class ClubeServiceImpl implements ClubeService {
         principal.setPrincipal(true);
         clubePessoaRepository.persist(principal);
 
+        emailService.avisarNovaSolicitacaoClube(
+                clube.getNome(), clube.getCidade(), clube.getRepresentanteNome(), email);
+        emailService.confirmarSolicitacaoRecebida(email, clube.getNome(), clube.getRepresentanteNome());
+
         return ClubeMapper.toResponse(clube);
     }
 
@@ -191,6 +196,9 @@ public class ClubeServiceImpl implements ClubeService {
         // o próprio clube escolheu. Antes, aprovar gerava uma senha aleatória que nunca era
         // exibida nem enviada a ninguém — a conta nascia inutilizável.
         definirAcesso(clube, true);
+
+        emailService.avisarClubeAprovado(
+                clube.getRepresentanteEmail(), clube.getNome(), clube.getRepresentanteNome());
     }
 
     @Override
@@ -202,6 +210,8 @@ public class ClubeServiceImpl implements ClubeService {
         clube.setStatus("REJEITADO");
         clube.setMotivoRejeicao(motivo);
         definirAcesso(clube, false);
+
+        emailService.avisarClubeRejeitado(clube.getRepresentanteEmail(), clube.getNome(), motivo);
     }
 
     @Override

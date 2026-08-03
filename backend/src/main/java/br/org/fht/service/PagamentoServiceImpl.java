@@ -42,6 +42,7 @@ public class PagamentoServiceImpl implements PagamentoService {
     @Inject AtletaRepository atletaRepository;
     @Inject ClubeRepository clubeRepository;
     @Inject ConsentimentoRepository consentimentoRepository;
+    @Inject EmailService emailService;
     @Inject R2StorageService r2;
 
     /** Anuidade por atleta. Fonte única — antes o valor 35 estava escrito em 3 lugares. */
@@ -142,7 +143,12 @@ public class PagamentoServiceImpl implements PagamentoService {
             itens.add(item);
         }
 
-        return toDTO(lote, itens, nomeDoClube(clubeId));
+        String clubeNome = nomeDoClube(clubeId);
+        // Requisito explícito da federação: o aviso tem que dizer QUAIS atletas o pagamento cobre.
+        emailService.avisarPagamentoRecebido(clubeNome, lote.getProtocolo(), lote.getValorTotal(),
+                itens.stream().map(PagamentoLoteItem::getAtletaNome).toList());
+
+        return toDTO(lote, itens, clubeNome);
     }
 
     /** Código curto e legível derivado de um UUID — sem sequence e sem risco prático de colisão. */
@@ -232,8 +238,11 @@ public class PagamentoServiceImpl implements PagamentoService {
             ativados.add(a.getNomeCompleto());
         }
 
-        return new BaixaResultado(
-                toDTO(lote, itens, nomeDoClube(lote.getClubeId())), ativados, bloqueados);
+        String clubeNome = nomeDoClube(lote.getClubeId());
+        emailService.avisarBaixaConfirmada(emailDoClube(lote.getClubeId()), clubeNome,
+                lote.getProtocolo(), ativados.size(), bloqueados.size());
+
+        return new BaixaResultado(toDTO(lote, itens, clubeNome), ativados, bloqueados);
     }
 
     /** Null = documentação em ordem. Caso contrário, o motivo em texto para a federação ver. */
@@ -273,7 +282,11 @@ public class PagamentoServiceImpl implements PagamentoService {
         List<PagamentoLoteItem> itens = itemRepository.findByLoteId(id);
         itens.forEach(i -> i.setAtivo(false));
 
-        return toDTO(lote, itens, nomeDoClube(lote.getClubeId()));
+        String clubeNome = nomeDoClube(lote.getClubeId());
+        emailService.avisarPagamentoRejeitado(
+                emailDoClube(lote.getClubeId()), clubeNome, lote.getProtocolo(), motivo);
+
+        return toDTO(lote, itens, clubeNome);
     }
 
     private PagamentoLote buscarComEscopo(UUID id, JsonWebToken jwt) {
@@ -287,6 +300,11 @@ public class PagamentoServiceImpl implements PagamentoService {
 
     private String nomeDoClube(UUID clubeId) {
         return clubeRepository.findByIdOptional(clubeId).map(Clube::getNome).orElse(null);
+    }
+
+    /** E-mail do representante — é para lá que vão os avisos do clube. */
+    private String emailDoClube(UUID clubeId) {
+        return clubeRepository.findByIdOptional(clubeId).map(Clube::getRepresentanteEmail).orElse(null);
     }
 
     private PagamentoLoteDTO toDTO(PagamentoLote l, List<PagamentoLoteItem> itens, String clubeNome) {

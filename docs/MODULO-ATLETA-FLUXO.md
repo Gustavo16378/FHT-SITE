@@ -141,3 +141,56 @@ O seed já monta os cenários: **Sofia** (menor completo, aguardando aprovação
 - **Verificação do responsável** (art. 14, §5): hoje é a coleta do CPF + o aceite registrado com
   IP/user-agent. O double opt-in por e-mail ficou de fora.
 - Política de Privacidade e Aviso de Privacidade — dependem do texto do advogado.
+
+---
+
+## 9. 🔄 REGRA REVOGADA (ago/2026) — o pagamento virou EM LOTE, pelo clube
+
+⚠️ **Tudo que o §8 descreve sobre pagamento no ato do cadastro está REVOGADO.** A federação mudou
+a regra. O que continua valendo do §8: RG obrigatório, responsável legal e consentimento do menor.
+
+### Como funciona agora
+1. O clube cadastra os atletas **sem pagar nada** — todos nascem `AGUARDANDO_PAGAMENTO`, sem prazo curto.
+2. No painel do clube, a aba **Meus Atletas** mostra uma barra com a **soma dos pendentes**.
+3. O clube seleciona quem entra (todos marcados por padrão, **pagamento parcial é permitido**),
+   faz **um Pix só** e anexa **um comprovante**.
+4. Isso vira um **lote** com protocolo (`FHT-2026-A3F91C`) que sabe **quais atletas cobre**.
+5. A federação vê na aba **Financeiro**, com a **lista nominal** e o comprovante, e **dá baixa**.
+6. A baixa ativa os atletas que também passam no portão documental.
+
+Não há gateway de pagamento — sem orçamento. A conferência é manual, e é isso que o sistema apoia.
+
+### Os dois portões da aprovação
+São **independentes**, e essa separação é deliberada:
+
+| Portão | Exige |
+|---|---|
+| **Documental** | RG digitalizado + (se menor) consentimento do responsável |
+| **Financeiro** | anuidade do ano com baixa confirmada |
+
+**Pagar não ativa um menor sem autorização do responsável.** Dinheiro não compra conformidade com
+o art. 14. Na baixa em massa, quem não passa no documental fica em `AGUARDANDO_APROVACAO` e a
+federação recebe a lista dos bloqueados com o motivo.
+
+### O que saiu de cena
+- O `comprovantePix` no cadastro e no anexo de documentos.
+- O `prazoPagamentoAte` (a coluna ficou, sem uso).
+- O expurgo de 24h — virou **90 dias** contados do cadastro (`atleta.expurgo.dias`). Com a regra
+  nova, o job de 24h apagaria justamente quem espera o lote fechar.
+- O QR Code de "R$ 35 por atleta" da tela de cadastro.
+- O endereço do atleta: **o endereço é o do clube**, não faz sentido pedir de novo (e coletar sem
+  finalidade fere a minimização — LGPD art. 6, III).
+
+### Estrutura (migration V16)
+`pagamento_lotes` + `pagamento_lote_itens`. Cada item guarda **snapshot** do nome e do valor: a
+linha é prova de pagamento e precisa continuar legível se o atleta for removido (FK
+`ON DELETE SET NULL`). Índice único parcial em `(atleta_id, ano) WHERE ativo` trava cobrança dupla
+e protege de duplo clique; rejeitar o lote desativa os itens e devolve os atletas para a fila.
+
+O valor da anuidade é config única: `fht.anuidade.valor` (padrão R$ 35). Antes estava escrito em
+três lugares diferentes.
+
+### Posições do atleta
+São as oficiais da federação — goleiro, ponta direita, ponta esquerda, armador lateral direito,
+armador lateral esquerdo, armador central e pivô — e o atleta pode ocupar **mais de uma**
+(o mesmo jogador atua como ponta direita e esquerda).

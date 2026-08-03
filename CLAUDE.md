@@ -17,8 +17,9 @@ Cobre: site público one-page, área administrativa da federação, área do clu
 
 **Backend** (`backend/`, package base `br.org.fht`)
 - Java 21 (Temurin) + **Quarkus 3.15.1** (JVM mode) — **não é Spring**
-- Hibernate ORM Panache, PostgreSQL 16, **Flyway** (migrations `V1`–`V14`)
-- **Quarkus Scheduler** (`@Scheduled`) — hoje só o expurgo de cadastros de atleta não pagos
+- Hibernate ORM Panache, PostgreSQL 16, **Flyway** (migrations `V1`–`V16`)
+- **Quarkus Scheduler** (`@Scheduled`) — hoje só o expurgo de cadastros de atleta abandonados
+- **Quarkus Mailer** — avisos de filiação e pagamento. ⚠️ **Envio SIMULADO por padrão** (`SMTP_MOCK=true`): aparece no log e não sai. Para ligar: preencher `SMTP_HOST/USER/PASS` e `SMTP_MOCK=false` — nenhum código muda
 - **SmallRye JWT** RSA 2048 (JWT próprio — substituiu Keycloak por decisão)
 - Cloudflare **R2** (AWS SDK v2 S3) para uploads de documentos
 - Sentry (monitoramento), MicroProfile OpenAPI + **Swagger UI** em `/swagger`
@@ -48,8 +49,7 @@ Containerização foi feita justamente pra rodar idêntico no PC de mesa e no no
 - `admin@fht.org.br` / `123456` → **ADMIN_FHT** (seed `V4__seed_admin.sql`)
 - `clube@fht.org.br` / `123456` → **ADMIN_CLUBE** (usuário real no banco, via `scripts/seed_teste.sql`)
 
-`AuthContext.tsx` usa a **API real**; só cai num mock offline se o backend não responder.
-⚠️ **Esse fallback (`MOCK_USERS`) tem que sair antes do deploy** — são credenciais de admin no bundle JS.
+`AuthContext.tsx` usa **só a API real** — o fallback offline com credenciais embutidas foi removido (ago/2026, `d410a51`): iam parar no bundle JS publicado. Falha de rede agora devolve 503 com mensagem clara.
 
 ## Domínio & arquitetura
 
@@ -68,8 +68,10 @@ Containerização foi feita justamente pra rodar idêntico no PC de mesa e no no
 **Atleta:** CPF, RG, nascimento, endereço, sexo, posição, categoria, status de transferência, taxa de filiação, 4 documentos (Foto 3x4, RG, Comprovante de residência, Comprovante Pix) + **dados do responsável legal** (menores).
 **⭐ Regra de anuidade (nova):** a taxa de filiação é **ANUAL** (`taxaAno`). Pagar a anuidade do ano **habilita participar dos eventos/competições daquele ano** → elegibilidade pra competir = anuidade do ano paga; a filiação vence e renova por ano. Amarra Financeiro ↔ Competições. Ver `docs/MODULO-DASHBOARD-FINANCEIRO.md` §4.1.
 **⭐ Fluxo de cadastro — ✅ FEITO (jul/2026):** clube cadastra (**RG obrigatório**; foto e comprovante de residência podem vir depois). **Menor de 18** exige dados + consentimento do responsável (LGPD art. 14), validado no servidor. 📄 `docs/MODULO-ATLETA-FLUXO.md` §8.
-**⭐ Fluxo de PAGAMENTO — 🔄 MUDOU em ago/2026 (em construção):** o atleta **não paga mais no ato do cadastro**. O clube cadastra à vontade (todos nascem `AGUARDANDO_PAGAMENTO`, sem prazo curto), e depois usa um **botão de pagamento** que soma os pendentes: **um Pix só, um comprovante só, N atletas**. O comprovante chega no painel do admin **com a lista nominal** dos atletas que cobre, e a federação dá baixa. Sem gateway de Pix (sem orçamento) — é conferência manual. O `AtletaExpurgoJob` passou a apagar só cadastro **abandonado há 90 dias** (antes era 24h, o que apagaria quem espera o lote).
-**Clube:** CNPJ, endereço, representante, documentos (Ata, Estatuto), status (`PENDENTE` / aprovado / `SUSPENSO`).
+**⭐ Fluxo de PAGAMENTO — ✅ FEITO (ago/2026), migration `V16`:** o atleta **não paga no cadastro**. O clube cadastra à vontade (todos nascem `AGUARDANDO_PAGAMENTO`), e usa o **botão de pagamento** que soma os pendentes: **um Pix só, um comprovante só, N atletas**, com **pagamento parcial permitido**. Vira um lote com protocolo (`FHT-2026-A3F91C`) que sabe quais atletas cobre; chega no Financeiro do admin **com a lista nominal** + comprovante, e a federação dá baixa. Sem gateway (sem orçamento) — conferência manual.
+**⭐ Os DOIS PORTÕES da aprovação do atleta** (independentes de propósito): **documental** (RG + consentimento do responsável se menor) e **financeiro** (anuidade do ano com baixa). **Pagar não ativa menor sem autorização** — dinheiro não compra conformidade com o art. 14. Valor da anuidade: config única `fht.anuidade.valor`. O `AtletaExpurgoJob` virou **90 dias** (era 24h, que apagaria quem espera o lote).
+**Clube:** CNPJ, endereço, representante (nome, **CPF**, cargo, e-mail, telefone), documentos (Ata, Estatuto), status (`PENDENTE` / aprovado / `SUSPENSO`).
+**⭐ Filiação ponta a ponta — ✅ FEITA (ago/2026), migration `V15`:** o clube **escolhe a senha** no cadastro público e a conta nasce ali, **inativa**; **aprovar = liberar o acesso**; rejeitar/suspender **fecham** o acesso. (Antes, aprovar gerava senha aleatória que nunca era exibida a ninguém — a conta nascia inutilizável.) Tabela **`clube_pessoas`**: 2 representantes + **técnico** (quem define a escalação). São **dados cadastrais** — login por pessoa depende do módulo de permissões.
 
 **Frontend — rotas:** `/` (site público one-page), `/login`, `/clube` (protegida `ADMIN_CLUBE`), `/admin` (protegida `ADMIN_FHT`) via `ProtectedRoute` + `AuthContext`.
 Site público (componentes em `src/components/`): Hero, Competitions, Registration, News, About, Clubs, Referees, Gallery, Documents, Contact, Footer, CookieBanner, Navbar (hide-on-scroll), ScrollProgress.
@@ -94,6 +96,7 @@ Site público (componentes em `src/components/`): Hero, Competitions, Registrati
 - **Painel do CLUBE funcional:** login real de clube (era mock — agora tem usuário no banco); lista de atletas **com escopo** (clube vê só os próprios); cadastro multi-step; **detalhe "ver tudo" + edição** dos próprios atletas via `PUT /api/atletas/{id}` (backend com escopo: clube só edita os seus, admin edita qualquer); **gráficos** no dashboard (elenco por categoria = real; desempenho em competições = mock).
 - **Sessão logada (UX):** Navbar da home mostra **"Meu Painel"** (leva ao /admin ou /clube) + "Sair" quando logado; botão **"Ver site"** no rodapé dos painéis → circula painel↔site sem deslogar (token no `localStorage`).
 - **3 bugfixes de backend** (jul/2026): `@Transactional` faltando em `criarUsuarioClube`; query Panache malformada em `findByClubeId`; ambos davam 500 e travavam o fluxo do clube. Achados testando ao vivo.
+- **Ecossistema de FILIAÇÃO ponta a ponta (ago/2026)** — o pedido do Gustavo: "que a filiação funcione, crie um clube, esse clube vá pro painel do admin, ele aprove, depois o clube adiciona técnico, atleta e etc, faz o pagamento e sobe o comprovante". **Está fechado e validado rodando**: clube se cadastra escolhendo a senha → cai na fila do admin → aprovação libera o acesso → clube entra → monta a comissão técnica → cadastra atletas → barra de pagamento soma os pendentes → paga em lote com um comprovante → cai no Financeiro do admin com a lista nominal → baixa ativa os atletas. Migrations `V15` (credenciais + pessoas do clube) e `V16` (pagamento em lote). E-mail em cada etapa (simulado até plugar o SMTP).
 - **Competições — Fatia 1 (jul/2026, 7º módulo mock→real)** — CRUD real no admin (`CompeticoesPage` perdeu 285 linhas de dados fictícios), status derivado das datas com override manual, toggle de vitrine, e `Competitions.tsx`/`Hero.tsx` consumindo a API. Migration `V13`. 📄 `docs/MODULO-COMPETICOES.md` §9.
 - **Fluxo de filiação do atleta com LGPD (jul/2026, 6º módulo mock→real)** — o bloqueador de lançamento. Migration `V12`, entidade `Consentimento`, etapa de **responsável legal** no cadastro do clube (aparece sozinha quando a data de nascimento indica menor), `POST /api/atletas/{id}/documentos` pra anexar o comprovante depois, `AtletaExpurgoJob` (`@Scheduled`) apagando os não pagos, e aprovação bloqueada sem comprovante/consentimento. 📄 `docs/MODULO-ATLETA-FLUXO.md` §8.
 - **Telas de DEMO (mock) do painel admin** (jul/2026, pra reunião): as 7 seções antes em placeholder agora têm telas **navegáveis mock** em `frontend/src/pages/admin/*Page.tsx` (Competições, Financeiro, Notícias, Diretoria, Documentos, Galeria, Usuários/Admins) — self-contained, dados de exemplo, modais/abas/painéis via `useState`, **sem backend**. Dashboard do admin ganhou gráficos (SVG puro). ⚠️ **São mock pra demonstração** — trocar por API real quando cada módulo for implementado no backend. Roteiro da demo em `docs/ROTEIRO-DEMO.md`.
@@ -104,7 +107,8 @@ Site público (componentes em `src/components/`): Hero, Competitions, Registrati
 **Pendências / lacunas conhecidas:**
 - **R2 não conectado de verdade** — código pronto, mas falta criar o bucket e preencher `R2_ACCOUNT_ID` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`. Sem isso, upload retorna 503. 🗓️ **DECISÃO: R2 é a ÚLTIMA etapa do projeto** — só conecta quando for pro Cloudflare, praticamente indo pro ar. Consequência: **nada no dev pode depender de R2**. Features com upload (docs de atleta/clube, imagens de notícias) se desenvolvem com URL externa ou storage local como fallback, e trocam pro R2 só no fim.
 - ✅ **O site público NÃO consome mais nenhum dado estático** (jul/2026). O único `src/data/*.ts` que sobrou é `referees.ts`, e ele guarda só os **cursos** de árbitro — que não têm módulo. `competitions.ts` foi deletado com a Fatia 1 de Competições.
-- **Ainda mock no painel admin (sem backend):** **Financeiro** e **Usuários & Admins**. Do módulo de Competições, as abas de chaveamento/check-in/jogos ficam vazias até as Fatias 2-4.
+- **Ainda mock no painel admin (sem backend):** só **Usuários & Admins**. O **Financeiro virou real** (fila de baixa dos pagamentos em lote). Do módulo de Competições, as abas de chaveamento/check-in/jogos ficam vazias até as Fatias 2-4.
+- **⚠️ Pendências de LGPD levantadas em `docs/LGPD-INVENTARIO-DADOS.md`** (o insumo da Política de Privacidade). As de gravidade **alta**, ainda em aberto: o consentimento de **imagem é decorativo** (gravado mas nunca consultado — o site publica de qualquer jeito) e a **revogação não existe** (`setRevogadoEm` nunca é chamado), embora o termo prometa; **nome + categoria de menor** vão ao ar no modal público do clube sem filtro; **documentos servidos sem autenticação** (`FileResource` não tem `@RolesAllowed`); **apagar o cadastro não apaga os arquivos**; **não há log de auditoria**; e o **formulário de contato não envia nada** enquanto diz que enviou.
 
 **Backlog de módulos (brain-dump da visão do Gustavo em jul/2026 — ORDEM A DEFINIR no fim do despejo).**
 Tema comum: quase tudo é "admin/diretoria alimenta conteúdo que hoje é estático em `src/data/*.ts`".

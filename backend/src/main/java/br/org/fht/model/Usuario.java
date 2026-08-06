@@ -31,7 +31,16 @@ public class Usuario extends DefaultEntity {
     public void setNome(String nome) { this.nome = nome; }
 
     public String getEmail() { return email; }
-    public void setEmail(String email) { this.email = email; }
+
+    /**
+     * O e-mail é o identificador de login e a coluna é UNIQUE — então normaliza aqui, no único
+     * ponto por onde todo mundo passa. Antes, o cadastro normalizava e o login não: quem se
+     * cadastrava pelo celular (teclado capitaliza a primeira letra sozinho) digitava exatamente
+     * o mesmo texto depois e tomava 401 de credencial inválida.
+     */
+    public void setEmail(String email) {
+        this.email = email == null ? null : email.trim().toLowerCase();
+    }
 
     public String getSenhaHash() { return senhaHash; }
     public void setSenhaHash(String senhaHash) { this.senhaHash = senhaHash; }

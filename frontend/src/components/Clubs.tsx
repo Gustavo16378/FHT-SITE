@@ -209,8 +209,10 @@ export default function Clubs() {
         )}
 
         <div className="text-center">
+          {/* Leva ao formulário de filiação (#cadastro), não ao contato: é o único caminho que
+              cria a conta do clube ponta a ponta. */}
           <a
-            href="#contato"
+            href="#cadastro"
             className="inline-flex items-center gap-2 font-display text-night bg-gold hover:bg-gold-light px-8 py-3.5 rounded-lg text-lg tracking-wider transition-colors duration-250 shadow-lg shadow-gold/20"
           >
             FILIAR MEU CLUBE <ArrowRight size={18} />

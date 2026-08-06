@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Home, Users, UserPlus, Trophy, Settings, LogOut, Menu, X,
+  Home, Users, UserPlus, Settings, LogOut, Menu, X,
   CheckCircle, AlertCircle, Upload, ChevronRight, ChevronLeft,
-  Building2, FileText, Edit3, Save, Calendar, MapPin, Check, Contact,
+  Building2, FileText, Edit3, Save, Contact,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { maskCPF, maskCNPJ, maskPhone, validateCPF } from '../utils/masks'
@@ -15,7 +15,7 @@ import type {
 } from '../types/api'
 
 /* ── tipos ───────────────────────────────────────────────── */
-type Page = 'dashboard' | 'atletas' | 'cadastrar' | 'inscricoes' | 'equipe' | 'dados'
+type Page = 'dashboard' | 'atletas' | 'cadastrar' | 'equipe' | 'dados'
 
 function fmtDate(iso: string | null): string {
   if (!iso) return '—'
@@ -1690,199 +1690,22 @@ function MeusDadosPage() {
   )
 }
 
-/* ── Inscrições (MOCK navegável — escala atletas REAIS) ──── */
-interface CompeticaoMock {
-  id: string
-  nome: string
-  categorias: string
-  periodo: string
-  local: string
-  vagas: number
-}
-
-const COMPETICOES_MOCK: CompeticaoMock[] = [
-  { id: 'c1', nome: 'Campeonato Tocantinense de Handebol', categorias: 'Adulto Masc./Fem.', periodo: '10 – 24 de agosto de 2026', local: 'Palmas — TO', vagas: 16 },
-  { id: 'c2', nome: 'Copa TO Sub-18', categorias: 'Sub-18', periodo: '05 – 12 de setembro de 2026', local: 'Araguaína — TO', vagas: 14 },
-  { id: 'c3', nome: 'Taça das Categorias de Base', categorias: 'Sub-14 / Sub-16', periodo: '01 – 15 de outubro de 2026', local: 'Gurupi — TO', vagas: 20 },
-  { id: 'c4', nome: 'Liga Escolar de Handebol', categorias: 'Sub-12 / Sub-14', periodo: '20/out – 03/nov de 2026', local: 'Porto Nacional — TO', vagas: 14 },
-]
-
-function EscalacaoModal({ competicao, ativos, onClose, onConfirm }: {
-  competicao: CompeticaoMock
-  ativos: AtletaDTO[]
-  onClose: () => void
-  onConfirm: (compId: string, ids: string[]) => void
-}) {
-  const [selected, setSelected] = useState<string[]>([])
-
-  function toggle(id: string) {
-    setSelected(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id])
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex" onClick={onClose}>
-      <div className="flex-1 backdrop-blur-sm" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }} />
-      <div className="w-full max-w-lg h-full bg-[#0a1628] border-l border-federation/20 overflow-y-auto flex flex-col"
-        onClick={e => e.stopPropagation()}>
-
-        <div className="flex items-start justify-between p-6 border-b border-federation/20 sticky top-0 bg-[#0a1628] z-10">
-          <div>
-            <p className="font-display text-gold text-xs tracking-widest mb-1">ESCALAR EQUIPE</p>
-            <h2 className="font-display text-fht-white text-xl leading-tight">{competicao.nome}</h2>
-            <p className="font-body text-gray-soft text-sm">{competicao.categorias}</p>
-          </div>
-          <button onClick={onClose} className="text-gray-soft hover:text-gold transition-colors duration-250 mt-1">
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="flex-1 p-6">
-          {ativos.length === 0 ? (
-            <div className="flex items-center gap-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg px-4 py-3">
-              <AlertCircle size={16} className="text-yellow-400 flex-shrink-0" />
-              <p className="font-body text-yellow-400 text-sm">Cadastre e ative atletas antes de escalar sua equipe.</p>
-            </div>
-          ) : (
-            <>
-              <p className="font-body text-gray-soft text-xs mb-3">Selecione os atletas que vão representar o clube.</p>
-              <div className="flex flex-col gap-2">
-                {ativos.map(a => {
-                  const on = selected.includes(a.id)
-                  return (
-                    <button key={a.id} type="button" onClick={() => toggle(a.id)}
-                      className={`flex items-center justify-between gap-3 px-4 py-3 rounded-lg border text-left transition-colors duration-200 ${
-                        on ? 'border-gold/50 bg-gold/10' : 'border-federation/20 bg-federation/5 hover:border-federation/40'
-                      }`}>
-                      <div>
-                        <p className="font-body text-fht-white text-sm">{a.nomeCompleto}</p>
-                        <p className="font-body text-gray-soft text-xs">{a.posicao} · {a.categoria}</p>
-                      </div>
-                      <span className={`w-5 h-5 rounded-md border flex items-center justify-center flex-shrink-0 ${
-                        on ? 'bg-gold border-gold' : 'border-federation/40'
-                      }`}>
-                        {on && <Check size={14} className="text-night" />}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            </>
-          )}
-        </div>
-
-        <div className="sticky bottom-0 bg-[#0a1628] border-t border-federation/20 p-5 flex items-center gap-3">
-          <span className="font-body text-gray-soft text-sm mr-auto">{selected.length} selecionado(s)</span>
-          <button onClick={onClose}
-            className="font-display text-gray-soft border border-federation/30 hover:border-federation/60 px-5 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250">
-            CANCELAR
-          </button>
-          <button onClick={() => onConfirm(competicao.id, selected)} disabled={selected.length === 0}
-            className="font-display text-night bg-gold hover:bg-gold-light px-6 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250 disabled:opacity-40 disabled:cursor-not-allowed">
-            CONFIRMAR INSCRIÇÃO
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function InscricoesPage({ atletas }: { atletas: AtletaDTO[] }) {
-  const ativos = atletas.filter(a => a.status === 'ATIVO')
-  const [inscricoes, setInscricoes] = useState<Record<string, string[]>>({})
-  const [escalando, setEscalando] = useState<CompeticaoMock | null>(null)
-
-  const abertas = COMPETICOES_MOCK.filter(c => !inscricoes[c.id])
-  const minhas = COMPETICOES_MOCK.filter(c => inscricoes[c.id])
-  const semAtivos = ativos.length === 0
-
-  function confirmar(compId: string, ids: string[]) {
-    setInscricoes(p => ({ ...p, [compId]: ids }))
-    setEscalando(null)
-  }
-
-  return (
-    <div>
-      <div className="flex items-center gap-3 mb-6">
-        <h2 className="font-display text-fht-white text-3xl">INSCRIÇÕES</h2>
-        <span className="font-body text-[10px] text-gray-soft/60 border border-federation/20 rounded-full px-2 py-0.5">demonstração</span>
-      </div>
-
-      {semAtivos && (
-        <div className="flex items-center gap-3 bg-yellow-500/10 border border-yellow-500/30 rounded-xl px-5 py-4 mb-6">
-          <AlertCircle size={18} className="text-yellow-400 flex-shrink-0" />
-          <p className="font-body text-yellow-400 text-sm">Cadastre e ative atletas antes de escalar sua equipe nas competições.</p>
-        </div>
-      )}
-
-      <p className="font-display text-gold text-xs tracking-widest mb-4">COMPETIÇÕES COM INSCRIÇÕES ABERTAS</p>
-      {abertas.length === 0 ? (
-        <p className="font-body text-gray-soft text-sm mb-10">Você já se inscreveu em todas as competições disponíveis.</p>
-      ) : (
-        <div className="grid md:grid-cols-2 gap-4 mb-10">
-          {abertas.map(c => (
-            <div key={c.id} className="bg-[#0d1b2a]/60 border border-federation/20 rounded-xl p-5 flex flex-col">
-              <div className="flex items-start justify-between gap-3 mb-4">
-                <div className="flex items-center gap-2">
-                  <Trophy size={18} className="text-gold flex-shrink-0" />
-                  <h3 className="font-display text-fht-white text-lg leading-tight">{c.nome}</h3>
-                </div>
-                <span className="font-body text-[10px] text-gray-soft/60 border border-federation/20 rounded-full px-2 py-0.5 flex-shrink-0">demonstração</span>
-              </div>
-              <div className="flex flex-col gap-2 mb-5">
-                <div className="flex items-center gap-2 font-body text-gray-soft text-sm"><Users size={14} className="text-federation flex-shrink-0" /> {c.categorias}</div>
-                <div className="flex items-center gap-2 font-body text-gray-soft text-sm"><Calendar size={14} className="text-federation flex-shrink-0" /> {c.periodo}</div>
-                <div className="flex items-center gap-2 font-body text-gray-soft text-sm"><MapPin size={14} className="text-federation flex-shrink-0" /> {c.local}</div>
-                <div className="flex items-center gap-2 font-body text-gray-soft text-sm"><Trophy size={14} className="text-federation flex-shrink-0" /> {c.vagas} vagas por equipe</div>
-              </div>
-              <button onClick={() => setEscalando(c)} disabled={semAtivos}
-                className="mt-auto font-display text-night bg-gold hover:bg-gold-light px-5 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250 disabled:opacity-40 disabled:cursor-not-allowed">
-                INSCREVER EQUIPE
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <p className="font-display text-gold text-xs tracking-widest mb-4">MINHAS INSCRIÇÕES</p>
-      {minhas.length === 0 ? (
-        <div className="bg-[#0d1b2a]/40 border border-federation/20 rounded-xl px-5 py-8 text-center">
-          <p className="font-body text-gray-soft text-sm">Nenhuma inscrição ainda. Inscreva sua equipe nas competições acima.</p>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-3">
-          {minhas.map(c => (
-            <div key={c.id} className="bg-[#0d1b2a]/60 border border-green-500/20 rounded-xl p-5 flex items-center justify-between gap-4">
-              <div>
-                <h3 className="font-display text-fht-white text-lg leading-tight">{c.nome}</h3>
-                <p className="font-body text-gray-soft text-sm mt-1">{c.periodo} · {c.local}</p>
-                <p className="font-body text-gray-soft text-xs mt-1">{inscricoes[c.id].length} atleta(s) escalado(s)</p>
-              </div>
-              <span className="flex items-center gap-1.5 font-body text-xs px-2.5 py-1 rounded-full border text-green-400 bg-green-500/10 border-green-500/30 flex-shrink-0">
-                <Check size={13} /> Inscrito
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {escalando && (
-        <EscalacaoModal
-          competicao={escalando}
-          ativos={ativos}
-          onClose={() => setEscalando(null)}
-          onConfirm={confirmar}
-        />
-      )}
-    </div>
-  )
-}
+/* ── Inscrições em competições ────────────────────────────
+   Bloco removido: era mock navegável (4 campeonatos inventados) que escalava atletas REAIS e
+   devolvia selo verde "Inscrito", sem nada sair do navegador. Volta com a Fatia 3 do módulo de
+   Competições, consumindo as competições que o admin cadastrou de verdade.
+   Ver docs/MODULO-COMPETICOES.md §9.                                                        */
 
 /* ── Sidebar ─────────────────────────────────────────────── */
+// "Inscrições" está fora do menu até a Fatia 3 de Competições existir no backend. A tela lista
+// 4 campeonatos inventados — que nem batem com os reais cadastrados pelo admin —, deixa escalar
+// atletas REAIS vindos da API e devolve selo verde "Inscrito · N atletas escalados" que some no
+// F5. Um clube podia chegar no dia do jogo achando que estava inscrito.
+// Ver docs/MODULO-COMPETICOES.md e docs/REQUISITOS-PENDENTES.md.
 const NAV = [
   { id: 'dashboard', label: 'Dashboard',        Icon: Home,     disabled: false },
   { id: 'atletas',   label: 'Meus Atletas',     Icon: Users,    disabled: false },
   { id: 'cadastrar', label: 'Cadastrar Atleta', Icon: UserPlus, disabled: false },
-  { id: 'inscricoes',label: 'Inscrições',        Icon: Trophy,   disabled: false },
   { id: 'equipe',    label: 'Comissão Técnica',  Icon: Contact,  disabled: false },
   { id: 'dados',     label: 'Meus Dados',        Icon: Settings, disabled: false },
 ] as const
@@ -2009,7 +1832,6 @@ export default function ClubeDashboard() {
                   onVer={setAtletaDetalhe} onPago={() => { reload(true).catch(() => {}) }} />
               )}
               {page === 'cadastrar' && <CadastrarAtletaPage onSuccess={handleAtletaSuccess} />}
-              {page === 'inscricoes' && <InscricoesPage atletas={atletas} />}
               {page === 'equipe' && <EquipePage />}
               {page === 'dados' && <MeusDadosPage />}
             </>

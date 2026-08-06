@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { MessageCircle, Mail, Send, MapPin } from 'lucide-react'
 import { IconInstagram, IconFacebook, IconYoutube } from './SocialIcons'
 import { useInView } from '../hooks/useInView'
+import { apiPostJson } from '../services/api'
 
 const subjects = ['Atleta', 'Clube', 'Arbitragem', 'Imprensa', 'Outros']
 
@@ -9,14 +10,32 @@ export default function Contact() {
   const ref = useInView()
   const [form, setForm] = useState({ name: '', email: '', phone: '', subject: '', message: '' })
   const [sent, setSent] = useState(false)
+  const [enviando, setEnviando] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setSent(true)
+    setErro(null)
+    setEnviando(true)
+    try {
+      await apiPostJson('/api/contato', {
+        nome: form.name,
+        email: form.email,
+        telefone: form.phone,
+        assunto: form.subject,
+        mensagem: form.message,
+      })
+      setSent(true)
+    } catch (err) {
+      // Só declara "enviada" quando saiu de verdade — a tela antes dizia isso sem nenhuma requisição.
+      setErro(err instanceof Error ? err.message : 'Não foi possível enviar sua mensagem.')
+    } finally {
+      setEnviando(false)
+    }
   }
 
   return (
@@ -130,11 +149,17 @@ export default function Contact() {
                   rows={5}
                   className="font-body bg-night/60 border border-federation/20 focus:border-gold rounded-lg px-4 py-3 text-fht-white placeholder-gray-soft text-sm outline-none transition-colors duration-250 resize-none"
                 />
+                {erro && (
+                  <p className="font-body text-red-400 text-sm bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3">
+                    {erro}
+                  </p>
+                )}
                 <button
                   type="submit"
-                  className="font-display text-night bg-gold hover:bg-gold-light py-3.5 rounded-lg text-lg tracking-wider transition-colors duration-250 shadow-lg shadow-gold/20"
+                  disabled={enviando}
+                  className="font-display text-night bg-gold hover:bg-gold-light py-3.5 rounded-lg text-lg tracking-wider transition-colors duration-250 shadow-lg shadow-gold/20 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  ENVIAR MENSAGEM
+                  {enviando ? 'ENVIANDO...' : 'ENVIAR MENSAGEM'}
                 </button>
               </form>
             )}

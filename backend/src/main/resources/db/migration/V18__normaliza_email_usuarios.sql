@@ -1,0 +1,12 @@
+-- O e-mail e o identificador de login e a coluna e UNIQUE, mas ate agora so o cadastro
+-- normalizava (trim + minusculas) — o login comparava o texto cru. Quem se cadastrou pelo
+-- celular, com o teclado capitalizando a primeira letra, ficava trancado do lado de fora
+-- digitando exatamente a mesma coisa.
+--
+-- A normalizacao passou pro setter da entidade (Usuario.setEmail), que e o unico caminho de
+-- escrita. Aqui alinhamos as linhas que ja estao gravadas.
+--
+-- Se esta migration falhar por violacao de unicidade, e porque existem DUAS contas que so
+-- diferem por maiuscula/minuscula (ex.: 'Clube@x.com' e 'clube@x.com'). Isso e um problema real
+-- de dados, nao da migration: decida qual conta vale e apague a outra antes de subir.
+UPDATE usuarios SET email = lower(trim(email)) WHERE email <> lower(trim(email));

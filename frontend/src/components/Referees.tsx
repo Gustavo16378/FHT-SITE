@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Star, Calendar, MapPin, Users, ArrowRight, Loader2 } from 'lucide-react'
-import { refereeCourses } from '../data/referees'
+import { Star, MapPin, ArrowRight, Loader2 } from 'lucide-react'
 import { useInView } from '../hooks/useInView'
 import { apiGet, fileUrl } from '../services/api'
 import type { ArbitroPublicoDTO } from '../types/api'
@@ -121,25 +120,10 @@ export default function Referees() {
               </p>
             </div>
 
-            {/* Próximos cursos */}
-            <h4 className="font-display text-fht-white text-xl mb-3">PRÓXIMOS CURSOS</h4>
-            <div className="flex flex-col gap-3" style={{ filter: 'opacity(0.9999)' }}>
-              {refereeCourses.map((course) => (
-                <a
-                  key={course.id}
-                  href={course.registrationLink}
-                  className="bg-night/60 border border-federation/20 rounded-lg p-4 hover:border-gold/40 transition-colors duration-250 group block"
-                  style={{ filter: 'opacity(0.9999)', display: 'block' }}
-                >
-                  <p className="font-display text-fht-white text-base leading-tight group-hover:text-gold transition-colors duration-250 mb-2">{course.title}</p>
-                  <div className="flex flex-col gap-1 text-xs text-gray-soft font-body">
-                    <span className="flex items-center gap-1.5"><Calendar size={11} /> {new Date(course.date + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
-                    <span className="flex items-center gap-1.5"><MapPin size={11} /> {course.location}</span>
-                    <span className="flex items-center gap-1.5"><Users size={11} /> {course.spots} vagas</span>
-                  </div>
-                </a>
-              ))}
-            </div>
+            {/* A agenda de "PRÓXIMOS CURSOS" saiu daqui: era estática, com duas datas de 2025 que
+                o site anunciava como futuras. Não existe módulo de cursos, e agenda inventada num
+                site oficial de federação é pior que agenda nenhuma. Enquanto não houver módulo,
+                quem se interessa procura a arbitragem pelo botão acima. */}
           </div>
         </div>
       </div>

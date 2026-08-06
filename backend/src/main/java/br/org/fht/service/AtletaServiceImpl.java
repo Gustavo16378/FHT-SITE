@@ -1,6 +1,7 @@
 package br.org.fht.service;
 
 import br.org.fht.common.CPFValidator;
+import br.org.fht.common.Campos;
 import br.org.fht.common.Escopo;
 import br.org.fht.common.Fuso;
 import br.org.fht.common.OrigemRequisicao;
@@ -87,23 +88,26 @@ public class AtletaServiceImpl implements AtletaService {
 
         var atleta = new Atleta();
         atleta.setClubeId(clubeId);
-        atleta.setNomeCompleto(form.nomeCompleto);
+        // Colunas NOT NULL entram por Campos.obrigatorio: sem isso a ausência ou o estouro só
+        // aparecem no INSERT e o clube lê "Erro interno do servidor" com o formulário todo preenchido.
+        atleta.setNomeCompleto(Campos.obrigatorio(form.nomeCompleto, 255, "nomeCompleto", "Nome completo é obrigatório"));
         atleta.setDataNascimento(nascimento);
-        atleta.setSexo(form.sexo);
+        atleta.setSexo(Campos.obrigatorio(form.sexo, 10, "sexo", "Sexo é obrigatório"));
         atleta.setCpf(form.cpf);
-        atleta.setRg(form.rg);
-        atleta.setRgOrgaoEmissor(form.rgOrgaoEmissor);
-        atleta.setNaturalidadeCidade(form.naturalidadeCidade);
-        atleta.setNaturalidadeUf(form.naturalidadeUf);
-        atleta.setTelefone(form.telefone);
-        atleta.setEmail(form.email);
-        atleta.setCep(form.cep);
-        atleta.setLogradouro(form.logradouro);
-        atleta.setNumero(form.numero);
-        atleta.setCidade(form.cidade);
-        atleta.setUfResidencia(form.ufResidencia);
-        atleta.setPosicao(form.posicao);
-        atleta.setCategoria(form.categoria);
+        atleta.setRg(Campos.obrigatorio(form.rg, 30, "rg", "RG é obrigatório"));
+        atleta.setRgOrgaoEmissor(Campos.tamanho(form.rgOrgaoEmissor, 50, "rgOrgaoEmissor"));
+        atleta.setNaturalidadeCidade(Campos.tamanho(form.naturalidadeCidade, 100, "naturalidadeCidade"));
+        atleta.setNaturalidadeUf(Campos.tamanho(form.naturalidadeUf, 2, "naturalidadeUf"));
+        atleta.setTelefone(Campos.tamanho(form.telefone, 20, "telefone"));
+        atleta.setEmail(Campos.tamanho(form.email, 255, "email"));
+        atleta.setCep(Campos.tamanho(form.cep, 9, "cep"));
+        atleta.setLogradouro(Campos.tamanho(form.logradouro, 255, "logradouro"));
+        atleta.setNumero(Campos.tamanho(form.numero, 20, "numero"));
+        atleta.setCidade(Campos.tamanho(form.cidade, 100, "cidade"));
+        atleta.setUfResidencia(Campos.tamanho(form.ufResidencia, 2, "ufResidencia"));
+        // Multi-seleção: as posições chegam concatenadas. Coluna alargada pra 200 na V17.
+        atleta.setPosicao(Campos.obrigatorio(form.posicao, 200, "posicao", "Informe ao menos uma posição"));
+        atleta.setCategoria(Campos.obrigatorio(form.categoria, 20, "categoria", "Categoria é obrigatória"));
         atleta.setTransferencia("true".equalsIgnoreCase(form.isTransferencia));
         atleta.setClubeAnterior(form.clubeAnterior);
 
@@ -258,17 +262,20 @@ public class AtletaServiceImpl implements AtletaService {
         Atleta atleta = buscarComEscopo(id, jwt);
 
         // Atualização parcial: só aplica campos não nulos. Não mexe em CPF, documentos nem status.
-        if (form.nomeCompleto() != null) atleta.setNomeCompleto(form.nomeCompleto());
+        // Mesmas guardas de tamanho do cadastro — a edição escrevia direto na coluna e estourava igual.
+        if (form.nomeCompleto() != null)
+            atleta.setNomeCompleto(Campos.obrigatorio(form.nomeCompleto(), 255, "nomeCompleto", "Nome completo não pode ficar vazio"));
+        // parseNascimento trata formato inválido; LocalDate.parse cru devolvia 500 na edição.
         if (form.dataNascimento() != null && !form.dataNascimento().isBlank())
-            atleta.setDataNascimento(LocalDate.parse(form.dataNascimento()));
-        if (form.sexo() != null) atleta.setSexo(form.sexo());
-        if (form.rg() != null) atleta.setRg(form.rg());
-        if (form.telefone() != null) atleta.setTelefone(form.telefone());
-        if (form.email() != null) atleta.setEmail(form.email());
-        if (form.cidade() != null) atleta.setCidade(form.cidade());
-        if (form.ufResidencia() != null) atleta.setUfResidencia(form.ufResidencia());
-        if (form.posicao() != null) atleta.setPosicao(form.posicao());
-        if (form.categoria() != null) atleta.setCategoria(form.categoria());
+            atleta.setDataNascimento(parseNascimento(form.dataNascimento()));
+        if (form.sexo() != null) atleta.setSexo(Campos.tamanho(form.sexo(), 10, "sexo"));
+        if (form.rg() != null) atleta.setRg(Campos.tamanho(form.rg(), 30, "rg"));
+        if (form.telefone() != null) atleta.setTelefone(Campos.tamanho(form.telefone(), 20, "telefone"));
+        if (form.email() != null) atleta.setEmail(Campos.tamanho(form.email(), 255, "email"));
+        if (form.cidade() != null) atleta.setCidade(Campos.tamanho(form.cidade(), 100, "cidade"));
+        if (form.ufResidencia() != null) atleta.setUfResidencia(Campos.tamanho(form.ufResidencia(), 2, "ufResidencia"));
+        if (form.posicao() != null) atleta.setPosicao(Campos.tamanho(form.posicao(), 200, "posicao"));
+        if (form.categoria() != null) atleta.setCategoria(Campos.tamanho(form.categoria(), 20, "categoria"));
         if (form.transferencia() != null) atleta.setTransferencia(form.transferencia());
         if (form.clubeAnterior() != null) atleta.setClubeAnterior(form.clubeAnterior());
 
@@ -414,6 +421,32 @@ public class AtletaServiceImpl implements AtletaService {
         atleta.setStatus("REJEITADO");
         atleta.setMotivoRejeicao(motivo);
         atleta.setPrazoPagamentoAte(null);
+    }
+
+    /**
+     * Desfaz a rejeição, devolvendo o atleta à fila de aprovação.
+     *
+     * <p>Rejeitar era irreversível: o clube não pode recadastrar (409 de CPF já existente),
+     * {@code reativar} recusa qualquer status que não seja SUSPENSO, e o painel não oferecia botão
+     * em REJEITADO. Uma rejeição por engano só se desfazia no banco — apagando o atleta, o que
+     * levava junto os consentimentos por cascata.
+     *
+     * <p>Volta para AGUARDANDO_APROVACAO se a anuidade do ano já tem baixa; senão, para
+     * AGUARDANDO_PAGAMENTO. Quem decide ativar continua sendo a federação, pelos dois portões.
+     */
+    @Override
+    @Transactional
+    public void reconsiderar(UUID id) {
+        Atleta atleta = atletaRepository.findByIdOptional(id)
+                .orElseThrow(() -> new WebApplicationException("Atleta não encontrado", 404));
+
+        if (!"REJEITADO".equals(atleta.getStatus())) {
+            throw new WebApplicationException("Apenas atletas rejeitados podem voltar para análise", 409);
+        }
+
+        boolean pago = loteItemRepository.temPagamentoConfirmado(id, Fuso.hoje().getYear());
+        atleta.setStatus(pago ? STATUS_AGUARDANDO_APROVACAO : STATUS_AGUARDANDO_PAGAMENTO);
+        atleta.setMotivoRejeicao(null);
     }
 
     @Override

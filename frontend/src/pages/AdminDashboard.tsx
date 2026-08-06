@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Shield, Users, Star, Trophy, Newspaper,
   FileText, LogOut, Menu, X, AlertCircle, Search,
-  Image as ImageIcon, Contact, UserCog, Wallet, Home, Plus,
+  Image as ImageIcon, Contact, Wallet, Home, Plus,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { apiGet, apiPatch, apiPostForm, apiPutForm, ApiError, fileUrl } from '../services/api'
@@ -15,10 +15,11 @@ import { NoticiasPage } from './admin/NoticiasPage'
 import { DiretoriaPage } from './admin/DiretoriaPage'
 import { DocumentosPage } from './admin/DocumentosPage'
 import { GaleriaPage } from './admin/GaleriaPage'
-import { UsuariosPage } from './admin/UsuariosPage'
+// UsuariosPage segue no repositório como base do módulo de admins/permissões, mas fora do menu
+// enquanto for mock. Ver NAV_GROUPS mais abaixo.
 
 /* ── tipos (view-model) ───────────────────────────────────────── */
-type Page = 'dashboard' | 'clubes' | 'atletas' | 'arbitros' | 'competicoes' | 'financeiro' | 'noticias' | 'galeria' | 'diretoria' | 'documentos' | 'usuarios'
+type Page = 'dashboard' | 'clubes' | 'atletas' | 'arbitros' | 'competicoes' | 'financeiro' | 'noticias' | 'galeria' | 'diretoria' | 'documentos'
 
 type StatusClube = 'PENDENTE' | 'ATIVO' | 'REJEITADO' | 'SUSPENSO'
 type StatusAtleta = 'AGUARDANDO_PAGAMENTO' | 'AGUARDANDO_APROVACAO' | 'ATIVO' | 'REJEITADO' | 'SUSPENSO'
@@ -244,7 +245,7 @@ function SearchBar({ value, onChange, placeholder }: { value: string; onChange: 
 
 /* ── Atleta Detail Panel ──────────────────────────────────────── */
 function AtletaDetailPanel({
-  atleta, onClose, onAprovar, onRejeitar, onSuspender, onReativar,
+  atleta, onClose, onAprovar, onRejeitar, onSuspender, onReativar, onReconsiderar,
 }: {
   atleta: Atleta
   onClose: () => void
@@ -253,6 +254,7 @@ function AtletaDetailPanel({
   onRejeitar: (id: string) => void
   onSuspender: (id: string) => void
   onReativar: (id: string) => void
+  onReconsiderar: (id: string) => void
 }) {
   const Info = ({ label, value }: { label: string; value: string }) => (
     <div>
@@ -493,6 +495,14 @@ function AtletaDetailPanel({
               REATIVAR ATLETA
             </button>
           )}
+          {/* Rejeitar era definitivo: o clube não recadastra (CPF duplicado) e reativar só aceita
+              SUSPENSO. Sobrava apagar o atleta — o que levava junto os consentimentos, por cascata. */}
+          {atleta.status === 'REJEITADO' && (
+            <button onClick={() => onReconsiderar(atleta.id)}
+              className="flex-1 font-display text-gold bg-gold/10 border border-gold/30 hover:bg-gold/20 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250">
+              VOLTAR PARA A FILA
+            </button>
+          )}
           <button onClick={onClose}
             className="font-display text-gray-soft border border-federation/30 hover:border-federation/60 px-6 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250">
             FECHAR
@@ -505,7 +515,8 @@ function AtletaDetailPanel({
 
 /* ── Clube Detail Panel ───────────────────────────────────────── */
 function ClubeDetailPanel({
-  clube, atletas, onClose, onAprovar, onRejeitar, onSuspender, onReativar, onToggleVitrine, onVerAtleta,
+  clube, atletas, onClose, onAprovar, onRejeitar, onSuspender, onReativar, onReconsiderar,
+  onToggleVitrine, onVerAtleta,
 }: {
   clube: Clube
   atletas: Atleta[]
@@ -514,6 +525,7 @@ function ClubeDetailPanel({
   onRejeitar: (id: string) => void
   onSuspender: (id: string) => void
   onReativar: (id: string) => void
+  onReconsiderar: (id: string) => void
   onToggleVitrine: (id: string, visivel: boolean) => void
   onVerAtleta: (a: Atleta) => void
 }) {
@@ -685,6 +697,14 @@ function ClubeDetailPanel({
             <button onClick={() => onReativar(clube.id)}
               className="flex-1 font-display text-green-400 bg-green-500/10 border border-green-500/30 hover:bg-green-500/20 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250">
               REATIVAR CLUBE
+            </button>
+          )}
+          {/* Sem isto, rejeitar era irreversível: o clube não recadastra (e-mail já existe), não
+              entra (usuário inativo) e não tinha botão nenhum aqui. Só saía por SQL. */}
+          {clube.status === 'REJEITADO' && (
+            <button onClick={() => onReconsiderar(clube.id)}
+              className="flex-1 font-display text-gold bg-gold/10 border border-gold/30 hover:bg-gold/20 py-2.5 rounded-lg text-sm tracking-wider transition-colors duration-250">
+              VOLTAR PARA ANÁLISE
             </button>
           )}
           <button onClick={onClose}
@@ -872,6 +892,7 @@ function ClubesPage({ clubes, atletas, reload }: {
   const handleAprovar = (id: string) => acao(() => apiPatch(`/api/clubes/${id}/aprovar`))
   const handleSuspender = (id: string) => acao(() => apiPatch(`/api/clubes/${id}/suspender`))
   const handleReativar = (id: string) => acao(() => apiPatch(`/api/clubes/${id}/reativar`))
+  const handleReconsiderar = (id: string) => acao(() => apiPatch(`/api/clubes/${id}/reconsiderar`))
   const handleVitrine = (id: string, visivel: boolean) => acao(() => apiPatch(`/api/clubes/${id}/vitrine`, { visivel }))
 
   function abrirRejeitar(id: string) {
@@ -906,6 +927,7 @@ function ClubesPage({ clubes, atletas, reload }: {
   const atletaAprovar = (id: string) => acaoAtleta(() => apiPatch(`/api/atletas/${id}/aprovar`))
   const atletaSuspender = (id: string) => acaoAtleta(() => apiPatch(`/api/atletas/${id}/suspender`))
   const atletaReativar = (id: string) => acaoAtleta(() => apiPatch(`/api/atletas/${id}/reativar`))
+  const atletaReconsiderar = (id: string) => acaoAtleta(() => apiPatch(`/api/atletas/${id}/reconsiderar`))
   function atletaAbrirRejeitar(id: string) {
     setAtletaDetalhe(null)
     setAtletaRejeitarId(id)
@@ -970,6 +992,7 @@ function ClubesPage({ clubes, atletas, reload }: {
           onRejeitar={abrirRejeitar}
           onSuspender={handleSuspender}
           onReativar={handleReativar}
+          onReconsiderar={handleReconsiderar}
           onToggleVitrine={handleVitrine}
           onVerAtleta={setAtletaDetalhe}
         />
@@ -983,6 +1006,7 @@ function ClubesPage({ clubes, atletas, reload }: {
           onRejeitar={atletaAbrirRejeitar}
           onSuspender={atletaSuspender}
           onReativar={atletaReativar}
+          onReconsiderar={atletaReconsiderar}
         />
       )}
 
@@ -1039,6 +1063,7 @@ function AtletasPage({ atletas, reload }: {
     acao(() => apiPatch(`/api/atletas/${id}/aprovar`, { dispensarPagamento }))
   const handleSuspender = (id: string) => acao(() => apiPatch(`/api/atletas/${id}/suspender`))
   const handleReativar = (id: string) => acao(() => apiPatch(`/api/atletas/${id}/reativar`))
+  const handleReconsiderar = (id: string) => acao(() => apiPatch(`/api/atletas/${id}/reconsiderar`))
 
   function abrirRejeitar(id: string) {
     setDetalhe(null)
@@ -1104,6 +1129,7 @@ function AtletasPage({ atletas, reload }: {
           onRejeitar={abrirRejeitar}
           onSuspender={handleSuspender}
           onReativar={handleReativar}
+          onReconsiderar={handleReconsiderar}
         />
       )}
 
@@ -1544,9 +1570,12 @@ const NAV_GROUPS: { group: string | null; items: NavItem[] }[] = [
     { id: 'diretoria',  label: 'Diretoria',  Icon: Contact },
     { id: 'documentos', label: 'Documentos', Icon: FileText },
   ] },
-  { group: 'Sistema', items: [
-    { id: 'usuarios', label: 'Usuários & Admins', Icon: UserCog },
-  ] },
+  // "Usuários & Admins" está fora do menu até existir backend. A tela é 100% mock: criar admin,
+  // salvar permissões e criar login de clube só mexem no estado local — recarregou, sumiu. O risco
+  // não é estético: o admin cria um "login de clube" com senha na frente de alguém, nada é criado,
+  // e o clube nunca consegue entrar. O backend hoje só tem os papéis ADMIN_FHT e ADMIN_CLUBE, sem
+  // coluna de escopo — a hierarquia e as permissões por área são desenho, não software.
+  // Ver docs/MODULO-ADMINS-PERMISSOES.md e docs/REQUISITOS-PENDENTES.md.
 ]
 
 /* ── Main ─────────────────────────────────────────────────────── */
@@ -1669,7 +1698,6 @@ export default function AdminDashboard() {
               {page === 'galeria'     && <GaleriaPage />}
               {page === 'diretoria'   && <DiretoriaPage />}
               {page === 'documentos'  && <DocumentosPage />}
-              {page === 'usuarios'    && <UsuariosPage />}
             </>
           )}
         </main>

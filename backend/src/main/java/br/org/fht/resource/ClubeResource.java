@@ -160,6 +160,25 @@ public class ClubeResource {
     }
 
     @PATCH
+    @Path("/{id}/reconsiderar")
+    @RolesAllowed("ADMIN_FHT")
+    @SecurityRequirement(name = "BearerAuth")
+    @Operation(summary = "Voltar clube rejeitado para análise",
+            description = "Desfaz a rejeição: o clube retorna ao status PENDENTE e volta para a fila.")
+    @APIResponses({
+            @APIResponse(responseCode = "200", description = "Clube devolvido à análise"),
+            @APIResponse(responseCode = "401", description = "Token ausente ou inválido"),
+            @APIResponse(responseCode = "403", description = "Apenas ADMIN_FHT"),
+            @APIResponse(responseCode = "404", description = "Clube não encontrado"),
+            @APIResponse(responseCode = "409", description = "Clube não está rejeitado")
+    })
+    public Response reconsiderar(
+            @Parameter(description = "UUID do clube", required = true) @PathParam("id") UUID id) {
+        clubeService.reconsiderar(id);
+        return Response.ok(ApiResponse.ok(null, "Clube devolvido para análise")).build();
+    }
+
+    @PATCH
     @Path("/{id}/suspender")
     @RolesAllowed("ADMIN_FHT")
     @SecurityRequirement(name = "BearerAuth")

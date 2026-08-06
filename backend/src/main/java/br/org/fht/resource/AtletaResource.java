@@ -173,6 +173,25 @@ public class AtletaResource {
     }
 
     @PATCH
+    @Path("/{id}/reconsiderar")
+    @RolesAllowed("ADMIN_FHT")
+    @Operation(summary = "Voltar atleta rejeitado para a fila",
+            description = "Desfaz a rejeição. O atleta volta para AGUARDANDO_APROVACAO se a anuidade "
+                    + "do ano já tem baixa, ou para AGUARDANDO_PAGAMENTO se ainda não tem.")
+    @APIResponses({
+            @APIResponse(responseCode = "200", description = "Atleta devolvido à fila"),
+            @APIResponse(responseCode = "401", description = "Token ausente ou inválido"),
+            @APIResponse(responseCode = "403", description = "Apenas ADMIN_FHT"),
+            @APIResponse(responseCode = "404", description = "Atleta não encontrado"),
+            @APIResponse(responseCode = "409", description = "Atleta não está rejeitado")
+    })
+    public Response reconsiderar(
+            @Parameter(description = "UUID do atleta", required = true) @PathParam("id") UUID id) {
+        atletaService.reconsiderar(id);
+        return Response.ok(ApiResponse.ok(null, "Atleta devolvido para a fila")).build();
+    }
+
+    @PATCH
     @Path("/{id}/suspender")
     @RolesAllowed("ADMIN_FHT")
     @Consumes(MediaType.APPLICATION_JSON)

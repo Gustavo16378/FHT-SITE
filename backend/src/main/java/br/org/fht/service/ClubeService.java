@@ -26,6 +26,9 @@ public interface ClubeService {
 
     void rejeitar(UUID id, String motivo);
 
+    /** Desfaz a rejeição: o clube volta para PENDENTE e entra de novo na fila de análise. */
+    void reconsiderar(UUID id);
+
     void suspender(UUID id);
 
     void reativar(UUID id);

@@ -146,20 +146,67 @@ public class EmailService {
                 """.formatted(protocolo, nomeClube, motivo == null || motivo.isBlank() ? "não informado" : motivo));
     }
 
+    /* ───────────── contato do site ───────────── */
+
+    /**
+     * Encaminha à federação uma mensagem do formulário "Fale com a FHT".
+     *
+     * <p>Diferente dos demais: o remetente é um visitante anônimo, então o texto dele vai
+     * <b>escapado</b> pro HTML — sem isso qualquer um injetaria marcação na caixa de entrada da
+     * federação. E o Reply-To aponta pra quem escreveu, pra federação responder apertando
+     * "responder" em vez de copiar o endereço na mão.
+     *
+     * <p>A mensagem não é armazenada em lugar nenhum: sai por e-mail e acabou.
+     *
+     * @return false se o envio não pôde ser feito — aqui, ao contrário dos avisos, o visitante
+     *         precisa saber, porque senão a tela mente dizendo que enviou.
+     */
+    public boolean encaminharContato(String nome, String email, String telefone, String assunto, String mensagem) {
+        return enviar(emailAdmin,
+                "[Site] " + assunto,
+                """
+                <h2>Mensagem pelo site</h2>
+                <ul>
+                  <li><b>Nome:</b> %s</li>
+                  <li><b>E-mail:</b> %s</li>
+                  <li><b>Telefone:</b> %s</li>
+                  <li><b>Assunto:</b> %s</li>
+                </ul>
+                <p><b>Mensagem:</b></p>
+                <p style="white-space:pre-wrap">%s</p>
+                """.formatted(escapar(nome), escapar(email),
+                        telefone == null || telefone.isBlank() ? "não informado" : escapar(telefone),
+                        escapar(assunto), escapar(mensagem)),
+                email);
+    }
+
+    private static String escapar(String texto) {
+        if (texto == null) return "";
+        return texto.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");
+    }
+
     /* ───────────── envio ───────────── */
 
-    private void enviar(String destino, String assunto, String corpoHtml) {
-        if (!habilitado) return;
+    private boolean enviar(String destino, String assunto, String corpoHtml) {
+        return enviar(destino, assunto, corpoHtml, null);
+    }
+
+    private boolean enviar(String destino, String assunto, String corpoHtml, String replyTo) {
+        if (!habilitado) return false;
         if (destino == null || destino.isBlank()) {
             LOG.warnf("E-mail '%s' não enviado: destinatário ausente", assunto);
-            return;
+            return false;
         }
         try {
-            mailer.send(Mail.withHtml(destino, assunto, envolver(corpoHtml)));
+            Mail mail = Mail.withHtml(destino, assunto, envolver(corpoHtml));
+            if (replyTo != null && !replyTo.isBlank()) mail.setReplyTo(replyTo);
+            mailer.send(mail);
             LOG.infof("E-mail enviado para %s: %s", destino, assunto);
+            return true;
         } catch (Exception e) {
             // Aviso não pode derrubar operação: o painel continua sendo a fonte da verdade.
             LOG.errorf(e, "Falha ao enviar e-mail para %s: %s", destino, assunto);
+            return false;
         }
     }
 

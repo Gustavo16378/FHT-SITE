@@ -30,6 +30,9 @@ public interface AtletaService {
 
     void rejeitar(UUID id, String motivo);
 
+    /** Desfaz a rejeição: o atleta volta para a fila (aguardando pagamento ou aprovação). */
+    void reconsiderar(UUID id);
+
     void suspender(UUID id);
 
     void reativar(UUID id);

@@ -505,7 +505,7 @@ function EquipesTab({ elencos }: { elencos: Elenco[] }) {
 
   if (elencos.length === 0) {
     return (
-      <EmptyTab icon={<Users size={32} className="text-gray-soft/50" />} texto="Nenhum clube inscrito nesta competição ainda." />
+      <EmptyTab icon={<Users size={32} className="text-gray-soft/50" />} texto="A inscrição de equipes chega na próxima etapa do módulo de Competições. Ainda não é possível inscrever clubes pelo sistema." />
     );
   }
 
@@ -740,7 +740,7 @@ function CheckinTab({ atletas, local, dia }: { atletas: CheckinAtleta[]; local: 
     return (
       <EmptyTab
         icon={<UserCheck size={32} className="text-gray-soft/50" />}
-        texto="O check-in do dia fica disponível quando houver atletas escalados para a competição."
+        texto="O check-in de atletas no dia do jogo chega na próxima etapa do módulo de Competições."
       />
     );
   }
@@ -1000,7 +1000,7 @@ function JogosTab({ jogosIniciais }: { jogosIniciais: Jogo[] }) {
 
   if (jogos.length === 0) {
     return (
-      <EmptyTab icon={<Play size={32} className="text-gray-soft/50" />} texto="A tabela de jogos aparece quando a competição começa." />
+      <EmptyTab icon={<Play size={32} className="text-gray-soft/50" />} texto="A tabela de jogos e os placares chegam na próxima etapa do módulo de Competições." />
     );
   }
 
@@ -1257,7 +1257,7 @@ function PainelFullscreen({
           ) : (
             <EmptyTab
               icon={<Trophy size={32} className="text-gray-soft/50" />}
-              texto="O chaveamento é gerado quando as inscrições são encerradas e o sorteio das chaves acontece."
+              texto="O chaveamento e o sorteio das chaves chegam na próxima etapa do módulo de Competições."
             />
           ))}
         {aba === 'equipes' && <EquipesTab elencos={elencos} />}
@@ -1604,7 +1604,8 @@ export function CompeticoesPage() {
         <div>
           <h2 className="font-display text-fht-white text-3xl">COMPETIÇÕES</h2>
           <p className="font-body text-gray-soft text-sm mt-1">
-            Gerencie campeonatos, chaveamento, escalações, check-in e placares ao vivo.
+            Cadastre campeonatos e controle o que aparece no site. Inscrições, chaveamento,
+            escalações, check-in e placares chegam nas próximas etapas do módulo.
           </p>
         </div>
         <button

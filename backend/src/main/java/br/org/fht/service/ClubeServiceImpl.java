@@ -172,7 +172,7 @@ public class ClubeServiceImpl implements ClubeService {
         if (form.sigla() != null) clube.setSigla(form.sigla());
         if (form.cnpj() != null) clube.setCnpj(form.cnpj());
         if (form.representanteNome() != null) clube.setRepresentanteNome(form.representanteNome());
-        if (form.representanteEmail() != null) clube.setRepresentanteEmail(form.representanteEmail());
+        if (form.representanteEmail() != null) trocarEmailDoRepresentante(clube, form.representanteEmail());
         if (form.representanteTelefone() != null) clube.setRepresentanteTelefone(form.representanteTelefone());
         if (form.representanteCargo() != null) clube.setRepresentanteCargo(form.representanteCargo());
 
@@ -214,6 +214,31 @@ public class ClubeServiceImpl implements ClubeService {
         emailService.avisarClubeRejeitado(clube.getRepresentanteEmail(), clube.getNome(), motivo);
     }
 
+    /**
+     * Desfaz a rejeição, devolvendo o clube à fila de análise.
+     *
+     * <p>Rejeitar era irreversível e fechava as três saídas: recadastrar dava 409 de e-mail já
+     * cadastrado, entrar dava 403 de usuário inativo, e o painel não oferecia botão nenhum em
+     * REJEITADO. Uma rejeição por engano, ou um clube que corrigiu a documentação, só se resolvia
+     * no banco.
+     *
+     * <p>Volta para PENDENTE de propósito — e não direto para ATIVO: quem decide aprovar é a
+     * federação, no mesmo fluxo de sempre. O acesso continua fechado enquanto está pendente.
+     */
+    @Override
+    @Transactional
+    public void reconsiderar(UUID id) {
+        Clube clube = clubeRepository.findByIdOptional(id)
+                .orElseThrow(() -> new WebApplicationException("Clube não encontrado", 404));
+
+        if (!"REJEITADO".equals(clube.getStatus())) {
+            throw new WebApplicationException("Apenas clubes rejeitados podem voltar para análise", 409);
+        }
+
+        clube.setStatus("PENDENTE");
+        clube.setMotivoRejeicao(null);
+    }
+
     @Override
     @Transactional
     public void suspender(UUID id) {
@@ -229,9 +254,40 @@ public class ClubeServiceImpl implements ClubeService {
         definirAcesso(clube, false);
     }
 
-    /** Liga/desliga o login do representante junto com o status do clube. */
+    /**
+     * O e-mail do representante <b>é</b> o login do clube — trocar um sem o outro tranca o clube
+     * do lado de fora, com a senha certa. Então a conta acompanha a edição.
+     *
+     * <p>Recusa e-mail já usado por outra conta: sem isso a troca estouraria no índice único
+     * como 500, no meio de um formulário de "Meus Dados".
+     */
+    private void trocarEmailDoRepresentante(Clube clube, String novoEmail) {
+        String email = novoEmail.trim().toLowerCase();
+        if (email.equals(clube.getRepresentanteEmail())) return;
+
+        var conta = usuarioRepository.findByClubeId(clube.getId());
+        boolean emUsoPorOutro = usuarioRepository.findByEmail(email)
+                .filter(u -> conta.isEmpty() || !u.getId().equals(conta.get().getId()))
+                .isPresent();
+        if (emUsoPorOutro) {
+            throw new WebApplicationException("E-mail já cadastrado para outro acesso", 409);
+        }
+
+        clube.setRepresentanteEmail(email);
+        conta.ifPresent(u -> u.setEmail(email));
+    }
+
+    /**
+     * Liga/desliga o login do representante junto com o status do clube.
+     *
+     * <p>Busca pelo <b>vínculo</b> (clubeId), não pelo e-mail: o clube pode trocar o e-mail do
+     * representante em "Meus Dados", e a conta não acompanha. Com a busca por e-mail, depois de
+     * uma troca o {@code ifPresent} não achava ninguém e falhava calado — a federação clicava em
+     * suspender, o painel respondia 200 e mostrava SUSPENSO, e o representante seguia entrando e
+     * cadastrando atleta normalmente. Vale igual para aprovar, rejeitar e reativar.
+     */
     private void definirAcesso(Clube clube, boolean liberado) {
-        usuarioRepository.findByEmail(clube.getRepresentanteEmail())
+        usuarioRepository.findByClubeId(clube.getId())
                 .ifPresent(u -> u.setAtivo(liberado));
     }
 

@@ -539,7 +539,9 @@ function AtletaDetailPanel({ atleta, onClose, onSaved }: {
     email: atleta.email ?? '',
     cidade: atleta.cidade ?? '',
     ufResidencia: atleta.ufResidencia ?? 'TO',
-    posicao: atleta.posicao,
+    // Lista, igual ao cadastro: a posição é gravada concatenada e um <select> de escolha única
+    // reduziria "Ponta Direita, Ponta Esquerda" a uma só na primeira edição.
+    posicoes: (atleta.posicao ?? '').split(',').map(p => p.trim()).filter(Boolean),
     categoria: atleta.categoria,
     transferencia: atleta.transferencia,
     clubeAnterior: atleta.clubeAnterior ?? '',
@@ -563,17 +565,27 @@ function AtletaDetailPanel({ atleta, onClose, onSaved }: {
     setForm(p => ({ ...p, [name]: value }))
   }
 
+  function alternarPosicao(pos: string) {
+    setForm(p => ({
+      ...p,
+      posicoes: p.posicoes.includes(pos) ? p.posicoes.filter(x => x !== pos) : [...p.posicoes, pos],
+    }))
+  }
+
   async function salvar() {
+    if (form.posicoes.length === 0) { setErro('Marque ao menos uma posição.'); return }
     setSaving(true); setErro('')
     try {
       // Campos do responsável só fazem sentido para menor — não sujar o cadastro do adulto.
       const {
         responsavelNome, responsavelCpf, responsavelParentesco, responsavelEmail,
-        responsavelTelefone, consentimentoCadastro, ...dadosBase
+        responsavelTelefone, consentimentoCadastro, posicoes, ...dadosBase
       } = form
+      // A API grava a posição como uma string só — mesmo formato do cadastro.
+      const comPosicao = { ...dadosBase, posicao: posicoes.join(', ') }
       const payload = atleta.menorDeIdade
-        ? { ...dadosBase, responsavelNome, responsavelCpf, responsavelParentesco, responsavelEmail, responsavelTelefone, consentimentoCadastro }
-        : dadosBase
+        ? { ...comPosicao, responsavelNome, responsavelCpf, responsavelParentesco, responsavelEmail, responsavelTelefone, consentimentoCadastro }
+        : comPosicao
 
       await apiPut(`/api/atletas/${atleta.id}`, payload)
       onSaved()
@@ -703,19 +715,27 @@ function AtletaDetailPanel({ atleta, onClose, onSaved }: {
                   </select>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <span className={lbl}>Posição</span>
-                  <select name="posicao" value={form.posicao} onChange={change} className={sel}>
-                    {POSICOES.map(p => <option key={p} value={p}>{p}</option>)}
-                  </select>
+              <div>
+                <span className={lbl}>Posições <span className="normal-case tracking-normal">(pode marcar mais de uma)</span></span>
+                <div className="flex flex-wrap gap-2">
+                  {POSICOES.map(p => {
+                    const ativo = form.posicoes.includes(p)
+                    return (
+                      <button key={p} type="button" onClick={() => alternarPosicao(p)}
+                        className={`font-body text-xs px-3.5 py-2 rounded-full border transition-colors duration-150 ${
+                          ativo ? 'text-gold bg-gold/10 border-gold/40' : 'text-gray-soft bg-night/40 border-federation/20 hover:border-federation/50'
+                        }`}>
+                        {p}
+                      </button>
+                    )
+                  })}
                 </div>
-                <div>
-                  <span className={lbl}>Categoria</span>
-                  <select name="categoria" value={form.categoria} onChange={change} className={sel}>
-                    {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
+              </div>
+              <div>
+                <span className={lbl}>Categoria</span>
+                <select name="categoria" value={form.categoria} onChange={change} className={sel}>
+                  {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
               </div>
               {atleta.menorDeIdade && (
                 <div className="flex flex-col gap-4 pt-4 border-t border-federation/20">

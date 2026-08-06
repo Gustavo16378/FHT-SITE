@@ -194,20 +194,32 @@ public class EmailService {
     private boolean enviar(String destino, String assunto, String corpoHtml, String replyTo) {
         if (!habilitado) return false;
         if (destino == null || destino.isBlank()) {
-            LOG.warnf("E-mail '%s' não enviado: destinatário ausente", assunto);
+            LOG.warnf("E-mail não enviado: destinatário ausente");
             return false;
         }
+        // Funil único de saída, então a higiene de cabeçalho mora aqui. Assunto e Reply-To viram
+        // cabeçalhos SMTP, e cabeçalho é delimitado por quebra de linha: um \r\n no meio do texto
+        // permite anexar cabeçalhos próprios (um Bcc, por exemplo). Vale para o assunto do
+        // formulário público, que é digitado por visitante anônimo, e para os assuntos montados
+        // com nome de clube, que também vêm de fora.
+        String assuntoLimpo = umaLinha(assunto);
         try {
-            Mail mail = Mail.withHtml(destino, assunto, envolver(corpoHtml));
-            if (replyTo != null && !replyTo.isBlank()) mail.setReplyTo(replyTo);
+            Mail mail = Mail.withHtml(destino, assuntoLimpo, envolver(corpoHtml));
+            String reply = umaLinha(replyTo);
+            if (reply != null && !reply.isBlank()) mail.setReplyTo(reply);
             mailer.send(mail);
-            LOG.infof("E-mail enviado para %s: %s", destino, assunto);
+            LOG.infof("E-mail enviado para %s: %s", destino, assuntoLimpo);
             return true;
         } catch (Exception e) {
             // Aviso não pode derrubar operação: o painel continua sendo a fonte da verdade.
-            LOG.errorf(e, "Falha ao enviar e-mail para %s: %s", destino, assunto);
+            LOG.errorf(e, "Falha ao enviar e-mail para %s: %s", destino, assuntoLimpo);
             return false;
         }
+    }
+
+    /** Achata quebras de linha — o que vira cabeçalho SMTP não pode ter \r nem \n. */
+    private static String umaLinha(String valor) {
+        return valor == null ? null : valor.replaceAll("[\\r\\n]+", " ").trim();
     }
 
     private String envolver(String conteudo) {

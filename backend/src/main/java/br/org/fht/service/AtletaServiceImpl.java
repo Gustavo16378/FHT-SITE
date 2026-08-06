@@ -268,14 +268,16 @@ public class AtletaServiceImpl implements AtletaService {
         // parseNascimento trata formato inválido; LocalDate.parse cru devolvia 500 na edição.
         if (form.dataNascimento() != null && !form.dataNascimento().isBlank())
             atleta.setDataNascimento(parseNascimento(form.dataNascimento()));
-        if (form.sexo() != null) atleta.setSexo(Campos.tamanho(form.sexo(), 10, "sexo"));
-        if (form.rg() != null) atleta.setRg(Campos.tamanho(form.rg(), 30, "rg"));
+        // Colunas NOT NULL usam obrigatorio também aqui: null continua significando "não mexe",
+        // mas string vazia é recusada com 422 em vez de zerar um campo que o banco exige.
+        if (form.sexo() != null) atleta.setSexo(Campos.obrigatorio(form.sexo(), 10, "sexo", "Sexo não pode ficar vazio"));
+        if (form.rg() != null) atleta.setRg(Campos.obrigatorio(form.rg(), 30, "rg", "RG não pode ficar vazio"));
         if (form.telefone() != null) atleta.setTelefone(Campos.tamanho(form.telefone(), 20, "telefone"));
         if (form.email() != null) atleta.setEmail(Campos.tamanho(form.email(), 255, "email"));
         if (form.cidade() != null) atleta.setCidade(Campos.tamanho(form.cidade(), 100, "cidade"));
         if (form.ufResidencia() != null) atleta.setUfResidencia(Campos.tamanho(form.ufResidencia(), 2, "ufResidencia"));
-        if (form.posicao() != null) atleta.setPosicao(Campos.tamanho(form.posicao(), 200, "posicao"));
-        if (form.categoria() != null) atleta.setCategoria(Campos.tamanho(form.categoria(), 20, "categoria"));
+        if (form.posicao() != null) atleta.setPosicao(Campos.obrigatorio(form.posicao(), 200, "posicao", "Informe ao menos uma posição"));
+        if (form.categoria() != null) atleta.setCategoria(Campos.obrigatorio(form.categoria(), 20, "categoria", "Categoria não pode ficar vazia"));
         if (form.transferencia() != null) atleta.setTransferencia(form.transferencia());
         if (form.clubeAnterior() != null) atleta.setClubeAnterior(form.clubeAnterior());
 
@@ -447,6 +449,9 @@ public class AtletaServiceImpl implements AtletaService {
         boolean pago = loteItemRepository.temPagamentoConfirmado(id, Fuso.hoje().getYear());
         atleta.setStatus(pago ? STATUS_AGUARDANDO_APROVACAO : STATUS_AGUARDANDO_PAGAMENTO);
         atleta.setMotivoRejeicao(null);
+        // Relógio do expurgo zerado: sem isto, desfazer uma rejeição antiga devolvia o cadastro
+        // à fila já vencido, e o job o apagava — com os consentimentos junto — em até 24h.
+        atleta.setAguardandoDesde(LocalDateTime.now());
     }
 
     @Override

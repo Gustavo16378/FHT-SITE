@@ -17,7 +17,11 @@ import org.jboss.logging.Logger;
  * lote, quando puder: com a regra antiga o job apagaria justamente quem está esperando o lote
  * fechar — e levaria os consentimentos LGPD junto, por cascata.
  *
- * O prazo passou a ser longo (90 dias por padrão) e conta do cadastro, não de um prazo de pagamento.
+ * O prazo passou a ser longo (90 dias por padrão) e conta de quando o cadastro ENTROU na fila de
+ * pagamento (aguardandoDesde), não do cadastro: um atleta devolvido à fila pelo "reconsiderar"
+ * ganha o prazo inteiro de novo. E quem já está num lote enviado fica fora do alcance — pagou,
+ * está só esperando a federação dar baixa.
+ *
  * O job continua existindo porque é a única rotina de descarte automático de dado pessoal do
  * sistema: cadastro de menor abandonado não pode ficar guardado para sempre (LGPD art. 6, III —
  * necessidade). Ver docs/MODULO-ATLETA-FLUXO.md.
@@ -38,12 +42,15 @@ public class AtletaExpurgoJob {
     @Transactional
     public void expurgarCadastrosAbandonados() {
         var limite = Fuso.hoje().minusDays(diasParaExpurgo).atStartOfDay();
-        var abandonados = atletaRepository.findAguardandoPagamentoAntesDe(limite);
+        var abandonados = atletaRepository.findAbandonadosAntesDe(limite);
         if (abandonados.isEmpty()) return;
 
+        // Sem nome completo no log: o expurgo existe para NÃO guardar dado pessoal para sempre,
+        // e o log da hospedagem não tem prazo de retenção definido — o nome de um menor
+        // sobreviveria ao próprio descarte do cadastro. O id basta para auditar.
         abandonados.forEach(a -> LOG.infof(
-                "Expurgo: atleta %s (%s) cadastrado em %s nunca foi pago em %d dias — apagado",
-                a.getId(), a.getNomeCompleto(), a.getCreatedAt(), diasParaExpurgo));
+                "Expurgo: atleta %s (clube %s), na fila desde %s, nunca pago em %d dias — apagado",
+                a.getId(), a.getClubeId(), a.getAguardandoDesde(), diasParaExpurgo));
 
         // Os consentimentos vão junto (FK ON DELETE CASCADE na migration V12).
         abandonados.forEach(atletaRepository::delete);

@@ -1,5 +1,6 @@
 package br.org.fht.model;
 
+import br.org.fht.common.Fuso;
 import jakarta.persistence.*;
 
 import java.math.BigDecimal;
@@ -116,10 +117,23 @@ public class Atleta extends DefaultEntity {
     @Column(name = "taxa_ano")
     private Integer taxaAno;
 
+    /**
+     * Quando o cadastro entrou na fila de pagamento — o relógio do expurgo.
+     *
+     * <p>Separado de {@code createdAt} de propósito: um atleta rejeitado e depois devolvido à fila
+     * reinicia a contagem. Sem isso, reconsiderar um cadastro antigo o entregava ao expurgo, que
+     * apagava tudo (inclusive os consentimentos, por cascata) na varredura seguinte.
+     */
+    @Column(name = "aguardando_desde")
+    private LocalDateTime aguardandoDesde;
+
     @Override
     protected void onCreate() {
         super.onCreate();
-        if (taxaAno == null) taxaAno = LocalDate.now().getYear();
+        // Fuso, não LocalDate.now(): o container roda em UTC e depois das 21h em Palmas o ano
+        // poderia virar antes da hora, gravando a anuidade no ano seguinte.
+        if (taxaAno == null) taxaAno = Fuso.hoje().getYear();
+        if (aguardandoDesde == null) aguardandoDesde = LocalDateTime.now();
     }
 
     public UUID getClubeId() { return clubeId; }
@@ -199,6 +213,9 @@ public class Atleta extends DefaultEntity {
 
     public LocalDateTime getPrazoPagamentoAte() { return prazoPagamentoAte; }
     public void setPrazoPagamentoAte(LocalDateTime prazoPagamentoAte) { this.prazoPagamentoAte = prazoPagamentoAte; }
+
+    public LocalDateTime getAguardandoDesde() { return aguardandoDesde; }
+    public void setAguardandoDesde(LocalDateTime aguardandoDesde) { this.aguardandoDesde = aguardandoDesde; }
 
     /** Menor de 18 na data de referência — dispara as exigências do art. 14 da LGPD. */
     public boolean isMenorDeIdade(LocalDate referencia) {

@@ -29,11 +29,22 @@ public class AtletaRepository implements PanacheRepositoryBase<Atleta, UUID> {
     }
 
     /**
-     * Cadastros abandonados: nunca foram pagos e já passaram do prazo de tolerância.
-     * Conta do cadastro, não de um prazo por atleta — o pagamento agora é em lote, quando o
-     * clube puder. Alvo do AtletaExpurgoJob.
+     * Cadastros abandonados: entraram na fila de pagamento e nunca saíram dela.
+     *
+     * <p>O relógio é {@code aguardandoDesde}, não {@code createdAt}: um atleta devolvido à fila
+     * pelo "reconsiderar" reinicia a contagem, senão a federação desfazia uma rejeição antiga e
+     * o job apagava o cadastro na varredura seguinte.
+     *
+     * <p>E fica de fora quem já está num lote vivo — pagou e espera a federação dar baixa.
+     * Sem esse recorte, o clube que pagou em março e não teve o comprovante conferido perdia o
+     * atleta em junho, com o dinheiro já pago.
+     *
+     * <p>Alvo do {@link br.org.fht.service.AtletaExpurgoJob}.
      */
-    public List<Atleta> findAguardandoPagamentoAntesDe(LocalDateTime limite) {
-        return list("status = ?1 AND createdAt < ?2", "AGUARDANDO_PAGAMENTO", limite);
+    public List<Atleta> findAbandonadosAntesDe(LocalDateTime limite) {
+        return list("status = ?1 AND aguardandoDesde < ?2"
+                + " AND id NOT IN (SELECT i.atletaId FROM PagamentoLoteItem i"
+                + "                WHERE i.atletaId IS NOT NULL AND i.ativo = true)",
+                "AGUARDANDO_PAGAMENTO", limite);
     }
 }

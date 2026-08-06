@@ -105,6 +105,7 @@ export default function Contact() {
                     required
                     type="text"
                     name="name"
+                    maxLength={120}
                     placeholder="Seu nome"
                     value={form.name}
                     onChange={handleChange}
@@ -124,6 +125,7 @@ export default function Contact() {
                   <input
                     type="tel"
                     name="phone"
+                    maxLength={20}
                     placeholder="Telefone / WhatsApp"
                     value={form.phone}
                     onChange={handleChange}
@@ -140,15 +142,19 @@ export default function Contact() {
                     {subjects.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
-                <textarea
-                  required
-                  name="message"
-                  placeholder="Sua mensagem..."
-                  value={form.message}
-                  onChange={handleChange}
-                  rows={5}
-                  className="font-body bg-night/60 border border-federation/20 focus:border-gold rounded-lg px-4 py-3 text-fht-white placeholder-gray-soft text-sm outline-none transition-colors duration-250 resize-none"
-                />
+                <div>
+                  <textarea
+                    required
+                    name="message"
+                    maxLength={4000}
+                    placeholder="Sua mensagem..."
+                    value={form.message}
+                    onChange={handleChange}
+                    rows={5}
+                    className="w-full font-body bg-night/60 border border-federation/20 focus:border-gold rounded-lg px-4 py-3 text-fht-white placeholder-gray-soft text-sm outline-none transition-colors duration-250 resize-none"
+                  />
+                  <p className="font-body text-gray-soft/60 text-xs text-right mt-1">{form.message.length}/4000</p>
+                </div>
                 {erro && (
                   <p className="font-body text-red-400 text-sm bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3">
                     {erro}

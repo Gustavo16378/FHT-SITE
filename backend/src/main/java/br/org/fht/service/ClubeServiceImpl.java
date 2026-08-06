@@ -1,6 +1,7 @@
 package br.org.fht.service;
 
 import br.org.fht.common.CPFValidator;
+import br.org.fht.common.Campos;
 import br.org.fht.common.Escopo;
 import br.org.fht.exception.ValidationException;
 import br.org.fht.dto.clube.AtletaVitrineDTO;
@@ -262,7 +263,10 @@ public class ClubeServiceImpl implements ClubeService {
      * como 500, no meio de um formulário de "Meus Dados".
      */
     private void trocarEmailDoRepresentante(Clube clube, String novoEmail) {
-        String email = novoEmail.trim().toLowerCase();
+        // Valida ANTES de gravar. Como este campo passou a reescrever o login, salvar "Meus Dados"
+        // com o e-mail em branco ou com um typo sem "@" trancava o clube do lado de fora — e não
+        // existe fluxo de recuperação de senha para trazê-lo de volta.
+        String email = Campos.email(novoEmail, "representanteEmail");
         if (email.equals(clube.getRepresentanteEmail())) return;
 
         var conta = usuarioRepository.findByClubeId(clube.getId());

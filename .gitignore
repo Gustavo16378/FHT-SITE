@@ -4,3 +4,6 @@
 # Chaves JWT (geradas localmente — não commitar)
 backend/src/main/resources/privateKey.pem
 backend/src/main/resources/publicKey.pem
+
+# Arquivos gerados pra envio (docx/pdf) � a fonte e o .md em docs/
+docs/entrega/

@@ -2,7 +2,6 @@ package br.org.fht.resource;
 
 import br.org.fht.common.ApiResponse;
 import br.org.fht.dto.clube.ClubeForm;
-import br.org.fht.dto.clube.ClubePessoaForm;
 import br.org.fht.dto.clube.ClubeResponseDTO;
 import br.org.fht.dto.clube.ClubeUpdateForm;
 import br.org.fht.service.ClubeService;
@@ -235,86 +234,6 @@ public class ClubeResource {
         boolean visivel = req == null || req.visivel() == null || req.visivel();
         clubeService.definirVitrine(id, visivel);
         return Response.ok(ApiResponse.ok(null, visivel ? "Clube exibido na home" : "Clube ocultado da home")).build();
-    }
-
-    /* ───────────────── pessoas do clube (representantes e técnico) ───────────────── */
-
-    @GET
-    @Path("/{id}/pessoas")
-    @RolesAllowed({"ADMIN_FHT", "ADMIN_CLUBE"})
-    @SecurityRequirement(name = "BearerAuth")
-    @Operation(summary = "Listar pessoas do clube",
-            description = "Representantes e técnico. ADMIN_CLUBE só alcança o próprio clube.")
-    @APIResponses({
-            @APIResponse(responseCode = "200", description = "Lista de pessoas"),
-            @APIResponse(responseCode = "401", description = "Token ausente ou inválido"),
-            @APIResponse(responseCode = "403", description = "Sem permissão sobre este clube")
-    })
-    public Response listarPessoas(
-            @Parameter(description = "UUID do clube", required = true) @PathParam("id") UUID id) {
-        return Response.ok(ApiResponse.ok(clubeService.listarPessoas(id, jwt), "OK")).build();
-    }
-
-    @POST
-    @Path("/{id}/pessoas")
-    @RolesAllowed({"ADMIN_FHT", "ADMIN_CLUBE"})
-    @Consumes(MediaType.APPLICATION_JSON)
-    @SecurityRequirement(name = "BearerAuth")
-    @Operation(summary = "Adicionar pessoa ao clube",
-            description = "Cadastra 2º representante, técnico ou auxiliar. São dados cadastrais: "
-                    + "nesta etapa ninguém aqui recebe login próprio.")
-    @APIResponses({
-            @APIResponse(responseCode = "201", description = "Pessoa adicionada"),
-            @APIResponse(responseCode = "401", description = "Token ausente ou inválido"),
-            @APIResponse(responseCode = "403", description = "Sem permissão sobre este clube"),
-            @APIResponse(responseCode = "404", description = "Clube não encontrado"),
-            @APIResponse(responseCode = "422", description = "Dados inválidos")
-    })
-    public Response adicionarPessoa(
-            @Parameter(description = "UUID do clube", required = true) @PathParam("id") UUID id,
-            ClubePessoaForm form) {
-        var pessoa = clubeService.adicionarPessoa(id, form, jwt);
-        return Response.status(201).entity(ApiResponse.created(pessoa, "Pessoa adicionada")).build();
-    }
-
-    @PUT
-    @Path("/{id}/pessoas/{pessoaId}")
-    @RolesAllowed({"ADMIN_FHT", "ADMIN_CLUBE"})
-    @Consumes(MediaType.APPLICATION_JSON)
-    @SecurityRequirement(name = "BearerAuth")
-    @Operation(summary = "Editar pessoa do clube", description = "Atualização parcial.")
-    @APIResponses({
-            @APIResponse(responseCode = "200", description = "Pessoa atualizada"),
-            @APIResponse(responseCode = "401", description = "Token ausente ou inválido"),
-            @APIResponse(responseCode = "403", description = "Sem permissão sobre este clube"),
-            @APIResponse(responseCode = "404", description = "Pessoa não encontrada")
-    })
-    public Response atualizarPessoa(
-            @Parameter(description = "UUID do clube", required = true) @PathParam("id") UUID id,
-            @Parameter(description = "UUID da pessoa", required = true) @PathParam("pessoaId") UUID pessoaId,
-            ClubePessoaForm form) {
-        return Response.ok(ApiResponse.ok(
-                clubeService.atualizarPessoa(id, pessoaId, form, jwt), "Pessoa atualizada")).build();
-    }
-
-    @DELETE
-    @Path("/{id}/pessoas/{pessoaId}")
-    @RolesAllowed({"ADMIN_FHT", "ADMIN_CLUBE"})
-    @SecurityRequirement(name = "BearerAuth")
-    @Operation(summary = "Remover pessoa do clube",
-            description = "O representante principal não pode ser removido — ele responde pela filiação.")
-    @APIResponses({
-            @APIResponse(responseCode = "200", description = "Pessoa removida"),
-            @APIResponse(responseCode = "401", description = "Token ausente ou inválido"),
-            @APIResponse(responseCode = "403", description = "Sem permissão sobre este clube"),
-            @APIResponse(responseCode = "404", description = "Pessoa não encontrada"),
-            @APIResponse(responseCode = "409", description = "Tentou remover o representante principal")
-    })
-    public Response removerPessoa(
-            @Parameter(description = "UUID do clube", required = true) @PathParam("id") UUID id,
-            @Parameter(description = "UUID da pessoa", required = true) @PathParam("pessoaId") UUID pessoaId) {
-        clubeService.removerPessoa(id, pessoaId, jwt);
-        return Response.ok(ApiResponse.ok(null, "Pessoa removida")).build();
     }
 
     @Schema(description = "Motivo da rejeição")

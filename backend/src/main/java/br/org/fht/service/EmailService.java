@@ -79,7 +79,7 @@ public class EmailService {
                 está liberado.</p>
                 <p>Entre com <b>este e-mail</b> e a senha que você escolheu no cadastro. Se
                 esqueceu a senha, fale com a federação.</p>
-                <p>No painel você pode cadastrar a comissão técnica, incluir os atletas e pagar
+                <p>No painel você pode incluir os atletas e pagar
                 a anuidade.</p>
                 """.formatted(representante, nomeClube));
     }

@@ -1,7 +1,6 @@
 package br.org.fht.exception;
 
 import br.org.fht.common.ApiResponse;
-import io.sentry.Sentry;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
@@ -44,7 +43,6 @@ public class GlobalExceptionMapper implements ExceptionMapper<Exception> {
         }
 
         LOG.errorf(ex, "Erro interno não tratado: %s", ex.getMessage());
-        Sentry.captureException(ex);
 
         return Response.status(500)
                 .entity(ApiResponse.error("Erro interno do servidor", 500))

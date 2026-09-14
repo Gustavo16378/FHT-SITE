@@ -6,8 +6,6 @@ import br.org.fht.common.Escopo;
 import br.org.fht.exception.ValidationException;
 import br.org.fht.dto.clube.AtletaVitrineDTO;
 import br.org.fht.dto.clube.ClubeForm;
-import br.org.fht.dto.clube.ClubePessoaDTO;
-import br.org.fht.dto.clube.ClubePessoaForm;
 import br.org.fht.dto.clube.ClubeResponseDTO;
 import br.org.fht.dto.clube.ClubeUpdateForm;
 import br.org.fht.dto.clube.ClubeVitrineDTO;
@@ -15,11 +13,9 @@ import br.org.fht.dto.clube.ClubeVitrineDetalheDTO;
 import br.org.fht.mapper.ClubeMapper;
 import br.org.fht.model.Atleta;
 import br.org.fht.model.Clube;
-import br.org.fht.model.ClubePessoa;
 import br.org.fht.model.Role;
 import br.org.fht.model.Usuario;
 import br.org.fht.repository.AtletaRepository;
-import br.org.fht.repository.ClubePessoaRepository;
 import br.org.fht.repository.ClubeRepository;
 import br.org.fht.repository.UsuarioRepository;
 import br.org.fht.storage.R2StorageService;
@@ -44,7 +40,6 @@ public class ClubeServiceImpl implements ClubeService {
     @Inject ClubeRepository clubeRepository;
     @Inject UsuarioRepository usuarioRepository;
     @Inject AtletaRepository atletaRepository;
-    @Inject ClubePessoaRepository clubePessoaRepository;
     @Inject EmailService emailService;
     @Inject R2StorageService r2;
 
@@ -110,18 +105,6 @@ public class ClubeServiceImpl implements ClubeService {
         usuario.setClubeId(clube.getId());
         usuario.setAtivo(false);
         usuarioRepository.persist(usuario);
-
-        // O representante do formulário é a primeira pessoa do clube (a principal).
-        var principal = new ClubePessoa();
-        principal.setClubeId(clube.getId());
-        principal.setNome(clube.getRepresentanteNome());
-        principal.setCpf(form.representanteCpf);
-        principal.setFuncao(ClubePessoa.FUNCAO_REPRESENTANTE);
-        principal.setCargo(form.representanteCargo);
-        principal.setEmail(email);
-        principal.setTelefone(form.representanteTelefone);
-        principal.setPrincipal(true);
-        clubePessoaRepository.persist(principal);
 
         emailService.avisarNovaSolicitacaoClube(
                 clube.getNome(), clube.getCidade(), clube.getRepresentanteNome(), email);
@@ -356,111 +339,6 @@ public class ClubeServiceImpl implements ClubeService {
         Clube clube = clubeRepository.findByIdOptional(id)
                 .orElseThrow(() -> new WebApplicationException("Clube não encontrado", 404));
         clube.setVisivelNaHome(visivel);
-    }
-
-    // --------------------- pessoas do clube ---------------------
-
-    @Override
-    public List<ClubePessoaDTO> listarPessoas(UUID clubeId, JsonWebToken jwt) {
-        exigirAcessoAoClube(clubeId, jwt);
-        return clubePessoaRepository.findByClubeId(clubeId).stream().map(this::toPessoaDTO).toList();
-    }
-
-    @Override
-    @Transactional
-    public ClubePessoaDTO adicionarPessoa(UUID clubeId, ClubePessoaForm form, JsonWebToken jwt) {
-        exigirAcessoAoClube(clubeId, jwt);
-        if (!clubeRepository.findByIdOptional(clubeId).isPresent()) {
-            throw new WebApplicationException("Clube não encontrado", 404);
-        }
-        validarPessoa(form);
-
-        var p = new ClubePessoa();
-        p.setClubeId(clubeId);
-        aplicarPessoa(p, form);
-        // Só o representante criado na filiação é principal — quem entra aqui nunca vira dono do
-        // login, porque login por pessoa depende do módulo de permissões.
-        p.setPrincipal(false);
-        clubePessoaRepository.persist(p);
-        return toPessoaDTO(p);
-    }
-
-    @Override
-    @Transactional
-    public ClubePessoaDTO atualizarPessoa(UUID clubeId, UUID pessoaId, ClubePessoaForm form, JsonWebToken jwt) {
-        exigirAcessoAoClube(clubeId, jwt);
-        ClubePessoa p = clubePessoaRepository.findByClubeIdAndId(clubeId, pessoaId)
-                .orElseThrow(() -> new WebApplicationException("Pessoa não encontrada", 404));
-
-        if (form.funcao() != null && !ClubePessoa.FUNCOES_VALIDAS.contains(form.funcao())) {
-            throw new ValidationException("funcao",
-                    "Função inválida. Use: " + String.join(", ", ClubePessoa.FUNCOES_VALIDAS));
-        }
-        if (!branco(form.cpf()) && !CPFValidator.isValid(form.cpf())) {
-            throw new ValidationException("cpf", "CPF inválido");
-        }
-        if (form.nome() != null && form.nome().isBlank()) {
-            throw new ValidationException("nome", "Nome é obrigatório");
-        }
-
-        if (form.nome() != null) p.setNome(form.nome().trim());
-        if (form.cpf() != null) p.setCpf(form.cpf());
-        if (form.funcao() != null) p.setFuncao(form.funcao());
-        if (form.cargo() != null) p.setCargo(form.cargo());
-        if (form.email() != null) p.setEmail(form.email());
-        if (form.telefone() != null) p.setTelefone(form.telefone());
-
-        return toPessoaDTO(p);
-    }
-
-    @Override
-    @Transactional
-    public void removerPessoa(UUID clubeId, UUID pessoaId, JsonWebToken jwt) {
-        exigirAcessoAoClube(clubeId, jwt);
-        ClubePessoa p = clubePessoaRepository.findByClubeIdAndId(clubeId, pessoaId)
-                .orElseThrow(() -> new WebApplicationException("Pessoa não encontrada", 404));
-
-        // O principal é o representante da filiação e o dono do login: removê-lo deixaria o
-        // clube sem responsável e sem acesso.
-        if (p.isPrincipal()) {
-            throw new WebApplicationException(
-                    "O representante principal não pode ser removido — ele responde pela filiação", 409);
-        }
-        clubePessoaRepository.delete(p);
-    }
-
-    private void validarPessoa(ClubePessoaForm form) {
-        if (form == null || branco(form.nome())) {
-            throw new ValidationException("nome", "Nome é obrigatório");
-        }
-        if (branco(form.funcao()) || !ClubePessoa.FUNCOES_VALIDAS.contains(form.funcao())) {
-            throw new ValidationException("funcao",
-                    "Função inválida. Use: " + String.join(", ", ClubePessoa.FUNCOES_VALIDAS));
-        }
-        if (!branco(form.cpf()) && !CPFValidator.isValid(form.cpf())) {
-            throw new ValidationException("cpf", "CPF inválido");
-        }
-    }
-
-    private void aplicarPessoa(ClubePessoa p, ClubePessoaForm form) {
-        p.setNome(form.nome().trim());
-        p.setCpf(form.cpf());
-        p.setFuncao(form.funcao());
-        p.setCargo(form.cargo());
-        p.setEmail(form.email());
-        p.setTelefone(form.telefone());
-    }
-
-    private ClubePessoaDTO toPessoaDTO(ClubePessoa p) {
-        return new ClubePessoaDTO(p.getId(), p.getNome(), p.getCpf(), p.getFuncao(),
-                p.getCargo(), p.getEmail(), p.getTelefone(), p.isPrincipal());
-    }
-
-    /** Só a federação alcança qualquer clube; os demais, apenas o próprio. */
-    private void exigirAcessoAoClube(UUID clubeId, JsonWebToken jwt) {
-        if (!Escopo.ehAdminFederacao(jwt) && !clubeId.equals(Escopo.clubeDoToken(jwt))) {
-            throw new WebApplicationException("Acesso negado", 403);
-        }
     }
 
     // --------------------- helpers vitrine ---------------------

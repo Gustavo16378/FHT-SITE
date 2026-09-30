@@ -109,12 +109,13 @@ Sem Docker pra API (banco ainda no compose):
 
 ```bash
 cd backend
-mvnw.cmd quarkus:dev     # Windows: baixa o Maven na primeira execução
-mvn quarkus:dev          # Linux/Mac, com Maven instalado
+./mvnw quarkus:dev       # Linux, macOS, Git Bash
+mvnw.cmd quarkus:dev     # cmd / PowerShell
 ```
 
-Os jars do Maven não vão pro git (`*.jar` no `.gitignore`), então num clone novo o
-`.mvn/wrapper/apache-maven-3.9.9/bin/mvn` só funciona depois que o `mvnw.cmd` rodar uma vez.
+O Maven Wrapper oficial (3.3.2, Maven 3.9.9) está versionado: `mvnw`, `mvnw.cmd` e
+`.mvn/wrapper/`. Num clone novo basta ter Java 21; na primeira execução ele baixa o Maven para
+`~/.m2/wrapper`. O `.gitattributes` garante LF no `mvnw` e CRLF no `mvnw.cmd`.
 
 No perfil **dev** o Hibernate roda com `database.generation=validate` (confere a `V1` contra as
 entidades ao subir) e a Flyway aplica também o seed de demonstração (`db/dev/R__seed_dev.sql`,

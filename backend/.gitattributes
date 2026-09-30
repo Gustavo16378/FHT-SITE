@@ -1,0 +1,5 @@
+# Scripts do Maven Wrapper: o mvnw precisa de LF (roda em Linux/macOS/CI mesmo vindo de um
+# checkout no Windows com core.autocrlf=true); o .cmd precisa de CRLF.
+mvnw     text eol=lf
+*.cmd    text eol=crlf
+*.jar    binary

@@ -2,7 +2,7 @@ target/
 .quarkus/
 *.class
 *.jar
-!mvnw.jar
+!.mvn/wrapper/maven-wrapper.jar
 .env
 *.pem
 *.p12

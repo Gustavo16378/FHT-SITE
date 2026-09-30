@@ -1,8 +1,8 @@
 -- Schema inicial do MVP free tier (set/2026).
 --
 -- Consolida as migrations V1-V19 da versão completa (tag v-full) SEM as tabelas dos módulos que
--- saíram do escopo (arbitros, competicoes, competicao_categorias, clube_pessoas). O banco de
--- produção nasce do zero no Neon, então não há histórico a carregar. Derivado do estado atual das
+-- saíram do escopo do MVP (as quatro tabelas ficam só na v-full). O banco de produção nasce do
+-- zero no Neon, então não há histórico a carregar. Derivado do estado atual das
 -- entidades em br.org.fht.model: nomes, tipos, índices, constraints e FKs preservados.
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;

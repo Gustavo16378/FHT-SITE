@@ -42,6 +42,8 @@ services:
       # Chaves JWT em base64 (o setup.sh grava no .env a partir dos .pem locais)
       JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:-}
       JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY:-}
+      # Senha do primeiro admin (V2). No compose tem padrão de teste; em produção é obrigatória.
+      FHT_ADMIN_SENHA: ${FHT_ADMIN_SENHA:-123456}
     ports:
       - "8080:8080"
     volumes:

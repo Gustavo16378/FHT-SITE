@@ -1,8 +1,22 @@
 # Inventário de Dados Pessoais — insumo para a Política de Privacidade
 
+> ## ⚠️ VERSÃO PARA REVISÃO DO CONTROLADOR — NÃO PUBLICADA
+>
+> **Nota da revisão para o MVP (30/09/2026):** as referências a código (`arquivo:linha`) e às
+> migrations `V1`–`V16` foram levantadas na versão completa do sistema (tag `v-full`) e podem ter
+> deslocado na versão MVP — nela, todas as migrations foram consolidadas em
+> `db/migration/V1__schema_inicial.sql` (10 tabelas: `clubes`, `usuarios`, `atletas`,
+> `consentimentos`, `pagamento_lotes`, `pagamento_lote_itens`, `noticias`, `fotos`, `diretores`,
+> `documentos`) + `V2__seed_admin.sql`. As seções sobre **árbitros, competições, comissão técnica
+> do clube e Sentry foram removidas** porque esses módulos saíram do sistema. Hospedagem,
+> transferência internacional e backup foram atualizados para a infraestrutura do MVP (§5, §6, §8).
+> Correções de código feitas depois de 04/08 e antes do MVP (por exemplo, o formulário
+> "Fale com a FHT", que passou a enviar por e-mail) **não** foram reincorporadas nesta revisão —
+> revalidar antes de publicar.
+
 > **Versão de 04/08/2026. Esta versão SUBSTITUI integralmente a de 02/08/2026** — não use a anterior.
-> Nos dois dias entre uma e outra, cinco entregas mudaram o sistema (senha escolhida pelo clube,
-> comissão técnica, pagamento em lote, envio de e-mail e remoção das credenciais de teste do site),
+> Nos dois dias entre uma e outra, cinco entregas mudaram o sistema (entre elas: senha escolhida
+> pelo clube, pagamento em lote, envio de e-mail e remoção das credenciais de teste do site),
 > e várias afirmações da versão antiga ficaram **falsas**. As correções estão incorporadas no corpo
 > deste documento, sem deixar as duas versões convivendo.
 >
@@ -53,7 +67,7 @@
 
 **⚠️ Correção importante sobre o ENDEREÇO (mudou em 02/08/2026):** o endereço do atleta **deixou de ser coletado pela interface**. A etapa de endereço saiu do formulário do clube, e o código que monta o envio traz a justificativa escrita: "Endereço do atleta = endereço do clube; não é mais coletado no cadastro" (`frontend/src/pages/ClubeDashboard.tsx:946`, e a explicação ao usuário em `:1036-1053`). Duas ressalvas que a política **não pode ignorar**: (a) as colunas continuam existindo no banco (`V3__create_atletas.sql:14-16`) e a interface de programação continua **aceitando** esses campos (`AtletaForm.java:40-53`; gravados em `AtletaServiceImpl.java:100-104`) — os endereços já gravados antes de agosto continuam lá e ninguém os apagou; (b) o **comprovante de residência continua sendo pedido como arquivo** (`ClubeDashboard.tsx:1181-1182`; `AtletaServiceImpl.java:124-126`), ou seja, o endereço de casa do atleta — inclusive de menor — continua entrando no sistema, só que dentro de um PDF ou imagem.
 
-**Finalidade:** Filiação do atleta à federação por meio do clube, verificação de identidade e de unicidade do cadastro (impede o mesmo CPF em dois clubes), enquadramento em categoria etária e sexo para competições, controle da anuidade que habilita a competir no ano e comunicação com o filiado.
+**Finalidade:** Filiação do atleta à federação por meio do clube, verificação de identidade e de unicidade do cadastro (impede o mesmo CPF em dois clubes), enquadramento na categoria etária e no naipe (sexo) da filiação, controle da anuidade anual da filiação e comunicação com o filiado.
 
 **⚠️ ATENÇÃO — coleta sem uso (ainda em aberto):** **órgão emissor do RG** e **naturalidade (cidade e UF)** continuam sendo pedidos na tela (`ClubeDashboard.tsx:941-943`) e gravados (`AtletaServiceImpl.java:95-97`), e **nunca são devolvidos por nenhuma resposta do sistema** — não constam da ficha entregue pela API (`AtletaResponseDTO.java:15-46`) e nenhuma tela os exibe.
 
@@ -75,13 +89,13 @@ Redação segura para a política: *a filiação do atleta só é aprovada com d
 
 **Base legal sugerida:** art. 7, V e art. 7, II (o documento é meio de prova da informação declarada). DECISÃO FINAL DO ADVOGADO.
 
-**Quem acessa:** Formalmente: representante do clube e federação. **NA PRÁTICA HOJE: qualquer pessoa que tenha a URL do arquivo.** O endereço `GET /api/files/{path}` não possui nenhuma exigência de login ou de perfil — o arquivo inteiro tem 55 linhas e não contém uma única anotação de segurança (`FileResource.java:23-54`), e o comentário no topo assume: "Público e sem auth de propósito" (`:16-22`). O único controle é o segredo da URL, que não expira, não é revogável e não verifica quem pede. Os arquivos estão hoje em disco local (volume `/app/uploads`); o Cloudflare R2 com balde privado **não** está ativo (credenciais vazias em `application.properties:63-65`, com queda silenciosa para o disco local em `R2StorageService.java:51-60`).
+**Quem acessa:** Formalmente: representante do clube e federação. **NA PRÁTICA HOJE: qualquer pessoa que tenha a URL do arquivo.** O endereço `GET /api/files/{path}` não possui nenhuma exigência de login ou de perfil — o arquivo inteiro tem 55 linhas e não contém uma única anotação de segurança (`FileResource.java:23-54`), e o comentário no topo assume: "Público e sem auth de propósito" (`:16-22`). O único controle é o segredo da URL, que não expira, não é revogável e não verifica quem pede. **Onde ficam os arquivos (MVP):** em produção, no Cloudflare R2, bucket `fht-documentos`; o endereço gravado para cada arquivo é o endereço público configurado (`r2.public-url`) seguido do caminho (`R2StorageService.java`, método `upload`) — ou seja, também em produção o arquivo é acessível a quem tiver a URL, sem verificação de quem pede. O balde privado com URL assinada **não** foi implementado. Em desenvolvimento, sem credenciais, os arquivos continuam indo para o disco local (volume `/app/uploads`) e servidos por `/api/files` sem autenticação (queda silenciosa em `R2StorageService.java:51-60`).
 
 ### Atleta — imagem
 
 **Dados:** Foto 3x4 enviada no cadastro (não é publicada no site: o objeto público do atleta não tem foto); Fotos da galeria pública "Momentos que ficam" (`Foto.java:9-18`; `GaleriaResource.java:29-35`); Imagens de capa e do corpo das notícias; Legenda livre e obrigatória da foto, ano e categoria (ex.: 2024, Sub-16) — `FotoDTO.java:9-17`.
 
-**Finalidade:** Divulgação institucional das atividades e competições da federação no site público.
+**Finalidade:** Divulgação institucional das atividades da federação no site público.
 
 **Base legal sugerida:** art. 7, I (consentimento) — é o único item genuinamente opcional. **RESSALVA CRÍTICA, reverificada em 04/08 e inalterada:** existe a finalidade de consentimento `IMAGEM_PUBLICA` no modelo (`Consentimento.java:20`), ela é **gravada** no cadastro (`AtletaServiceImpl.java:158-161`) e **nenhum ponto do sistema a consulta antes de publicar**. A busca por esse marcador em todo o código encontra quatro ocorrências, todas de definição, escrita ou exibição — nenhuma de leitura para decidir publicar. Marcar ou não marcar a caixa **não muda absolutamente nada** no comportamento do site. E as fotos da galeria não são vinculadas a nenhum atleta, então não há como localizar em quais fotos um menor aparece. DECISÃO FINAL DO ADVOGADO sobre como sustentar a base legal enquanto o mecanismo não existir.
 
@@ -117,7 +131,7 @@ Redação segura para a política: *a filiação do atleta só é aprovada com d
 
 **✅ CORREÇÃO — o CPF do representante AGORA é coletado, armazenado e exibido.** A versão de 02/08 dizia que o formulário pedia o CPF e o descartava. **Isso deixou de ser verdade.** A coluna foi criada pela migration `V15__clube_credenciais_e_pessoas.sql:10`, com a justificativa escrita na própria migration ("Coletar sem armazenar nem usar viola a minimização — LGPD art. 6, III"). O formulário público envia o campo (`Registration.tsx:106`), o servidor valida o dígito verificador quando ele vem preenchido (`ClubeServiceImpl.java:69-71`) e o valor é gravado, e é devolvido pela API interna e mostrado no painel (`ClubeResponseDTO.java:20`). **A política PRECISA declarar o CPF do representante legal como dado pessoal coletado.**
 
-**⚠️ O CPF é gravado em DOIS lugares ao mesmo tempo** — na ficha do clube (`ClubeServiceImpl.java:89`) e na ficha da pessoa representante (`:117`) — e as duas cópias podem divergir, porque corrigir a pessoa não atualiza a ficha do clube (`:346-351`) e a ficha do clube **não permite corrigir o CPF de jeito nenhum** (o campo ficou de fora dos editáveis: `ClubeUpdateForm.java:11-20`). Um CPF digitado errado no cadastro público **não pode ser corrigido por ninguém através do sistema** — nem pelo titular, nem pela federação. Só por comando direto no banco. Ver §14.
+**⚠️ O CPF não pode ser corrigido.** No MVP ele é gravado num único lugar, a ficha do clube (coluna `representante_cpf` da tabela `clubes`; `ClubeServiceImpl.java:85`), e a ficha do clube **não permite corrigir o CPF de jeito nenhum** (o campo ficou de fora dos editáveis: `ClubeUpdateForm.java:11-21`). Um CPF digitado errado no cadastro público **não pode ser corrigido por ninguém através do sistema** — nem pelo titular, nem pela federação. Só por comando direto no banco. Ver §14.
 
 **✅ CORREÇÃO — o cargo do representante deixou de ser "coleta sem uso".** Ele passou a ser devolvido pela API e exibido no painel (`ClubeResponseDTO.java:19`) e é editável pelo próprio clube (`ClubeUpdateForm.java:20`; `ClubeServiceImpl.java:177`).
 
@@ -126,26 +140,6 @@ Redação segura para a política: *a filiação do atleta só é aprovada com d
 **Base legal sugerida:** art. 7, V (procedimento preliminar e execução do vínculo associativo entre clube e federação) e art. 7, IX (legítimo interesse) para o contato institucional. **NÃO usar consentimento:** o único aceite do formulário público diz apenas que as informações são verdadeiras e que a pessoa está ciente das regras da FHT — não é consentimento de tratamento, não remete a política nenhuma e sequer é enviado ou armazenado. DECISÃO FINAL DO ADVOGADO.
 
 **Quem acessa:** Federação (ADMIN_FHT) e o próprio clube. **Não é exposto publicamente:** os objetos da vitrine não trazem CNPJ, documentos nem contato do representante (`ClubeVitrineDTO.java:13-21`; `ClubeVitrineDetalheDTO.java:13-22`). Os PDFs, porém, são servidos sem autenticação por `/api/files`.
-
-### 🆕 Pessoa da comissão técnica do clube (2º representante, técnico e auxiliar)
-
-> **Categoria de titular inteiramente nova, criada em 02/08/2026 (migration V15) e ausente da versão anterior deste inventário.**
-
-**Dados:** Nome completo, obrigatório (`ClubePessoa.java:30-31`; `V15:22`); CPF, opcional, validado por dígito verificador quando informado (`ClubePessoa.java:33-34`; `V15:23`; `ClubeServiceImpl.java:380-382`); Função na equipe — REPRESENTANTE, TECNICO ou AUXILIAR (`ClubePessoa.java:20-25`; `V15:24-25` e `:34`); Cargo em texto livre, por exemplo "Técnico principal" (`ClubePessoa.java:39-40`); E-mail (`V15:27`); Telefone (`V15:28`); Marca de representante "principal", que identifica quem responde oficialmente pela filiação e é dono do único login do clube (`V15:29-30` e `:40`); Vínculo com o clube e datas de cadastro e alteração.
-
-**Finalidade:** Registrar quem responde pelo clube perante a federação e quem é o técnico responsável pela equipe. Segundo a própria migration, o técnico será quem define a escalação quando o módulo de competições existir (`V15:12-18`) — hoje isso é **intenção declarada em comentário**, não existe tabela nem código de escalação. A tela chama a seção de "Comissão técnica".
-
-**Base legal sugerida:** art. 7, V (execução do vínculo associativo — a pessoa exerce função dentro de um clube filiado) ou art. 7, IX (legítimo interesse na identificação dos responsáveis técnicos). **NÃO PODE SER CONSENTIMENTO:** não existe no sistema nenhum registro, caixa de seleção ou tela em que essas pessoas manifestem vontade; a tabela de consentimento é exclusiva de atleta, com vínculo obrigatório ao atleta (`V12:33-50`). DECISÃO FINAL DO ADVOGADO.
-
-**Quem acessa:** O representante do clube (que é quem digita esses dados) e a federação. Leitura e escrita exigem autenticação e escopo de clube (`ClubeResource.java:223-299`; `ClubeServiceImpl.java:399-404`). **NÃO é público** — nenhum endereço aberto devolve essas pessoas e nenhuma tela do site as exibe.
-
-**Fatos que o redator precisa saber, sem suavização:**
-1. **Quem preenche é o representante do clube**, num formulário do painel. A pessoa cadastrada **nunca toca no sistema**.
-2. **Ninguém pede autorização a ela e nenhum aviso é enviado ao e-mail dela.** O serviço de e-mail só escreve para a caixa da federação e para o e-mail do representante principal (`EmailService.java:34-36`; `PagamentoServiceImpl.java:305-308`). Na prática, um técnico pode ter nome, CPF, e-mail e telefone no banco da federação **sem jamais ser informado**.
-3. **Não têm login** e não terão tão cedo — a própria migration registra que "nesta etapa ninguém aqui recebe login próprio" (`V15:16-18`; repetido na documentação da API em `ClubeResource.java:244-246`). Não conseguem acessar, corrigir ou pedir exclusão dos próprios dados por meio nenhum.
-4. A primeira pessoa da lista é **criada automaticamente** a partir do formulário público de filiação, copiando nome, CPF, cargo, e-mail e telefone do representante (`ClubeServiceImpl.java:114-123`). Na migração, os representantes que já existiam foram copiados para a tabela nova (`V15:43-47`).
-5. **O clube pode APAGAR de verdade** um técnico ou auxiliar (`ClubeResource.java:281-283`; `ClubeServiceImpl.java:356-370`) — é um dos raríssimos mecanismos de eliminação efetiva que existem no sistema. O representante principal, porém, não pode ser removido, por regra explícita (`:365-368`).
-6. **Nada impede que um técnico ou auxiliar seja menor de idade** — não há verificação de idade nessa tabela, e portanto nenhuma verificação do art. 14 se aplicaria a eles.
 
 ### Titular de conta de acesso (representante de clube e administradores da FHT)
 
@@ -162,7 +156,7 @@ Redação segura para a política: *a filiação do atleta só é aprovada com d
 2. **O sistema guarda nome, e-mail e hash de senha de pessoas cujo clube JAMAIS foi aceito**, sem prazo e sem nenhum endereço da API capaz de apagá-las.
 3. **O formulário público responde "Este e-mail já está cadastrado no sistema"** (`ClubeServiceImpl.java:75-77`), o que permite a qualquer visitante anônimo descobrir se um determinado e-mail tem conta no sistema.
 
-**⚠️ Efeito colateral verificado no controle de acesso (NÃO VERIFICADO em execução, mas é o que o código determina):** o bloqueio e o desbloqueio da conta são feitos procurando o usuário **pelo e-mail gravado no cadastro do clube** (`ClubeServiceImpl.java:233-236`). Mas o clube pode editar esse e-mail livremente (`ClubeUpdateForm.java:18`; `ClubeServiceImpl.java:175`) e a conta de login não é atualizada junto. Depois de uma troca de e-mail, suspender ou rejeitar o clube **não encontra mais a conta** — e o acesso continua aberto.
+**✅ RESOLVIDO no código atual (ver §14 e a nota do topo) — texto de 04/08 mantido para registro. ⚠️ Efeito colateral verificado no controle de acesso (NÃO VERIFICADO em execução, mas é o que o código determinava):** o bloqueio e o desbloqueio da conta são feitos procurando o usuário **pelo e-mail gravado no cadastro do clube** (`ClubeServiceImpl.java:233-236`). Mas o clube pode editar esse e-mail livremente (`ClubeUpdateForm.java:18`; `ClubeServiceImpl.java:175`) e a conta de login não é atualizada junto. Depois de uma troca de e-mail, suspender ou rejeitar o clube **não encontra mais a conta** — e o acesso continua aberto.
 
 **Finalidade:** Autenticar o usuário, manter a sessão entre navegações e limitar cada clube aos próprios dados.
 
@@ -180,7 +174,7 @@ Redação segura para a política: *a filiação do atleta só é aprovada com d
 
 **O comprovante bancário é uma categoria de arquivo nova e sensível.** É o recibo de um Pix, que tipicamente traz nome do pagador, CPF parcialmente mascarado, instituição financeira, chave e data/hora da transação. O sistema **não lê, não valida, não extrai e não mascara nada disso**: recebe o arquivo como veio e o armazena em `pagamentos/{id do clube}/{referência aleatória}/{nome do arquivo}` (`PagamentoServiceImpl.java:129-131`). Ele é servido pelo **mesmo endereço de arquivos que não exige autenticação** (`FileResource.java:23-54`) e é aberto em nova aba pelo painel da federação (`FinanceiroPage.tsx:265-266`). *Alívio parcial:* diferente do caminho dos documentos de atleta, o caminho do comprovante usa uma referência aleatória, o que o torna bem menos adivinhável — mas continua sem verificar quem pede.
 
-**Finalidade:** Comprovar o pagamento da anuidade que habilita os atletas a competir no ano, permitir a conferência manual pela federação e manter o histórico financeiro do clube.
+**Finalidade:** Comprovar o pagamento da anuidade da filiação dos atletas, permitir a conferência manual pela federação e manter o histórico financeiro do clube.
 
 **Base legal sugerida:** art. 7, V (execução do vínculo associativo) combinado com art. 7, II (guarda de documento de comprovação financeira). **Verificar com a federação se há prazo contábil ou fiscal mínimo aplicável** — hoje não existe prazo nenhum, nem em código nem em decisão registrada. DECISÃO FINAL DO ADVOGADO.
 
@@ -214,26 +208,6 @@ Redação segura para a política: *a filiação do atleta só é aprovada com d
 
 **Observação para o redator:** este titular é **invisível para o sistema**. A federação não sabe quem ele é, não tem o nome dele em campo nenhum e não teria como localizá-lo se ele pedisse a exclusão dos próprios dados — a única forma seria abrir imagem por imagem.
 
-### Árbitro — dados publicados no site
-
-**Dados:** Nome completo (`Arbitro.java:12-13`); Foto do rosto (`ArbitroServiceImpl.java:51`); Cidade e UF (`Arbitro.java:27-30`); Nível de credenciamento: Regional, Estadual B, Estadual A, Nacional (`Arbitro.java:40-41`); Identificador do registro.
-
-**Finalidade:** Divulgar publicamente o corpo arbitral credenciado da federação na home do site.
-
-**Base legal sugerida:** art. 7, V (execução do credenciamento) ou art. 7, IX (legítimo interesse na transparência do corpo arbitral). **NÃO PODE SER CONSENTIMENTO:** desde ago/2026 o cadastro é feito por funcionário da FHT (`ArbitroResource.java:30`, `:49`, `:68` exigem ADMIN_FHT), o registro já nasce CREDENCIADO (`ArbitroServiceImpl.java:54-55`) e não existe nenhum campo, caixa ou tabela que capture anuência do árbitro. DECISÃO FINAL DO ADVOGADO.
-
-**Quem acessa:** Qualquer visitante anônimo — `GET /api/arbitros/publico` (`ArbitroResource.java:83-84`). São exatamente 6 campos (`ArbitroMapper.java:36-45`). Só entram na vitrine os árbitros com status CREDENCIADO (`ArbitroRepository.java:19`).
-
-### Árbitro — dados internos
-
-**Dados:** CPF (`Arbitro.java:15`); Data de nascimento (`:21-22`); Telefone e e-mail (`:25-26`); Número de registro na federação (`:42`); Ano de início na arbitragem e formação/cursos (`:44-47`); Status e motivo de rejeição (`:50-57`); RG, órgão emissor, sexo e RG digitalizado — aceitos pela API (`ArbitroForm.java:24-34`, `:67-69`) mas não coletados pela tela atual do painel.
-
-**Finalidade:** Gestão interna do credenciamento arbitral. Nenhum desses campos vai para o site público. O campo "sexo" não é usado em nenhuma regra, filtro ou tela — coleta sem finalidade declarada.
-
-**Base legal sugerida:** art. 7, V e art. 7, II. DECISÃO FINAL DO ADVOGADO.
-
-**Quem acessa:** Somente ADMIN_FHT. Exceção: o RG digitalizado, quando enviado, fica acessível por `/api/files` sem autenticação.
-
 ### Membro da diretoria da FHT
 
 **Dados:** Nome e cargo (`Diretor.java:9-13`); Área de atuação (`:15-16`); Mandato e "na diretoria desde" (`:18`, `:24-25`); E-mail (`:20`); Telefone (`:22`); Bio / currículo em texto livre (`:27-28`); Foto (`:30-31`).
@@ -242,7 +216,7 @@ Redação segura para a política: *a filiação do atleta só é aprovada com d
 
 **Base legal sugerida:** art. 7, V / art. 7, IX (transparência institucional e exercício de cargo de representação). Não há registro de consentimento de diretor no sistema. DECISÃO FINAL DO ADVOGADO.
 
-**Quem acessa:** Qualquer visitante anônimo. **ATENÇÃO — exposição maior que a dos árbitros:** `GET /api/diretores` é público e devolve o objeto **completo**, incluindo e-mail, telefone e biografia (`DiretorResource.java:29-34`; `DiretorDTO.java:9-22`). Não existe objeto público reduzido como o dos árbitros. A migration declara que o contato é institucional (`V9:2`), mas nada no código valida isso — um celular pessoal digitado no campo vai ao ar igual.
+**Quem acessa:** Qualquer visitante anônimo. **ATENÇÃO — exposição ampla:** `GET /api/diretores` é público e devolve o objeto **completo**, incluindo e-mail, telefone e biografia (`DiretorResource.java:29-34`; `DiretorDTO.java:9-22`). Não existe objeto público reduzido para diretores. A migration declara que o contato é institucional (`V9:2`), mas nada no código valida isso — um celular pessoal digitado no campo vai ao ar igual.
 
 ### Funcionário / dirigente da federação (autoria e operação)
 
@@ -279,33 +253,31 @@ Redação segura para a política: *a filiação do atleta só é aprovada com d
 São cinco vias:
 
 1. **Formulário público na página inicial, sem qualquer autenticação** — filiação de clube (`Registration.tsx`; endereço `POST /api/clubes/solicitar`, `ClubeResource.java:34-49`). Coleta nome, cidade, UF, sigla e CNPJ do clube; nome, CPF, cargo, e-mail e telefone do representante; **a senha de acesso escolhida por ele**; e os PDFs de ata e estatuto, que costumam conter nome, CPF, RG e assinatura de terceiros.
-2. **Painel do clube, por usuário autenticado** — cadastro de atletas (`ClubeDashboard.tsx:931-965`), cadastro da comissão técnica (`ClubeResource.java:239-259`) e envio do pagamento em lote com o comprovante (`PagamentoResource.java`).
-3. **Painel da federação, por administrador autenticado** — árbitros, diretores, notícias, fotos da galeria, documentos institucionais e competições.
+2. **Painel do clube, por usuário autenticado** — cadastro de atletas (`ClubeDashboard.tsx:931-965`) e envio do pagamento em lote com o comprovante (`PagamentoResource.java`).
+3. **Painel da federação, por administrador autenticado** — diretores, notícias, fotos da galeria e documentos institucionais.
 4. **Coleta automática, nunca declarada ao titular** — no momento em que um atleta é cadastrado, o sistema captura o **endereço IP e a identificação do navegador** de quem preencheu, e os grava como evidência do consentimento (`OrigemRequisicao.java:14-26`, invocada em `AtletaResource.java:57-59`). O código lê inclusive o cabeçalho `X-Forwarded-For` para obter o IP real por trás de proxy.
 5. **Geração automática de mensagens de e-mail a partir dos dados cadastrados** (`EmailService.java`) — ver §7.
 
-**O ponto que precisa aparecer com destaque na política:** o atleta — inclusive o menor — **nunca toca no sistema**; quem digita tudo é o representante do clube, e é do dispositivo dele que saem o IP e o navegador gravados como prova. O responsável legal também não toca: seu nome, CPF e contato são digitados por terceiro. Os membros da comissão técnica, idem. Os árbitros são cadastrados por funcionário da federação e nascem já credenciados. Os diretores são cadastrados por administrador. **Descrever o sistema como se o titular preenchesse o próprio cadastro seria uma descrição falsa do fluxo real** — e enfraqueceria justamente a evidência de consentimento do art. 14, §1º.
+**O ponto que precisa aparecer com destaque na política:** o atleta — inclusive o menor — **nunca toca no sistema**; quem digita tudo é o representante do clube, e é do dispositivo dele que saem o IP e o navegador gravados como prova. O responsável legal também não toca: seu nome, CPF e contato são digitados por terceiro. Os diretores são cadastrados por administrador. **Descrever o sistema como se o titular preenchesse o próprio cadastro seria uma descrição falsa do fluxo real** — e enfraqueceria justamente a evidência de consentimento do art. 14, §1º.
 
-Quando os dados **não vêm do titular**, o dever de transparência do art. 9º é ainda mais forte, porque o titular pode nem saber que está no banco. Hoje ele não sabe: não há aviso, e-mail ou termo para o responsável legal quanto aos dados dele, nem para as pessoas da comissão técnica.
+Quando os dados **não vêm do titular**, o dever de transparência do art. 9º é ainda mais forte, porque o titular pode nem saber que está no banco. Hoje ele não sabe: não há aviso, e-mail ou termo para o responsável legal quanto aos dados dele.
 
 ---
 
 ## 3. Finalidades e bases legais
 
 - **FILIAÇÃO E REGISTRO DE ATLETAS** — cadastrar o atleta, verificar sua identidade, impedir cadastro duplicado do mesmo CPF em dois clubes e mantê-lo vinculado ao clube filiado. Base sugerida: art. 7, V + art. 7, II. Para menores, observar o art. 14.
-- **ENQUADRAMENTO EM COMPETIÇÕES** — usar data de nascimento, sexo, categoria e posição para classificar o atleta. Base sugerida: art. 7, V. **Ressalva de fato, reverificada em 04/08:** o módulo de competições **ainda não trata dados de atleta** — não existe tabela de inscrição, escalação ou check-in, e nenhuma migration posterior (V15, V16) criou vínculo entre atleta e competição. A menção da V15 ao técnico "que define a escalação" é intenção futura em comentário (`V15:14`), não código existente.
-- **CONTROLE E COMPROVAÇÃO DA ANUIDADE (reescrita — V16)** — registrar o pagamento anual que habilita o atleta a competir, receber e guardar o comprovante bancário enviado pelo clube, e registrar nominalmente quais atletas cada pagamento cobre. Base sugerida: art. 7, V + art. 7, II (guarda de documento de comprovação financeira). **A retenção desses registros sobrevive à exclusão do cadastro do atleta, por decisão de projeto** — ver §8.
+- **ENQUADRAMENTO NA CATEGORIA E NO NAIPE DA FILIAÇÃO** — usar data de nascimento, sexo e categoria para enquadrar o atleta na categoria etária e no naipe da filiação, e registrar a posição em quadra informada pelo clube. Base sugerida: art. 7, V.
+- **CONTROLE E COMPROVAÇÃO DA ANUIDADE (reescrita — V16)** — registrar o pagamento anual da filiação do atleta, receber e guardar o comprovante bancário enviado pelo clube, e registrar nominalmente quais atletas cada pagamento cobre. Base sugerida: art. 7, V + art. 7, II (guarda de documento de comprovação financeira). **A retenção desses registros sobrevive à exclusão do cadastro do atleta, por decisão de projeto** — ver §8.
 - **COMPROVAÇÃO DOCUMENTAL** — armazenar RG e comprovante de residência como meio de prova das informações declaradas. Base sugerida: art. 7, V + art. 7, II.
 - **FILIAÇÃO DE CLUBES** — receber e analisar a solicitação, com ata e estatuto. Base sugerida: art. 7, V (procedimento preliminar de contrato).
 - **GESTÃO DE ACESSO E SEGURANÇA** — criar a credencial escolhida pelo próprio interessado, autenticar, manter sessão e limitar cada clube aos próprios dados. Base sugerida: art. 7, V + art. 7, II.
-- **🆕 IDENTIFICAÇÃO DA COMISSÃO TÉCNICA DO CLUBE** — registrar quem responde tecnicamente pelo clube perante a federação (2º representante, técnico e auxiliares). Base sugerida: art. 7, V ou art. 7, IX. **Não pode ser consentimento** — não existe mecanismo de captura, e essas pessoas nunca tocam no sistema.
 - **🆕 COMUNICAÇÃO OPERACIONAL POR E-MAIL** — avisar a federação de novas solicitações e de pagamentos recebidos, e avisar o representante do clube sobre o andamento da filiação e do pagamento. Base sugerida: art. 7, V (execução do vínculo) — ver §7 para o que cada mensagem carrega.
-- **CREDENCIAMENTO E DIVULGAÇÃO DO CORPO ARBITRAL** — publicar nome, foto, cidade, UF e nível dos árbitros credenciados. Base sugerida: art. 7, V ou art. 7, IX. **Não pode ser consentimento.**
 - **TRANSPARÊNCIA INSTITUCIONAL** — publicar diretoria (com contato e currículo), documentos institucionais e autoria das publicações. Base sugerida: art. 7, V / art. 7, IX.
 - **DIVULGAÇÃO DE IMAGEM EM GALERIA E NOTÍCIAS** — único tratamento genuinamente opcional. Base sugerida: art. 7, I (consentimento), **com a ressalva grave de que o consentimento registrado hoje não é consultado por ponto nenhum do sistema antes de publicar**.
 - **REGISTRO DE EVIDÊNCIA DE CONSENTIMENTO** — guardar quem consentiu, quando, de qual IP e sob qual versão do termo. Base sugerida: art. 7, II c/c art. 6, X.
 - **DESCARTE DE CADASTROS SEM ANUIDADE CONFIRMADA** — apagar automaticamente atletas parados em "aguardando pagamento" há mais de 90 dias. Base sugerida: art. 15, I e art. 16. É a única rotina de retenção que existe. **Cuidado com a redação — ver §8.**
-- **OBSERVAÇÃO TRANSVERSAL:** a recomendação técnica do projeto é reservar o consentimento (art. 7, I) **exclusivamente** ao que é opcional — hoje, apenas o uso de imagem. Todo o cadastro esportivo (atleta, responsável, clube, comissão técnica, árbitro, diretor) deve se apoiar em contrato/relação associativa e obrigação regulatória, porque o titular não tem como recusar sem perder a filiação, e porque em vários fluxos **não existe sequer mecanismo técnico para capturar ou revogar consentimento**.
+- **OBSERVAÇÃO TRANSVERSAL:** a recomendação técnica do projeto é reservar o consentimento (art. 7, I) **exclusivamente** ao que é opcional — hoje, apenas o uso de imagem. Todo o cadastro esportivo (atleta, responsável, clube, diretor) deve se apoiar em contrato/relação associativa e obrigação regulatória, porque o titular não tem como recusar sem perder a filiação, e porque em vários fluxos **não existe sequer mecanismo técnico para capturar ou revogar consentimento**.
 
 ---
 
@@ -313,15 +285,13 @@ Quando os dados **não vêm do titular**, o dever de transparência do art. 9º 
 
 - **ATLETAS (INCLUSIVE MENORES):** nome completo, posição em quadra e categoria etária de todo atleta ATIVO de clube marcado como visível na home — no modal do clube (`GET /api/clubes/publico/{id}`, `ClubeResource.java:74-85`, sem exigência de perfil). Sem filtro de idade e sem checagem de consentimento (`ClubeServiceImpl.java:271-291`; objeto em `AtletaVitrineDTO.java:10-14`). **É o item de maior exposição do sistema.**
 - **CLUBES:** nome, sigla, cidade, UF, lista de categorias e total de atletas. O identificador do clube também trafega publicamente.
-- **ÁRBITROS CREDENCIADOS:** identificador, nome completo, cidade, UF, nível de credenciamento e foto do rosto — exatamente 6 campos, só para quem está com status CREDENCIADO.
 - **DIRETORIA:** o registro **completo** de cada diretor — nome, cargo, área de atuação, mandato, "na diretoria desde", e-mail, telefone, biografia/currículo e foto. É a exposição mais ampla de contato do site, porque não existe objeto público reduzido.
 - **NOTÍCIAS publicadas:** título, conteúdo, imagens de capa e do corpo, e o **nome do administrador** que assinou a matéria.
 - **DOCUMENTOS INSTITUCIONAIS:** o arquivo e o nome de quem publicou (esse último trafega no pacote público mesmo sem ser exibido pela tela atual).
 - **GALERIA DE FOTOS:** imagem, legenda livre do evento, ano e categoria — podendo conter rostos identificáveis de atletas de categorias de base.
-- **COMPETIÇÕES:** lista e detalhe públicos (sem dados de atleta vinculados — o módulo ainda não trata dados pessoais).
-- **NA PRÁTICA, TODOS OS ARQUIVOS ENVIADOS AO SISTEMA:** RG digitalizado, foto 3x4, comprovante de residência e comprovante Pix legado de atletas; RG digitalizado de árbitros; ata e estatuto de clubes; **e agora também os comprovantes bancários dos pagamentos em lote**. Não são divulgados em nenhuma página, mas o endereço que os serve não exige autenticação — quem tiver a URL acessa.
-- **O QUE NÃO É PÚBLICO (verificado campo a campo):** CPF, RG, data de nascimento, endereço, CEP, telefone e e-mail de atleta; todos os dados do responsável legal; registros de consentimento; CNPJ do clube e nome/e-mail/telefone/cargo/CPF do representante; **todos os dados da comissão técnica**; **todos os dados de pagamento**; CPF, RG, nascimento, telefone, e-mail, registro e formação de árbitro.
-- **Filtros de visibilidade, reverificados um a um:** clubes só entram na vitrine se estiverem ATIVOS **e** marcados como visíveis (`ClubeRepository.java:22-24`; repetido em `ClubeServiceImpl.java:273`); só atletas ATIVOS entram no elenco público (`ClubeServiceImpl.java:276-279`); só árbitros CREDENCIADOS aparecem (`ArbitroRepository.java:19`); só notícias PUBLICADAS são acessíveis (`NoticiaRepository.java:17` e `:21`).
+- **NA PRÁTICA, TODOS OS ARQUIVOS ENVIADOS AO SISTEMA:** RG digitalizado, foto 3x4, comprovante de residência e comprovante Pix legado de atletas; ata e estatuto de clubes; **e agora também os comprovantes bancários dos pagamentos em lote**. Não são divulgados em nenhuma página, mas o endereço que os serve não exige autenticação — quem tiver a URL acessa (em produção, a URL pública do bucket `fht-documentos` no R2; em desenvolvimento, `/api/files` — ver §1).
+- **O QUE NÃO É PÚBLICO (verificado campo a campo):** CPF, RG, data de nascimento, endereço, CEP, telefone e e-mail de atleta; todos os dados do responsável legal; registros de consentimento; CNPJ do clube e nome/e-mail/telefone/cargo/CPF do representante; **todos os dados de pagamento**.
+- **Filtros de visibilidade, reverificados um a um:** clubes só entram na vitrine se estiverem ATIVOS **e** marcados como visíveis (`ClubeRepository.java:22-24`; repetido em `ClubeServiceImpl.java:273`); só atletas ATIVOS entram no elenco público (`ClubeServiceImpl.java:276-279`); só notícias PUBLICADAS são acessíveis (`NoticiaRepository.java:17` e `:21`).
 
 ---
 
@@ -335,54 +305,68 @@ Quando os dados **não vêm do titular**, o dever de transparência do art. 9º 
 | **Google (Google Fonts — fonts.googleapis.com e fonts.gstatic.com)** | Endereço IP e identificação do navegador de **todo visitante, em toda página** | **TRANSFERÊNCIA REAL E VERIFICADA** (`frontend/index.html:13-15`). Acontece **antes e independentemente** do aviso de cookies, sem qualquer opção de recusa. É transferência internacional. Hoje é o **único** terceiro que recebe dados automaticamente do navegador de todo visitante — antes eram dois. Recomendação técnica: auto-hospedar as fontes elimina esse terceiro por completo. |
 | **🆕 Provedor do servidor de e-mail de saída** | Nada hoje; quando ligado: nome do clube, cidade, nome e e-mail do representante, motivo de recusa em texto livre e **a lista nominal completa dos atletas de cada pagamento, inclusive menores** | **PRONTO E DESLIGADO POR CONFIGURAÇÃO.** O envio está em modo simulado por padrão (`application.properties:41`, `SMTP_MOCK` com valor padrão `true`; nem o `.env` nem o `docker-compose.yml` do repositório alteram isso). Basta trocar uma variável de ambiente para ligar, **sem mudar uma linha de código**, e o plano é ligar no lançamento. **Armadilha:** se alguém apenas desligar o modo simulado sem informar qual servidor usar, o padrão é o do **Gmail** (`application.properties:43`, porta 587), o que coloca o Google como operador, com servidores fora do Brasil. A conexão exige TLS (`:47`) — a mensagem viaja cifrada e chega em claro na caixa de destino. Ver §6 e §7. |
 | **🆕 Caixas postais de destino** | A caixa institucional da federação (padrão `contato@fht.org.br`, `application.properties:49`) recebe os avisos de nova filiação e **a lista nominal de atletas de cada pagamento**. O e-mail do representante de cada clube (buscado na ficha do clube — `PagamentoServiceImpl.java:305-308`) recebe os avisos de andamento | Quem hospeda essas caixas é **operador de tratamento**. Se forem Gmail/Workspace, Microsoft 365 ou Zoho, o provedor passa a **armazenar** (não só transportar) nomes de atletas menores, indefinidamente, fora do controle do sistema. **Alerta:** o e-mail do representante é editável pelo próprio clube (`ClubeUpdateForm.java:18`; `ClubeServiceImpl.java:175`) — o clube pode redirecionar a qualquer momento os avisos para outro endereço, sem que a federação seja notificada. |
-| **Cloudflare R2 (armazenamento de arquivos)** | Nada hoje | **PREVISTO MAS INATIVO.** As três credenciais continuam vazias (`application.properties:63-65`; `.env` e `.env.example` em branco; `docker-compose.yml:28-44` repassa variáveis vazias) e, sem elas, o serviço nem cria o cliente e cai **silenciosamente** no disco local do próprio servidor, apenas registrando um aviso (`R2StorageService.java:51-60`). Nenhum arquivo saiu do servidor da aplicação até hoje. O volume guardado localmente cresceu: agora inclui também os comprovantes de pagamento. |
-| **Sentry (monitoramento de erros — Functional Software Inc., EUA)** | Nada hoje | **CÓDIGO PRONTO, MAS DESLIGADO:** só inicializa se o identificador estiver preenchido, e o valor está vazio (`application.properties:70`; `SentryInitializer.java:23-32`). Quando ligado, captura toda exceção não tratada com a mensagem original (`GlobalExceptionMapper.java:46-47`), sem filtro nem mascaramento — uma violação de unicidade de banco pode carregar um CPF junto. Detalhe verificado agora: quando ligado, também coleta amostra de desempenho de 20% das requisições (`SentryInitializer.java:29`), enviando aos EUA as rotas acessadas, não só os erros. |
-| **Hospedagem e infraestrutura** | Todo o banco de dados, o volume de arquivos e os registros de execução | **CORREÇÃO em relação a 02/08:** existe, sim, configuração de publicação no repositório — ela só não estava na pasta procurada. O arquivo é **`backend/.github/workflows/deploy.yml`**, e descreve a esteira completa: compilação em runner do GitHub (`:10`), publicação da imagem em um registro Docker (`:27-40`) e **disparo de deploy no Railway** (`:42-46`, usando um segredo `RAILWAY_WEBHOOK_URL`). **Ressalva honesta:** por estar dentro de `backend/` e não na raiz do repositório, esse arquivo **não é executado pelo GitHub** — ele é prova documental da **intenção** de hospedar no Railway (EUA), não prova de que a produção já esteja lá. **O hospedeiro real continua tendo de ser confirmado com a federação** antes de ser nomeado operador. |
+| **Cloudflare R2 (armazenamento de arquivos — Cloudflare, Inc., EUA)** | Em produção: **todos os arquivos enviados** (documentos de atleta, ata e estatuto de clube, comprovantes de pagamento, imagens de notícias, galeria e diretoria) no bucket `fht-documentos`; e os **backups diários do banco inteiro** no bucket privado `fht-backups` | **OPERADOR, ATIVO EM PRODUÇÃO.** Com as três credenciais preenchidas, o upload vai ao bucket `fht-documentos` e o endereço gravado é a URL pública configurada (`r2.public-url`) + o caminho do arquivo (`R2StorageService.java`, método `upload`) — sem autenticação, como em §1. O bucket `fht-backups` é privado e sem URL pública (`.github/workflows/backup.yml`). **Região exata dos buckets: [A CONFIRMAR].** Em desenvolvimento, sem credenciais, o serviço cai **silenciosamente** no disco local, apenas registrando um aviso (`R2StorageService.java:51-60`). |
+| **Render (Render Services, Inc., EUA) — hospedagem da API** | Toda requisição à API, os dados que passam por ela e os **registros de execução (logs)** do servidor | **OPERADOR.** A API roda no Render, região Virginia (EUA), a partir de uma imagem Docker publicada no GitHub Container Registry. A esteira fica em `.github/workflows/deploy.yml` (raiz do repositório): gera a imagem, publica no GHCR e dispara o Deploy Hook do Render. Os logs de execução ficam no Render — **prazo de retenção: [A CONFIRMAR]**. As chaves de assinatura do token (JWT) vêm de variáveis de ambiente, nunca da imagem. *(A esteira de publicação antiga, em `backend/.github/workflows/deploy.yml`, foi removida.)* |
+| **Neon (Neon, Inc., EUA) — banco de dados** | **Todo o banco de dados** (as 10 tabelas, com todos os dados pessoais de §1) | **OPERADOR.** PostgreSQL gerenciado, região AWS us-east-1 (Virginia, EUA). A conexão exige TLS (`sslmode=require`, conforme `application.properties`, seção Datasource). |
+| **GitHub (GitHub, Inc., EUA) — Actions e Container Registry** | **Actions:** o dump **inteiro** do banco, uma vez por dia, dentro do runner que executa o backup. **GHCR:** a imagem Docker da API, **sem dado pessoal** | **OPERADOR (backup).** O `backup.yml` roda diariamente às 03:00 UTC num runner do GitHub Actions: `pg_dump` do banco inteiro com a imagem `postgres:16`, compressão gzip e envio ao bucket privado `fht-backups`; o conteúdo não vai ao log e o arquivo é apagado do runner ao fim. Ver §8. O repositório do código é **privado**. |
 | **CBHb ou outra entidade desportiva** | Nada | **NENHUMA integração existe no código.** A única menção à Confederação Brasileira de Handebol no sistema inteiro é um link de cortesia no rodapé (`Footer.tsx:16`). Não há envio, exportação nem sincronização. Se houver compartilhamento na prática (planilha, e-mail, sistema da CBHb), acontece **fora** do sistema e precisa ser declarado assim mesmo. **PERGUNTAR À FEDERAÇÃO.** |
 | **Gateway de pagamento / instituição financeira** | Nada | **Confirmado depois da V16.** Não existe nenhuma biblioteca de meio de pagamento no projeto (busca por Stripe, Mercado Pago, PagSeguro, Asaas, Gerencianet, Pagar.me, PayPal e OpenPix: zero ocorrências). O pagamento é Pix feito **por fora e em lote**: o clube seleciona vários atletas, faz um único Pix e anexa um único comprovante, que cobre nominalmente todos os selecionados (`PagamentoServiceImpl.java:85-152`). A federação confere a olho e dá baixa (`:202-246`). **Nenhum dado bancário, número de conta, chave Pix ou dado de cartão é digitado no sistema** — o que existe é a imagem do comprovante enviada pelo clube. |
-| **Público em geral (via endereços abertos)** | Nome, posição e categoria de atletas ativos; nome, foto, cidade, UF e nível de árbitros credenciados; registro completo de diretores (inclusive e-mail, telefone e currículo); nome do autor das publicações; fotos da galeria; **e, na prática, qualquer arquivo enviado ao sistema para quem tiver a URL — incluindo agora os comprovantes bancários** | Não é "compartilhamento com terceiro" em sentido estrito, mas é divulgação pública e precisa estar declarada na política com essa clareza. Ver §4. |
+| **Público em geral (via endereços abertos)** | Nome, posição e categoria de atletas ativos; registro completo de diretores (inclusive e-mail, telefone e currículo); nome do autor das publicações; fotos da galeria; **e, na prática, qualquer arquivo enviado ao sistema para quem tiver a URL — incluindo agora os comprovantes bancários** | Não é "compartilhamento com terceiro" em sentido estrito, mas é divulgação pública e precisa estar declarada na política com essa clareza. Ver §4. |
 | ~~ViaCEP~~ | — | **REMOVIDO DA LISTA.** A busca pela palavra "viacep" em todo o repositório retorna **zero ocorrências** em código. A consulta foi apagada junto com a coleta do endereço do atleta (`ClubeDashboard.tsx:946`). Não há mais transferência de dado de atleta para esse serviço, e ele era brasileiro de qualquer modo. |
 
 **Varredura exaustiva de chamadas externas (feita em 04/08):**
-- **No servidor:** existem exatamente **duas** saídas possíveis para fora — o Cloudflare R2 (desligado) e o servidor de e-mail (simulado). Nada mais. Nenhuma consulta a Receita Federal, bureau de crédito, confederação, sistema de governo ou qualquer serviço de terceiro. O único outro endereço externo no código do servidor é decorativo: a documentação da API cita `https://fht.org.br` e `https://api.fht.org.br` como endereços do próprio projeto.
+- **No servidor:** além do banco no Neon, existem exatamente **duas** saídas possíveis para fora — o Cloudflare R2 (ativo em produção) e o servidor de e-mail (simulado). Nada mais. Fora da aplicação, a rotina de backup do GitHub Actions lê o banco inteiro e grava no R2 (§8). Nenhuma consulta a Receita Federal, bureau de crédito, confederação, sistema de governo ou qualquer serviço de terceiro. O único outro endereço externo no código do servidor é decorativo: a documentação da API cita `https://fht.org.br` e `https://api.fht.org.br` como endereços do próprio projeto.
 - **No site:** a única transferência automática é o Google Fonts. Todas as chamadas de dados vão para a própria API da federação (`services/api.ts:50-98`; `AuthContext.tsx:80`; `Registration.tsx:113`). Os dois quadros que exibem PDF apontam para o próprio servidor da federação. **Não há CDN, biblioteca carregada de fora, mapa, vídeo, chat ou feed de rede social.**
 - **Ligações que só agem se o visitante clicar** (não são transferência automática, mas convém saber): três links externos no rodapé — Confederação Brasileira de Handebol, Comitê Olímpico do Brasil e Governo do Tocantins (`Footer.tsx:16-18`) — e um link de WhatsApp na seção de contato (`Contact.tsx:34`), que aponta para um número de exemplo, só zeros. Ao clicar, o visitante sai do site e o destino recebe o IP dele.
-- **Ponto de atenção operacional:** o arquivo de dados fictícios de demonstração (`scripts/seed_teste.sql:13-25`) preenche fotos de atleta com endereços de `i.pravatar.cc` e documentos com um PDF de exemplo em `africau.edu`. Se esse arquivo for carregado no ambiente que for ao ar, o navegador de quem abrir o painel passa a buscar imagens nesses dois sites estrangeiros. Não é comportamento do sistema, é contaminação de dado de teste — mas convém garantir que esse arquivo **nunca** rode em produção. O mesmo arquivo, versionado no GitHub, contém nomes, CPFs e contatos **fictícios**, incluindo menores fictícios; se alguém um dia colocar dados reais ali, eles vão para o repositório.
+- **Ponto de atenção operacional:** o seed de demonstração com dados fictícios (`backend/src/main/resources/db/dev/R__seed_dev.sql`) preenche imagens e documentos com endereços de `picsum.photos`, `i.pravatar.cc` e um PDF de exemplo do `w3.org`. Ele é aplicado **só no perfil de desenvolvimento** (`quarkus.flyway.locations` em `application-dev.properties`); produção nunca o aplica. Se um dia fosse carregado no ambiente que vai ao ar, o navegador de quem abrisse o painel passaria a buscar arquivos nesses sites estrangeiros. O arquivo contém nomes, CPFs e contatos **fictícios**, incluindo uma menor fictícia com responsável, e fica num repositório **privado**; se alguém um dia colocar dados reais ali, eles vão para o repositório.
 
 ---
 
 ## 6. 🆕 Transferência internacional de dados (art. 33)
 
 > **Seção nova.** A versão de 02/08 tratava o assunto em observações soltas dentro da tabela de
-> terceiros. O art. 33 exige tratamento próprio e informação específica ao titular — e **há uma
-> transferência acontecendo hoje, em toda visita ao site**.
+> terceiros. O art. 33 exige tratamento próprio e informação específica ao titular — e, com a
+> infraestrutura do MVP, **a base de dados inteira, os arquivos, os backups e os logs ficam nos
+> Estados Unidos** (itens 3 a 6), além da transferência que acontece em toda visita ao site (item 1).
+>
+> ⚠️ **Antes de publicar a política, é obrigatório definir a hipótese do art. 33 que sustenta essas
+> transferências** (Render, Neon, GitHub Actions e Cloudflare R2), com os contratos/termos de
+> tratamento de dados (DPA) de cada operador — ou a federação decide migrar para região no Brasil.
+> DECISÃO FINAL DO ADVOGADO. Sem isso, a seção de transferência internacional da política não
+> tem o que declarar.
 
 **1. ATIVA HOJE, sem nenhuma alternativa de recusa — GOOGLE (fontes tipográficas).**
-Toda visita a qualquer página do site carrega fontes de `fonts.googleapis.com` e `fonts.gstatic.com` (`frontend/index.html:13-15`). Isso transmite ao Google o endereço IP do visitante, a identificação do navegador e a página de origem, **em toda visita**, inclusive antes de qualquer interação e **antes de o aviso de cookies aparecer** — o aviso é montado pelo React, que só executa depois. Não há como recusar. É a **única transferência internacional efetivamente em curso**, e alcança todo visitante anônimo, inclusive crianças que entrem no site.
+Toda visita a qualquer página do site carrega fontes de `fonts.googleapis.com` e `fonts.gstatic.com` (`frontend/index.html:13-15`). Isso transmite ao Google o endereço IP do visitante, a identificação do navegador e a página de origem, **em toda visita**, inclusive antes de qualquer interação e **antes de o aviso de cookies aparecer** — o aviso é montado pelo React, que só executa depois. Não há como recusar. É a **única transferência internacional que parte do navegador do visitante**, e alcança todo visitante anônimo, inclusive crianças que entrem no site.
 
 **2. PREVISTA E LATENTE — GOOGLE (servidor de saída de e-mail).**
 O servidor de saída configurado por padrão no projeto é `smtp.gmail.com` (`application.properties:43`). O envio está desligado hoje (modo simulado, `:41`), mas basta preencher usuário e senha e virar a chave: **se ninguém trocar esse valor, toda mensagem — inclusive a que carrega a lista nominal de atletas menores — trafegará por infraestrutura do Google nos Estados Unidos.** Isso é transferência internacional e precisa ser declarada, com contrato de operador.
 
-**3. PREVISTA, INATIVA — CLOUDFLARE R2.**
-É o destino planejado de **todos** os arquivos: RG digitalizado, foto 3x4, comprovante de residência e comprovante de Pix de atletas, RG de árbitros, ata e estatuto de clubes, comprovantes bancários de pagamento. Inativo de fato: sem as três credenciais o serviço nem cria o cliente e cai no disco local (`R2StorageService.java:51-60`). Quando ativado, o destino é um endereço no domínio `r2.cloudflarestorage.com` e o cliente é construído declarando a região `US_EAST_1` (`R2StorageService.java`, método de inicialização).
+**3. ATIVA EM PRODUÇÃO — RENDER (Render Services, Inc., EUA), hospedagem da API.**
+A API roda no Render, região Virginia (EUA). Todo dado pessoal que entra ou sai do sistema passa por ela, e os **registros de execução (logs)** ficam lá — incluindo o nome completo do atleta ativado sem baixa de pagamento (`AtletaServiceImpl.java:392-394`) e o destinatário e o assunto de cada e-mail (`EmailService.java:159`). Prazo de retenção dos logs no Render: **[A CONFIRMAR]**.
 
-**4. PREVISTA, INATIVA — SENTRY (Functional Software Inc., EUA).**
-Só inicializa se o identificador estiver preenchido, e ele está vazio (`application.properties:70`). Se ligado, captura toda exceção não tratada com a mensagem original, sem filtro — uma violação de unicidade de banco pode carregar um CPF junto.
+**4. ATIVA EM PRODUÇÃO — NEON (Neon, Inc., EUA), banco de dados.**
+O banco inteiro — atletas (inclusive menores), responsáveis, consentimentos, clubes, contas de acesso, pagamentos, diretoria — fica no Neon, região AWS us-east-1 (Virginia, EUA).
 
-**5. DOCUMENTADA NO CÓDIGO, A CONFIRMAR — RAILWAY (EUA), como hospedeiro.**
-Existe uma esteira de publicação que compila no GitHub, envia a imagem a um registro Docker e dispara deploy no Railway (`backend/.github/workflows/deploy.yml:42-46`). **Ressalva:** por estar em `backend/` e não na raiz, essa esteira **não é executada** pelo GitHub — é prova de intenção, não de ambiente ativo. O hospedeiro real precisa ser confirmado, mas **hospedagem é o operador que recebe absolutamente tudo**: banco, arquivos e registros de execução — e os registros incluem o nome completo de atletas apagados pela rotina de descarte (`AtletaExpurgoJob.java:44-46`).
+**5. ATIVA EM PRODUÇÃO — CLOUDFLARE R2 (Cloudflare, Inc., EUA), arquivos e backups.**
+Destino de **todos** os arquivos (bucket `fht-documentos`): RG digitalizado, foto 3x4, comprovante de residência e comprovante de Pix de atletas, ata e estatuto de clubes, comprovantes bancários de pagamento, imagens públicas. E destino dos **backups diários do banco inteiro** (bucket privado `fht-backups`, §8). O destino é um endereço no domínio `r2.cloudflarestorage.com`; o cliente é construído declarando a região `US_EAST_1` (`R2StorageService.java`, método de inicialização), mas esse valor é parâmetro da biblioteca e não comprova onde os buckets estão. **Região exata dos buckets: [A CONFIRMAR].**
 
-**6. A CONFIRMAR — PROVEDOR DAS CAIXAS POSTAIS DA FEDERAÇÃO.**
+**6. ATIVA EM PRODUÇÃO — GITHUB (GitHub, Inc., EUA), Actions e Container Registry.**
+Uma vez por dia, a rotina de backup (`.github/workflows/backup.yml`) gera o **dump inteiro do banco** dentro de um runner do GitHub Actions antes de enviá-lo ao R2 — ou seja, todos os dados pessoais passam diariamente por infraestrutura do GitHub. O dump é apagado do runner ao fim e o conteúdo não vai ao log. O GitHub Container Registry guarda a imagem Docker da API, **sem dado pessoal**.
+
+**7. A CONFIRMAR — PROVEDOR DAS CAIXAS POSTAIS DA FEDERAÇÃO.**
 Os endereços `contato@fht.org.br` e `imprensa@fht.org.br`. Se estiverem em Google Workspace, Microsoft 365, Zoho ou similar, **todo aviso operacional com nome de atleta menor fica hospedado fora do Brasil**, independentemente de qual servidor de saída for usado. **Isso não é verificável no código.**
 
-**NÃO SÃO TRANSFERÊNCIA:** o GitHub, onde fica o código-fonte (`github.com/Gustavo16378/FHT-SITE`) — não há dado de titular ali, ressalvado o arquivo de dados fictícios já mencionado; e os links de rodapé para CBHb, COB e Governo do Tocantins, que são apenas hiperlinks e não enviam dado nenhum sozinhos.
+**8. A CONFIRMAR — HOSPEDAGEM DO SITE PÚBLICO (frontend).**
+Esta revisão não verificou onde o site é servido; o comentário da configuração de CORS menciona Cloudflare Pages (`application.properties`, seção CORS). Quem serve o site recebe o IP de todo visitante.
+
+**NÃO SÃO TRANSFERÊNCIA:** o repositório do código-fonte no GitHub (`github.com/Gustavo16378/FHT-SITE`, **privado**) — não há dado de titular ali, ressalvado o seed de dados fictícios já mencionado; a imagem Docker no GHCR (item 6); e os links de rodapé para CBHb, COB e Governo do Tocantins, que são apenas hiperlinks e não enviam dado nenhum sozinhos.
 
 **SAIU DA LISTA:** ViaCEP, removido do código.
 
 **A lista é exaustiva:** verificado que não há nenhum outro recurso externo no site — nenhuma outra fonte, biblioteca de CDN, mapa, vídeo incorporado, feed de rede social, chat, ferramenta de medição de audiência ou verificação anti-robô.
 
 > **Recomendação de melhor custo-benefício de todo o levantamento:** auto-hospedar as fontes.
-> Isso elimina a única transferência internacional em curso hoje, e deixa a seção inteira de
+> Isso elimina a única transferência internacional feita a partir do navegador do visitante, e deixa a seção inteira de
 > cookies e terceiros dramaticamente mais simples e mais defensável.
 
 ---
@@ -413,7 +397,7 @@ Hoje o envio está em **modo simulado** (`application.properties:41`, `SMTP_MOCK
 1. **A caixa institucional da federação** — endereço padrão `contato@fht.org.br` (`application.properties:49`; `EmailService.java:34-36`).
 2. **O e-mail pessoal ou profissional que o representante do clube digitou** no formulário de filiação; o sistema o busca na ficha do clube na hora de enviar (`PagamentoServiceImpl.java:305-308`; `ClubeServiceImpl.java:200-201` e `:214`).
 
-**Nenhuma mensagem vai para o responsável legal do menor, nem para o próprio atleta, nem para as pessoas da comissão técnica.**
+**Nenhuma mensagem vai para o responsável legal do menor, nem para o próprio atleta.**
 
 ### As sete mensagens, por evento, com o dado pessoal que cada uma carrega
 
@@ -443,10 +427,10 @@ Todas as mensagens terminam com a assinatura "Federação de Handebol do Tocanti
 
 ## 8. Retenção e descarte
 
-- **ÚNICA REGRA AUTOMÁTICA QUE EXISTE:** cadastros de atleta parados na situação `AGUARDANDO_PAGAMENTO` são apagados após 90 dias contados da **data de cadastro**. É uma rotina diária (`AtletaExpurgoJob.java:33`, `:37`, `:40-41`) e é a **única tarefa agendada de todo o sistema** (uma única ocorrência de agendamento em todo o backend). O critério exato é: situação igual a `AGUARDANDO_PAGAMENTO` e data de cadastro anterior ao limite (`AtletaRepository.java:36-38`). O prazo é configurável por variável de ambiente (`application.properties:60`) — sugerimos redigir como "até 90 dias".
+- **ÚNICA REGRA AUTOMÁTICA DE DESCARTE QUE EXISTE:** cadastros de atleta parados na situação `AGUARDANDO_PAGAMENTO` são apagados após 90 dias contados de quando o cadastro **entrou na fila de pagamento** (`aguardandoDesde`). É uma rotina diária (`AtletaExpurgoJob.java:36-43`) e é a **única tarefa agendada do backend**. O critério exato (verificado no MVP): situação igual a `AGUARDANDO_PAGAMENTO`, entrada na fila anterior ao limite, **e o atleta não pode estar em item ativo de um lote de pagamento já enviado** (`AtletaRepository.java:44-49`). O prazo é configurável por variável de ambiente (`atleta.expurgo.dias` em `application.properties`) — sugerimos redigir como "até 90 dias".
 
-- **⚠️ NÃO CHAME ESSES CADASTROS DE "ABANDONADOS".** Com o pagamento em lote, o atleta cujo clube **já pagou** continua marcado como `AGUARDANDO_PAGAMENTO` enquanto a federação não dá baixa no comprovante: o envio do lote **não altera a situação de nenhum atleta** (`PagamentoServiceImpl.java:85-152`; o comentário em `:67-71` confirma que "quem já mandou um lote e espera a baixa" permanece nessa situação). E a rotina de descarte **não exclui da varredura** quem já está dentro de um lote pago. **Cenário concreto:** clube cadastra o atleta em fevereiro, paga em abril, a federação demora a conferir, e em maio a rotina apaga o cadastro — com o Pix já feito e o comprovante já anexado, levando junto, em cascata, o consentimento do responsável legal. Há um segundo caminho para o mesmo destino: quando a federação **recusa** um pagamento, os atletas voltam à fila de pendentes (`PagamentoServiceImpl.java:280-283`) mantendo a data de cadastro original — o relógio dos 90 dias nunca reinicia e pode já estar vencido.
-  **Redação segura:** *"cadastros de atleta cuja anuidade não seja confirmada em até 90 dias são descartados"* — e não "cadastros abandonados", que descreve uma intenção que o código não implementa. **Do lado técnico, isto é correção urgente antes do lançamento:** apagar o cadastro de um atleta já pago é dano ao titular e ao clube, não só problema de redação.
+- **Correção em relação a 04/08:** a versão anterior deste inventário dizia que o prazo contava da data de cadastro e que a rotina apagava atletas já incluídos num lote pago aguardando baixa. **O código atual não faz isso:** quem está num lote enviado fica fora da varredura, e o atleta devolvido à fila (pagamento recusado ou "reconsiderar") recomeça a contagem (comentários em `AtletaExpurgoJob.java:20-23` e `AtletaRepository.java:34-40`).
+  **Redação segura, mantida:** *"cadastros de atleta cuja anuidade não seja paga em até 90 dias são descartados"* — evitando o rótulo genérico "cadastros abandonados".
 
 - **ATENÇÃO — documentação interna desatualizada, agora em outro arquivo.** O `CLAUDE.md` foi corrigido e já fala em 90 dias. Quem ainda carrega o texto antigo (expurgo de hora em hora, prazo de 24 horas) é o `docs/MODULO-ATLETA-FLUXO.md`, em oito trechos do corpo (linhas 26, 27, 31, 36, 56, 75, 80, 84 e 122), corrigindo só no final, na linha 178. **Um redator que ler aquele documento de cima para baixo vai escrever 24 horas na política.** A coluna `prazo_pagamento_ate` continua existindo no banco (`V12:15`), mas não é mais critério de nada.
 
@@ -459,27 +443,26 @@ Todas as mensagens terminam com a assinatura "Federação de Handebol do Tocanti
   - atleta ATIVO, SUSPENSO, REJEITADO e AGUARDANDO_APROVACAO;
   - clubes, **inclusive rejeitados**;
   - contas de acesso, **inclusive as de clubes rejeitados ou nunca analisados** — categoria que antes nem existia, porque a conta só nascia na aprovação (`ClubeServiceImpl.java:104-111` cria inativa; `:212` e `:233-236` apenas desligam a chave `ativo`);
-  - **🆕 a tabela de pessoas do clube**, com nome, CPF, cargo, e-mail e telefone (`V15:19-40`);
   - **🆕 o CPF do representante do clube**, que agora É armazenado (`V15:10`);
   - **🆕 os registros de pagamento** — cada lote com protocolo, valor, comprovante, datas e autor da baixa; cada item com o **nome do atleta** e o valor (`V16:10-50`);
-  - árbitros, inclusive os legados PENDENTE e REJEITADO preservados pela migration V14, que ainda guardam CPF, RG, telefone, e-mail e documentos de pessoas que apenas se candidataram;
   - diretores, notícias e fotos da galeria.
 
-  **Um clube que pediu filiação e foi recusado deixa hoje, permanentemente e sem nenhum meio de exclusão pela API:** o cadastro do clube, o PDF da ata, o PDF do estatuto, o CPF e os contatos do representante **em duas tabelas**, e uma conta de login com o resumo criptográfico da senha que ele escolheu.
+  **Um clube que pediu filiação e foi recusado deixa hoje, permanentemente e sem nenhum meio de exclusão pela API:** o cadastro do clube, o PDF da ata, o PDF do estatuto, o CPF e os contatos do representante, e uma conta de login com o resumo criptográfico da senha que ele escolheu.
 
-- **ARQUIVOS NUNCA SÃO APAGADOS — RECONFIRMADO EM 04/08.** Busca no backend inteiro por `deleteObject`, `DeleteObject`, `Files.delete`, `deleteIfExists` e qualquer chamada de exclusão de arquivo: **zero ocorrências**. O serviço de armazenamento tem apenas dois métodos, os dois de gravação (`R2StorageService.java:75` e `:103`). Apagar um atleta remove só a linha do banco (`AtletaServiceImpl.java:447-451`). O mesmo vale para árbitro, diretor, documento institucional, foto da galeria e notícia — todos têm exclusão na API, **nenhum apaga o arquivo correspondente**. E entrou uma **quinta categoria de arquivo**: o comprovante bancário do pagamento em lote (`PagamentoServiceImpl.java:129-131`), que também nunca é apagado — nem sequer existe endereço que apague um lote.
+- **ARQUIVOS NUNCA SÃO APAGADOS — RECONFIRMADO EM 04/08.** Busca no backend inteiro por `deleteObject`, `DeleteObject`, `Files.delete`, `deleteIfExists` e qualquer chamada de exclusão de arquivo: **zero ocorrências**. O serviço de armazenamento tem apenas dois métodos, os dois de gravação (`R2StorageService.java:75` e `:103`). Apagar um atleta remove só a linha do banco (`AtletaServiceImpl.java:447-451`). O mesmo vale para diretor, documento institucional, foto da galeria e notícia — todos têm exclusão na API, **nenhum apaga o arquivo correspondente**. E entrou uma **quinta categoria de arquivo**: o comprovante bancário do pagamento em lote (`PagamentoServiceImpl.java:129-131`), que também nunca é apagado — nem sequer existe endereço que apague um lote.
 
 - **ACÚMULO POR SUBSTITUIÇÃO — com uma precisão que faltava.** No cadastro, os arquivos vão para `atletas/{clube}/{identificador aleatório}/` (`AtletaServiceImpl.java:118`) e, na reanexação, para `atletas/{clube}/{id do atleta}/` (`:325`) — caminhos diferentes. **O arquivo enviado no cadastro fica órfão para sempre:** a pasta com identificador aleatório nunca mais é alcançada por nenhuma operação, então toda primeira versão do RG, da foto e do comprovante de residência permanece no armazenamento indefinidamente, sem nenhuma referência no banco depois que o documento é corrigido. Já **entre uma reanexação e outra**, se o clube subir um arquivo com exatamente o mesmo nome, o anterior **é sobrescrito** (`R2StorageService.java:113`, gravação com substituição); se o nome for diferente, acumula mais uma cópia. Os nomes recebem prefixos previsíveis (`foto_`, `rg_`, `res_`, `pix_` — `AtletaServiceImpl.java:327-337`), o que torna as URLs de reanexação ainda mais fáceis de adivinhar, agravando o problema do endereço sem autenticação.
 
-- **A migration V14 removeu a coluna de comprovante escolar de árbitros** (`V14:10-18`): os arquivos já enviados ficaram no armazenamento sem referência no banco, impossíveis de localizar pelo sistema e nunca apagados. Nenhuma migration posterior criou situação parecida.
-
-- **DOIS REPOSITÓRIOS PARALELOS QUE NINGUÉM ESTÁ CONTANDO:**
-  1. **Os registros de execução (logs) da hospedagem.** A rotina de descarte grava o identificador **e o nome completo** do atleta apagado (`AtletaExpurgoJob.java:44-46`), em formato JSON no console (`application.properties:74-75`). A ativação de atleta sem baixa de pagamento grava o identificador, **o nome completo** do atleta e o login de quem autorizou (`AtletaServiceImpl.java:392-394`). E cada e-mail enviado grava destinatário e assunto (`EmailService.java:159`). **O nome de uma criança sobrevive ao próprio descarte do cadastro que a rotina existe para cumprir**, dentro dos logs, sob o prazo de retenção do provedor de hospedagem — que ninguém definiu. *(Trocar o nome pelo identificador é correção de uma linha, nos dois pontos.)*
-  2. **A caixa postal da federação**, que passará a receber automaticamente listas nominais de atletas (§7). Uma vez entregue, a mensagem **escapa completamente de qualquer controle do sistema** — é um local de tratamento tão real quanto o banco de dados, e é o único que ninguém consegue apagar pelo sistema.
+- **TRÊS REPOSITÓRIOS PARALELOS QUE NINGUÉM ESTÁ CONTANDO:**
+  1. **Os registros de execução (logs) da hospedagem (Render).** Em formato JSON no console (`application.properties`, seção Logs JSON). A rotina de descarte grava **só o identificador** do atleta apagado, o clube e a data de entrada na fila — **não o nome** (`AtletaExpurgoJob.java:48-53`, com o comentário explicando que o nome de um menor não pode sobreviver ao descarte dentro do log). Mas a ativação de atleta sem baixa de pagamento ainda grava o identificador, **o nome completo** do atleta e o login de quem autorizou (`AtletaServiceImpl.java:392-394`). E cada e-mail enviado grava destinatário e assunto (`EmailService.java:159`). Tudo isso fica sob o prazo de retenção de logs do Render — **[A CONFIRMAR]**. *(Trocar o nome pelo identificador na ativação sem baixa é correção de uma linha.)*
+  2. **Os backups diários do banco (existem — ver abaixo)**, que guardam cópias de tudo por até 30 dias.
+  3. **A caixa postal da federação**, que passará a receber automaticamente listas nominais de atletas (§7). Uma vez entregue, a mensagem **escapa completamente de qualquer controle do sistema** — é um local de tratamento tão real quanto o banco de dados, e é o único que ninguém consegue apagar pelo sistema.
 
 - **Do lado do navegador:** o token de sessão fica no armazenamento local até o logout ou até a API recusar — não há expiração por tempo no site. O token de acesso vale **1 dia** e o de renovação **30 dias** no servidor (`JwtService.java:24` e `:38`), **mas não há revogação**: um token vazado vale até expirar. *Detalhe que suaviza o quadro:* o token de renovação de 30 dias é devolvido pela API no login (`AuthResource.java:63-66`) mas o site **nunca o guarda** — o navegador só grava o de um dia (`AuthContext.tsx:73`). Na prática, a sessão que existe no navegador dura no máximo um dia.
 
-- **NÃO HÁ BACKUP configurado** (nenhum script, agendamento ou `pg_dump` em lugar nenhum do repositório — a única pasta de scripts contém apenas o arquivo de dados fictícios) **e NÃO HÁ criptografia de dados em repouso**: CPF, RG, dados do responsável legal e todos os documentos ficam em texto puro no banco e no volume de arquivos. A extensão `pgcrypto` está habilitada (`V1:1`), mas apenas para gerar identificadores aleatórios — nenhuma coluna é cifrada. **Única ressalva, e só para dados em trânsito:** quando o envio de e-mail for ligado, a conexão com o servidor exige TLS (`application.properties:47`), então a mensagem viaja cifrada até o provedor — e lá chega em claro, como qualquer e-mail.
+- **🆕 BACKUP EXISTE (MVP).** `.github/workflows/backup.yml` roda diariamente às 03:00 UTC num runner do GitHub Actions (GitHub, Inc., EUA): faz `pg_dump` do **banco inteiro** com a imagem `postgres:16`, comprime com gzip e envia ao bucket **privado** `fht-backups` no Cloudflare R2 (sem URL pública), **mantendo os últimos 30 dumps** e apagando os mais antigos. O dump é apagado do runner ao fim e o conteúdo não vai ao log. **Efeito sobre a retenção, que a política precisa refletir:** um dado apagado do banco (inclusive a pedido do titular, inclusive pela rotina de descarte) **permanece nos dumps por até 30 dias**; e **restaurar um backup pode reintroduzir dado que já tinha sido apagado** — o procedimento de restauração precisa prever a reaplicação das eliminações feitas depois da data do dump.
+
+- **NÃO HÁ criptografia de dados em repouso aplicada pelo sistema**: CPF, RG, dados do responsável legal e todos os documentos ficam em texto puro no banco e no volume de arquivos. A extensão `pgcrypto` está habilitada (`V1:1`), mas apenas para gerar identificadores aleatórios — nenhuma coluna é cifrada. **Única ressalva, e só para dados em trânsito:** quando o envio de e-mail for ligado, a conexão com o servidor exige TLS (`application.properties:47`), então a mensagem viaja cifrada até o provedor — e lá chega em claro, como qualquer e-mail.
 
 ---
 
@@ -526,7 +509,7 @@ O endereço que serve os arquivos segue sem qualquer exigência de login ou perf
 
 **Novidade de agosto:** entrou nesse mesmo armazenamento aberto o **comprovante de pagamento Pix do lote** (`PagamentoServiceImpl.java:129-131`) — um comprovante bancário que costuma trazer nome, banco, chave Pix e valor de quem pagou.
 
-A proteção prometida (armazenamento privado na Cloudflare, com endereço assinado e prazo) **continua não executada**: as credenciais estão vazias e, sem elas, o sistema cai em silêncio no armazenamento local, sem falhar (`R2StorageService.java:51-60` e `:103-119`).
+A proteção prometida (armazenamento privado na Cloudflare, com endereço assinado e prazo) **continua não executada**: em produção os arquivos vão ao R2, mas o endereço gravado é a URL pública do bucket + o caminho (`R2StorageService.java`, método `upload`), igualmente sem verificação de quem pede; em desenvolvimento, sem credenciais, o sistema cai em silêncio no armazenamento local (`R2StorageService.java:51-60` e `:103-119`).
 
 ### PONTO CRÍTICO 4 — fotos de menores na galeria sem verificação
 
@@ -536,7 +519,7 @@ Inalterado. A galeria é servida sem login (`GaleriaResource.java:29-35`), a leg
 
 ### PONTO CRÍTICO 5 — o responsável não tem nenhum canal
 
-São exatamente dois perfis de acesso no sistema inteiro (`Role.java:3-6`): administrador da federação e administrador de clube. Não há portal do atleta, não há portal do responsável, e **não existe consulta pública por CPF**. Todo pedido de acesso, correção, revogação ou exclusão depende de um administrador agir a mão, e **não fica registro de que foi atendido** — não há trilha de auditoria em nenhuma das dezesseis migrations. **Agravante:** o sistema hoje sabe mandar e-mail e sabe o e-mail do responsável, e não lhe manda nada — nem sequer um aviso de que a criança foi cadastrada, ativada ou publicada no site.
+São exatamente dois perfis de acesso no sistema inteiro (`Role.java:3-6`): administrador da federação e administrador de clube. Não há portal do atleta, não há portal do responsável, e **não existe consulta pública por CPF**. Todo pedido de acesso, correção, revogação ou exclusão depende de um administrador agir a mão, e **não fica registro de que foi atendido** — não há trilha de auditoria no esquema do banco (`V1__schema_inicial.sql`). **Agravante:** o sistema hoje sabe mandar e-mail e sabe o e-mail do responsável, e não lhe manda nada — nem sequer um aviso de que a criança foi cadastrada, ativada ou publicada no site.
 
 ### PONTO CRÍTICO 6 — o termo promete o que não existe
 
@@ -561,7 +544,7 @@ A versão do termo gravada em cada registro é a `'1.0'` (`Consentimento.java:23
 - **"Correção ou exclusão a qualquer momento"** — só um administrador consegue, a mão, e apagar o cadastro **não apaga os arquivos** já enviados nem o nome no registro financeiro.
 - **"Pode ser revogada a qualquer momento"** — **NÃO EXISTE NENHUM CAMINHO DE REVOGAÇÃO NO SISTEMA.** O comando que grava a data de revogação existe como capacidade da entidade (`Consentimento.java:89`) e **nunca é chamado por nenhuma linha de código** — a busca em todo o repositório retorna uma única ocorrência, que é a própria definição do método. Não há endereço de API, tela, botão nem rotina administrativa. As duas telas internas até exibem um selo "revogado" (`ClubeDashboard.tsx:816-818`; `AdminDashboard.tsx:409-411`), **que nunca poderá aparecer**.
 
-**Dois problemas adicionais do termo:** (a) ele não traz nenhum link para política de privacidade nem indica a quem recorrer — e a palavra "privacidade" não aparece em nenhum arquivo do site; (b) **ele declara a mais**: diz autorizar o tratamento de "identificação, contato, **endereço** e documentos", mas o endereço do atleta deixou de ser coletado em 02/08 — embora o comprovante de residência, que traz o endereço de casa da criança dentro do arquivo, continue sendo pedido. **O termo precisa ser reescrito antes de a política ser publicada.**
+**Problemas adicionais do termo:** (a) ele não traz nenhum link para política de privacidade nem indica a quem recorrer — e a palavra "privacidade" não aparece em nenhum arquivo do site; (b) **ele declara a mais**: diz autorizar o tratamento de "identificação, contato, **endereço** e documentos", mas o endereço do atleta deixou de ser coletado em 02/08 — embora o comprovante de residência, que traz o endereço de casa da criança dentro do arquivo, continue sendo pedido; (c) *(novo no MVP)* ele cita "participação em competições" como finalidade, mas o sistema MVP não tem módulo de competições — o texto continua na tela (`ClubeDashboard.tsx`, caixa do responsável). **O termo precisa ser reescrito antes de a política ser publicada.**
 
 ### PONTO CRÍTICO 7 — consentimento retroativo sem evidência
 
@@ -615,16 +598,18 @@ O texto atual, "Este site utiliza cookies", é **factualmente errado em dois pon
 **O QUE EXISTE E É VERIFICÁVEL:**
 1. **Senha armazenada apenas como hash BCrypt com sal aleatório**, nunca em texto puro e nunca devolvida por nenhuma resposta da API — inclusive a senha escolhida pelo clube no cadastro público (`ClubeServiceImpl.java:107`; `AuthResource.java:119`).
 2. **Token de sessão assinado com chave RSA de 2048 bits**, validade de 1 dia (acesso) e 30 dias (renovação) — `JwtService.java:24` e `:38`.
-3. **Autorização verificada no servidor em todos os endereços com dado pessoal**, com lista de permissão explícita e restrição de cada clube aos próprios dados (`Escopo.java:24-42`), aplicada também aos módulos novos: pagamento em lote (`PagamentoServiceImpl.java:292-299`) e pessoas do clube (`ClubeServiceImpl.java:399-404`).
+3. **Autorização verificada no servidor em todos os endereços com dado pessoal**, com lista de permissão explícita e restrição de cada clube aos próprios dados (`Escopo.java:24-42`), aplicada também ao pagamento em lote (`PagamentoServiceImpl.java:292-299`).
 4. **Proteção contra manipulação de caminho de arquivo (`../`)**, na leitura e na gravação (`FileResource.java:37-40`; `R2StorageService.java:107-111`). *Lembrete: é proteção contra um ataque específico e não substitui controle de acesso.*
-5. **Mensagens de erro que não vazam dados pessoais:** erros não tratados devolvem a string fixa "Erro interno do servidor" (`GlobalExceptionMapper.java:49-53`). *Observação: a exceção original, que pode conter dado pessoal, é gravada no log e enviada ao Sentry (`:46-47`) — inofensivo hoje porque o Sentry está desligado, relevante no dia em que for ligado.*
-6. **Validação de CPF por dígito verificador, feita apenas localmente** (`common/CPFValidator.java`), sem consulta a nenhuma base externa — aplicada ao atleta, ao responsável legal, ao representante do clube e às pessoas da comissão técnica. **Com a saída do ViaCEP, o sistema não consulta absolutamente nenhuma base externa com dado de titular.**
+5. **Mensagens de erro que não vazam dados pessoais:** erros não tratados devolvem a string fixa "Erro interno do servidor" (`GlobalExceptionMapper.java:49-53`). *Observação: a exceção original, que pode conter dado pessoal, é gravada no log (`GlobalExceptionMapper.java`, `LOG.errorf`) — no MVP, portanto, nos logs do Render. **Não há envio de erros a nenhum terceiro**: o monitoramento externo de erros que existia na versão completa foi removido por inteiro.*
+6. **Validação de CPF por dígito verificador, feita apenas localmente** (`common/CPFValidator.java`), sem consulta a nenhuma base externa — aplicada ao atleta, ao responsável legal e ao representante do clube. **Com a saída do ViaCEP, o sistema não consulta absolutamente nenhuma base externa com dado de titular.**
 
-**Nada foi acrescentado a esta lista desde 02/08.**
+7. **🆕 (MVP) Backup diário do banco inteiro**, com retenção dos últimos 30 dumps, em bucket privado sem URL pública (§8).
+8. **🆕 (MVP) Segredos fora da imagem:** as chaves de assinatura do token (JWT) vêm de variáveis de ambiente (`JWT_PUBLIC_KEY`/`JWT_PRIVATE_KEY`, em base64) e nunca entram na imagem Docker; a senha do primeiro administrador vem da variável obrigatória `FHT_ADMIN_SENHA` e só o hash BCrypt é gravado (`V2__seed_admin.sql`). As origens aceitas pela API (CORS) são definidas por variável (`CORS_ORIGINS`). A conexão com o banco exige TLS (`sslmode=require`).
+
+**Fora os itens 7 e 8 (MVP), nada foi acrescentado a esta lista desde 02/08.**
 
 **O QUE NÃO EXISTE — e impede qualquer frase genérica sobre "proteção adequada":**
-- **Não há criptografia de dados em repouso** — CPF, RG, dados do responsável e documentos em texto puro no banco e no volume.
-- **Não há backup** configurado.
+- **Não há criptografia de dados em repouso aplicada pelo sistema** — CPF, RG, dados do responsável e documentos em texto puro no banco e no armazenamento de arquivos.
 - **Não há controle de acesso aos arquivos** — o endereço que os serve não verifica quem pede.
 - **Não há troca nem recuperação de senha** — zero ocorrências de "esqueci", "forgot", "reset", "recuperar" em todo o repositório.
 - **Não há bloqueio por tentativas, limite de requisições nem verificação anti-robô** — o login aceita tentativas ilimitadas (`AuthResource.java:51-69`), e o formulário público de filiação também não tem proteção.
@@ -633,7 +618,7 @@ O texto atual, "Este site utiliza cookies", é **factualmente errado em dois pon
 - **O mapa completo da API fica público inclusive em produção** (`application.properties:22`, configuração de sempre incluir a documentação, servida em `/swagger`).
 - **A senha escolhida no formulário público exige apenas 8 caracteres**, sem nenhuma regra de complexidade (`ClubeServiceImpl.java:65-68`).
 - **A imagem de execução do site roda o servidor de desenvolvimento**, não uma versão compilada para produção (`frontend/Dockerfile`, comando `npm run dev`).
-- **O administrador inicial continua com a senha `123456`** gravada no próprio arquivo de instalação do banco (`V4__seed_admin.sql:1-8`), só trocável por comando direto no banco — e é a conta com acesso a **todos** os dados de menores. *(Nota: a senha `123456` também aparece como exemplo na documentação da API, em `LoginRequest.java:14` — é só exemplo de documentação, mas convém trocar.)*
+- **A senha do administrador inicial só é trocável por comando direto no banco** — no MVP ela deixou de ser `123456` fixa: vem da variável obrigatória `FHT_ADMIN_SENHA`, usada uma única vez (`V2__seed_admin.sql`); o padrão `123456` vale só no perfil de desenvolvimento. É a conta com acesso a **todos** os dados de menores. *(Nota: a senha `123456` também aparece como exemplo na documentação da API, em `LoginRequest.java:14` — é só exemplo de documentação, mas convém trocar.)*
 
 **✅ RESOLVIDO desde 02/08:** as credenciais de teste embutidas no código do site foram removidas em 03/08 (commit `d410a51`). A busca por `123456` em todo o código do frontend retorna **zero ocorrências**, e o próprio código registra o motivo da remoção (`AuthContext.tsx:95`). Uma falha de rede agora devolve erro claro, sem conceder acesso simulado.
 
@@ -643,16 +628,14 @@ O texto atual, "Este site utiliza cookies", é **factualmente errado em dois pon
 
 **O que o sistema executa sozinho:**
 - **O representante do clube** vê e corrige os próprios dados cadastrais em `/clube > Meus Dados`: nome do clube, cidade, UF, sigla, CNPJ e o próprio nome, e-mail, telefone e cargo (`ClubeResource.java:104-106`; `ClubeServiceImpl.java:169-179`). **⚠️ Exceção nova e importante: ele NÃO consegue corrigir o próprio CPF** — o campo ficou de fora dos editáveis (`ClubeUpdateForm.java:11-20`); ele apenas o **vê** (`ClubeResponseDTO.java:20`). Um CPF errado não pode ser corrigido por ninguém pelo sistema, nem pelo titular nem pela federação. Isso colide com o art. 18, III e com o art. 6, V.
-- **O representante do clube pode APAGAR** o registro de uma pessoa da comissão técnica — nome, CPF, e-mail e telefone de um técnico ou auxiliar (`ClubeResource.java:281-283`; `ClubeServiceImpl.java:356-370`). **É a única exclusão de dado pessoal que alguém fora da federação consegue executar.** Ainda assim **não é autoatendimento do titular**: quem apaga é o clube, e a pessoa apagada nunca teve acesso ao sistema.
-- **O clube pode inserir e corrigir** os dados das pessoas da comissão técnica (`ClubeResource.java:239-279`).
 
 **O que NÃO existe:**
-- **Atleta, responsável legal, árbitro, diretor e membro da comissão técnica não têm nenhum acesso próprio ao sistema.** Só existem dois perfis (`Role.java:3-6`).
+- **Atleta, responsável legal e diretor não têm nenhum acesso próprio ao sistema.** Só existem dois perfis (`Role.java:3-6`).
 - **Não existe endereço de exclusão de clube nem de conta de acesso em toda a API** — reverificado varrendo todos os arquivos de endpoints do backend. O único DELETE de atleta é restrito ao ADMIN_FHT.
 - **Não existe exportação nem portabilidade** (art. 18, V) — busca por "exportar"/"portabilidade" no backend e no frontend: zero ocorrências.
 - **Não existe revogação de consentimento** (§9, Ponto Crítico 6).
 - **Não existe registro de que um pedido foi atendido** — não há trilha de auditoria.
-- **Apagar não apaga tudo:** os arquivos permanecem no armazenamento, o nome permanece no registro financeiro, e o nome permanece nos registros de execução.
+- **Apagar não apaga tudo:** os arquivos permanecem no armazenamento, o nome permanece no registro financeiro, o nome pode permanecer nos registros de execução (§8), e tudo permanece nos backups por até 30 dias (§8).
 
 **O que a federação precisa DEFINIR e ESCREVER antes de a política ir ao ar** (nada disso pode sair do código, porque não existe mecanismo):
 1. Por qual canal o pedido chega, quem o recebe e quem o executa.
@@ -672,32 +655,30 @@ O texto atual, "Este site utiliza cookies", é **factualmente errado em dois pon
 > Três negativas da versão de 02/08 foram **removidas desta lista porque viraram falsas**: a de que
 > o sistema não envia e-mail, a de que não há autocadastro de usuário, e a lista de destinos externos.
 
-- **NÃO existe login, portal ou área de acesso para atleta nem para responsável legal.** O enum de perfis tem exatamente dois valores, ADMIN_FHT e ADMIN_CLUBE (`Role.java:3-6`), e todos os dez métodos de `AtletaResource.java` exigem papel. **Reforço:** as pessoas cadastradas como comissão técnica do clube (técnico, auxiliar, segundo representante) **também** não ganharam login — a própria documentação da API diz que "nesta etapa ninguém aqui recebe login próprio" (`ClubeResource.java:244-246`; `V15:16-18`).
-- **NÃO existe consulta pública por CPF.** Não há nenhuma tela, rota ou endereço que permita a alguém digitar um CPF e receber dados de volta. **⚠️ Precisão necessária:** hoje **existe endereço público que RECEBE um CPF** — o cadastro público de clube (`ClubeResource.java:34-49`, sem autenticação) passou a receber e gravar o CPF do representante legal (`ClubeForm.java:46-47`; `ClubeServiceImpl.java:89` e `:117`). **Redação correta:** *o sistema recebe CPF por formulário público, mas nunca o devolve nem permite pesquisar por ele.* Os endereços públicos hoje são **14**, não 13: login, renovação de token, solicitação de filiação de clube, vitrine de clubes, detalhe público de clube, árbitros públicos, competições públicas (lista e detalhe), diretores, documentos, galeria, notícias (lista e por slug) e o servidor de arquivos.
-- **NÃO coletamos dados pessoais sensíveis (art. 5, II):** não há campo de saúde, atestado ou laudo médico, lesão, biometria, dado genético, origem racial, religião, filiação política ou sindical. **Reverificado incluindo V15 e V16 e as entidades novas** (`ClubePessoa.java`, `PagamentoLote.java`, `PagamentoLoteItem.java`): busca por saúde, atestado, médico, laudo, lesão, biometria, racial, religião, sindical e deficiência em todo o código do servidor e em todas as dezesseis migrations — **zero ocorrências**.
-- **NÃO há reconhecimento facial nem qualquer processamento biométrico.** As fotos enviadas (foto 3x4 do atleta, foto do árbitro, foto do diretor, fotos da galeria) são apenas armazenadas e exibidas; não há processamento de imagem, comparação ou extração de características.
-- **NÃO há perfilamento, scoring ou publicidade direcionada** sobre nenhum titular. **⚠️ Mas "decisão automatizada" merece cuidado:** há **duas rotinas que decidem sozinhas sobre a situação de uma pessoa**. (a) A rotina diária que apaga definitivamente o cadastro de atletas sem anuidade confirmada há 90 dias, sem intervenção humana (`AtletaExpurgoJob.java:37-51`). (b) Quando a federação dá baixa em um pagamento, o sistema percorre a lista e decide sozinho, atleta por atleta, quem passa a ATIVO e quem fica retido por falta de documentação (`PagamentoServiceImpl.java:222-239` e `:249-263`). **Redação sugerida:** manter a negativa de perfilamento, scoring e publicidade, e descrever essas duas rotinas com honestidade como regras automáticas de conferência e de descarte, informando que o titular pode pedir revisão ao Encarregado.
+- **NÃO existe login, portal ou área de acesso para atleta nem para responsável legal.** O enum de perfis tem exatamente dois valores, ADMIN_FHT e ADMIN_CLUBE (`Role.java:3-6`), e todos os dez métodos de `AtletaResource.java` exigem papel.
+- **NÃO existe consulta pública por CPF.** Não há nenhuma tela, rota ou endereço que permita a alguém digitar um CPF e receber dados de volta. **⚠️ Precisão necessária:** hoje **existe endereço público que RECEBE um CPF** — o cadastro público de clube (`ClubeResource.java:34-49`, sem autenticação) passou a receber e gravar o CPF do representante legal (`ClubeForm.java:46-47`; `ClubeServiceImpl.java:85`). **Redação correta:** *o sistema recebe CPF por formulário público, mas nunca o devolve nem permite pesquisar por ele.* Os endereços públicos no MVP são **12** (reverificado nos arquivos de endpoints): login, renovação de token, solicitação de filiação de clube, vitrine de clubes, detalhe público de clube, diretores, documentos, galeria, notícias (lista e por slug), envio do formulário de contato (`POST /api/contato`) e o servidor de arquivos.
+- **NÃO coletamos dados pessoais sensíveis (art. 5, II):** não há campo de saúde, atestado ou laudo médico, lesão, biometria, dado genético, origem racial, religião, filiação política ou sindical. **Reverificado no MVP**: busca por saúde, atestado, médico, laudo, lesão, biometria, racial, religião, sindical e deficiência em todo o código do servidor e nas migrations (`V1__schema_inicial.sql`, `V2__seed_admin.sql`) — **zero ocorrências**.
+- **NÃO há reconhecimento facial nem qualquer processamento biométrico.** As fotos enviadas (foto 3x4 do atleta, foto do diretor, fotos da galeria) são apenas armazenadas e exibidas; não há processamento de imagem, comparação ou extração de características.
+- **NÃO há perfilamento, scoring ou publicidade direcionada** sobre nenhum titular. **⚠️ Mas "decisão automatizada" merece cuidado:** há **duas rotinas que decidem sozinhas sobre a situação de uma pessoa**. (a) A rotina diária que apaga definitivamente o cadastro de atletas sem anuidade paga há 90 dias, sem intervenção humana (`AtletaExpurgoJob.java:37-51`). (b) Quando a federação dá baixa em um pagamento, o sistema percorre a lista e decide sozinho, atleta por atleta, quem passa a ATIVO e quem fica retido por falta de documentação (`PagamentoServiceImpl.java:222-239` e `:249-263`). **Redação sugerida:** manter a negativa de perfilamento, scoring e publicidade, e descrever essas duas rotinas com honestidade como regras automáticas de conferência e de descarte, informando que o titular pode pedir revisão ao Encarregado.
 - **NÃO há ferramentas de rastreamento, analytics ou publicidade no site.** Busca refeita por Google Analytics, Google Tag Manager, Pixel da Meta, Hotjar, Clarity, Matomo, Plausible, PostHog, Mixpanel, Segment e reCAPTCHA: zero ocorrências reais.
 - **NÃO utilizamos cookies.** O servidor não emite nenhum cookie e o site não lê nem escreve `document.cookie`. São exatamente duas chaves de armazenamento local (§10). Não há armazenamento de sessão nem banco local no navegador.
 - **NÃO há widget, mapa, vídeo, feed de rede social ou chat de terceiro incorporado.** Os três ícones de rede social do rodapé continuam sendo marcadores sem destino (`Footer.tsx:45-47`). Não há trabalhador de segundo plano nem cache offline. Existem apenas **links de saída clicáveis**, que não carregam nada sozinhos: o WhatsApp da federação (`Contact.tsx:34`, número ainda de exemplo) e três links institucionais no rodapé (`Footer.tsx:16-18`).
 - **NÃO há SMS, WhatsApp automático nem notificação push.** *(A parte "não enviamos e-mail" desta negativa antiga foi removida — ver §7.)*
 - **NÃO há integração com gateway de pagamento, banco ou instituição financeira.** Reconfirmado depois da V16 — ver §5.
 - **NÃO há integração, exportação ou envio de dados para a CBHb ou qualquer outra confederação/federação.** A única menção à CBHb no sistema é um link de cortesia no rodapé. **Ressalva:** se houver compartilhamento por planilha ou e-mail **fora** do sistema, isso precisa ser perguntado à federação.
-- **NÃO vendemos nem cedemos dados a terceiros.** Não há venda nem cessão comercial em lugar nenhum do código. **Os destinos externos verificáveis hoje são:** (1) o **Google**, que recebe o IP e o navegador de todo visitante por causa das fontes; (2) o **provedor de servidor de e-mail**, quando o envio for ligado, que passará a transportar avisos com nome de clube, nome e e-mail do representante e a lista nominal dos atletas de cada pagamento; (3) o **Cloudflare R2** e o **Sentry**, previstos no código e desligados hoje. *(O ViaCEP saiu da lista.)*
-- **O formulário "Fale com a FHT" do site NÃO envia nem armazena nada.** Reverificado em 04/08 e **vale insistir, porque agora o sistema TEM capacidade de enviar e-mail e mesmo assim este formulário não a usa.** A função de envio segue com três linhas, que apenas marcam a tela como enviada (`Contact.tsx:17-20`). Não existe requisição ao servidor e não existe endereço de contato no backend. **O cidadão continua vendo a confirmação de envio sem que nada tenha sido enviado.** A política **não pode** apontar esse formulário como canal do titular.
+- **NÃO vendemos nem cedemos dados a terceiros.** Não há venda nem cessão comercial em lugar nenhum do código. **Os destinos externos verificáveis hoje são:** (1) o **Google**, que recebe o IP e o navegador de todo visitante por causa das fontes; (2) o **provedor de servidor de e-mail**, quando o envio for ligado, que passará a transportar avisos com nome de clube, nome e e-mail do representante e a lista nominal dos atletas de cada pagamento; (3) os operadores de infraestrutura do MVP — **Render** (API e logs), **Neon** (banco), **Cloudflare R2** (arquivos e backups) e **GitHub Actions** (execução do backup), todos nos EUA (§5 e §6). *(O ViaCEP saiu da lista.)*
+- ⚠️ **DESATUALIZADO (ver nota do topo):** no código atual o formulário **passou a enviar** — `POST /api/contato` encaminha nome, e-mail, telefone, assunto e mensagem por e-mail à caixa institucional, sem armazenar nada (`ContatoResource.java`; `EmailService.java`, método `encaminharContato`), e em modo simulado a mensagem não sai. O texto a seguir descreve o estado de 04/08 e precisa ser revisto com os demais trechos sobre o formulário.
+  **O formulário "Fale com a FHT" do site NÃO envia nem armazena nada.** Reverificado em 04/08 e **vale insistir, porque agora o sistema TEM capacidade de enviar e-mail e mesmo assim este formulário não a usa.** A função de envio segue com três linhas, que apenas marcam a tela como enviada (`Contact.tsx:17-20`). Não existe requisição ao servidor e não existe endereço de contato no backend. **O cidadão continua vendo a confirmação de envio sem que nada tenha sido enviado.** A política **não pode** apontar esse formulário como canal do titular.
 - **NENHUM endereço público devolve CPF, número de RG, data de nascimento, endereço, CEP, telefone ou e-mail de atleta.** O objeto público do atleta tem exatamente três campos: nome, posição e categoria (`AtletaVitrineDTO.java:10-14`).
 - **NENHUM endereço público devolve dados do responsável legal do menor, nem os registros de consentimento.**
-- **NENHUM endereço público devolve CNPJ do clube, documentos do clube, ou nome, e-mail, telefone e CPF do representante legal** (`ClubeVitrineDTO.java:13-21`; `ClubeVitrineDetalheDTO.java:13-22`). **Continua valendo mesmo com a chegada da comissão técnica:** as pessoas do clube (nome, CPF, e-mail, telefone) só são acessíveis por endereço autenticado (`ClubeResource.java:223-237`) e não entram em nenhum objeto público.
+- **NENHUM endereço público devolve CNPJ do clube, documentos do clube, ou nome, e-mail, telefone e CPF do representante legal** (`ClubeVitrineDTO.java:13-21`; `ClubeVitrineDetalheDTO.java:13-22`).
 - **NENHUM endereço público devolve qualquer dado de pagamento** — todos os endereços do módulo financeiro exigem perfil (`PagamentoResource.java:37,50,69,80,95,109,132`).
-- **NENHUM endereço público devolve CPF, RG, data de nascimento, telefone, e-mail, número de registro, formação ou documentos de árbitro** — o mapeamento público devolve apenas seis campos (`ArbitroMapper.java:36-45`).
-- **Atletas que não estão ATIVOS não aparecem no site. Clubes não aprovados ou não marcados como visíveis não aparecem na vitrine. Árbitros não credenciados não aparecem. Notícias em rascunho não são acessíveis publicamente** — os quatro filtros reverificados um a um em §4.
-- **NÃO existe mais formulário público de auto-inscrição de árbitro** — foi removido pela migration V14; criação, alteração e exclusão exigem ADMIN_FHT (`ArbitroResource.java:30`, `:49`, `:68`).
+- **Atletas que não estão ATIVOS não aparecem no site. Clubes não aprovados ou não marcados como visíveis não aparecem na vitrine. Notícias em rascunho não são acessíveis publicamente** — os três filtros reverificados um a um em §4.
 - **A senha NUNCA é armazenada em texto puro e NUNCA é devolvida por nenhuma resposta** — apenas o hash BCrypt, com sal aleatório. **⚠️ Mas o contexto mudou:** a senha **agora é coletada do público**, digitada no formulário de filiação do site e trafegando pela internet até o servidor (`Registration.tsx:107`; `ClubeForm.java:53-56`). Isso torna **obrigatório** que o site rode sob conexão segura em produção e coloca a credencial na lista de dados pessoais coletados.
 - **As mensagens de erro da API não vazam dados pessoais nem detalhes internos** (`GlobalExceptionMapper.java:49-53`).
 - **O sistema tem proteção contra manipulação de caminho de arquivo (`../`)** na leitura e na gravação. *Não substitui controle de acesso — o servidor de arquivos continua sem exigir autenticação.*
-- **Um clube só enxerga os próprios atletas, o próprio cadastro, as próprias pessoas e os próprios pagamentos** — verificação de escopo por lista de permissão explícita, com recusa em vez de acesso amplo (`Escopo.java:24-42`, aplicada também em `PagamentoServiceImpl.java:292-299` e `ClubeServiceImpl.java:399-404`).
+- **Um clube só enxerga os próprios atletas, o próprio cadastro e os próprios pagamentos** — verificação de escopo por lista de permissão explícita, com recusa em vez de acesso amplo (`Escopo.java:24-42`, aplicada também em `PagamentoServiceImpl.java:292-299`).
 - **O CPF do atleta, o do responsável e o do representante NÃO são usados para consulta a nenhuma base externa** (Receita Federal, bureaus de crédito). A única validação é o cálculo local do dígito verificador. **Com a saída do ViaCEP, o sistema não consulta nenhuma base externa com dado de titular.**
-- **NÃO existem, hoje, dados de atleta vinculados a competições:** o módulo não possui tabela de inscrição, escalação ou check-in, e nenhuma migration nova (V15, V16) criou esse vínculo. *(A menção da V15 ao técnico "que define a escalação" é intenção futura em comentário — `V15:14`.)*
 
 ---
 
@@ -714,15 +695,15 @@ O texto atual, "Este site utiliza cookies", é **factualmente errado em dois pon
 
 ### [ALTA] A política NÃO pode dizer "você pode excluir seus dados pelo painel" nem "atendemos pedidos de exclusão pelo sistema".
 
-Não existe canal de autoatendimento para nenhum titular. O único DELETE de atleta é restrito ao ADMIN_FHT, e **não existe endereço de exclusão de clube nem de conta de acesso em toda a API** — reverificado varrendo todos os arquivos de endpoints. A única exclusão executável por alguém fora da federação é a remoção de uma pessoa da comissão técnica pelo próprio clube (§12), e mesmo essa **não é autoatendimento do titular**.
+Não existe canal de autoatendimento para nenhum titular. O único DELETE de atleta é restrito ao ADMIN_FHT, e **não existe endereço de exclusão de clube nem de conta de acesso em toda a API** — reverificado varrendo todos os arquivos de endpoints. No MVP, **ninguém fora da federação consegue excluir dado pessoal** pelo sistema.
 
-**Por que importa:** e o quadro **PIOROU**. Antes, a conta de acesso só nascia na aprovação; hoje ela é criada já na solicitação pública, com o hash da senha escolhida. Rejeitar apenas desativa esse login. **Um clube que teve a filiação NEGADA permanece no banco para sempre com nome, CPF, e-mail e telefone do representante, os PDFs de ata e estatuto, um registro na tabela de pessoas e uma conta de usuário com hash de senha — nada disso é apagado por nenhum código.** Conflita com o art. 18, IV/VI e com o art. 15, I. Redigir como: *pedidos de exclusão são feitos por e-mail ao Encarregado e processados manualmente.*
+**Por que importa:** e o quadro **PIOROU**. Antes, a conta de acesso só nascia na aprovação; hoje ela é criada já na solicitação pública, com o hash da senha escolhida. Rejeitar apenas desativa esse login. **Um clube que teve a filiação NEGADA permanece no banco para sempre com nome, CPF, e-mail e telefone do representante, os PDFs de ata e estatuto e uma conta de usuário com hash de senha — nada disso é apagado por nenhum código.** Conflita com o art. 18, IV/VI e com o art. 15, I. Redigir como: *pedidos de exclusão são feitos por e-mail ao Encarregado e processados manualmente.*
 
 ### [ALTA] A política NÃO pode dizer "a exclusão do cadastro elimina seus documentos".
 
 Não existe nenhum código de exclusão de arquivo no backend inteiro — reconfirmado em 04/08, zero ocorrências. O serviço de armazenamento tem apenas dois métodos, os dois de gravação (`R2StorageService.java:75` e `:103`). Apagar o atleta remove só a linha do banco (`AtletaServiceImpl.java:447-451`).
 
-**Por que importa:** e há **duas agravantes novas**. (1) Surgiu uma **quinta categoria de arquivo** — o comprovante bancário do pagamento em lote (`PagamentoServiceImpl.java:129-131`) —, que também nunca é apagado, e nem sequer existe endereço que apague um lote. (2) **Mesmo apagando o atleta, o nome completo dele permanece no livro de pagamentos**, por decisão de projeto (`V16:36-43`). Um pedido de eliminação (art. 18, VI) **não é integralmente atendido pelo sistema, nem pela via administrativa** — sobram pelo menos três cópias do nome: a tabela financeira, os registros de execução e os arquivos no armazenamento. **Ou a federação assume isso na política como retenção por obrigação fiscal, com prazo declarado, ou o sistema precisa ganhar uma rotina de anonimização antes do lançamento.**
+**Por que importa:** e há **duas agravantes novas**. (1) Surgiu uma **quinta categoria de arquivo** — o comprovante bancário do pagamento em lote (`PagamentoServiceImpl.java:129-131`) —, que também nunca é apagado, e nem sequer existe endereço que apague um lote. (2) **Mesmo apagando o atleta, o nome completo dele permanece no livro de pagamentos**, por decisão de projeto (`V16:36-43`). Um pedido de eliminação (art. 18, VI) **não é integralmente atendido pelo sistema, nem pela via administrativa** — sobram cópias do nome na tabela financeira, nos arquivos no armazenamento, possivelmente nos registros de execução (§8) e, por até 30 dias, nos backups diários (§8). **Ou a federação assume isso na política como retenção por obrigação fiscal, com prazo declarado, ou o sistema precisa ganhar uma rotina de anonimização antes do lançamento.**
 
 ### [ALTA] A política NÃO pode dizer que a autorização de uso de imagem pode ser revogada a qualquer momento.
 
@@ -746,17 +727,19 @@ Nome completo + posição + categoria (Sub-12 a Sub-18) de todo atleta ATIVO vã
 
 `GET /api/files/{path}` não tem nenhuma anotação de segurança — o arquivo inteiro tem 55 linhas e o comentário no topo admite: "Público e sem auth de propósito" (`FileResource.java:16-54`). A única proteção é o segredo da URL, que não expira, não é revogável e não verifica quem pede.
 
-**Por que importa:** **a superfície exposta AUMENTOU.** Além de RG de atletas (inclusive menores), RG de árbitros e ata/estatuto de clubes, agora passa pelo mesmo endereço aberto o **comprovante bancário** do pagamento da anuidade. É ausência de controle de acesso, não "medida de segurança" (art. 46). A mitigação planejada (balde privado no R2 com URL assinada) **continua não executada**: as credenciais seguem vazias e o sistema cai silenciosamente no armazenamento local, apenas registrando um aviso (`R2StorageService.java:57-59`).
+**Por que importa:** **a superfície exposta AUMENTOU.** Além de RG de atletas (inclusive menores) e ata/estatuto de clubes, agora passa pelo mesmo endereço aberto o **comprovante bancário** do pagamento da anuidade. É ausência de controle de acesso, não "medida de segurança" (art. 46). A mitigação planejada (balde privado no R2 com URL assinada) **continua não executada**: no MVP o R2 está ativo em produção, mas o endereço gravado é a URL pública do bucket `fht-documentos` + o caminho (`R2StorageService.java`, método `upload`) — o mesmo modelo "quem tem a URL, acessa". Em desenvolvimento, sem credenciais, o sistema cai silenciosamente no armazenamento local (`R2StorageService.java:57-59`).
 
 ### [ALTA] A política NÃO pode dizer que registramos quem acessou ou alterou dados pessoais — mas pode citar UMA exceção, com precisão.
 
-**A afirmação central continua verdadeira, com o alcance corrigido:** não existe tabela, entidade nem serviço de auditoria em nenhuma das **dezesseis** migrations (não catorze, como dizia a versão anterior). A busca por "auditoria" em todo o backend retorna **uma única ocorrência, e é um comentário admitindo a ausência** (`AtletaServiceImpl.java:392`).
+**A afirmação central continua verdadeira, com o alcance corrigido:** não existe tabela, entidade nem serviço de auditoria no esquema do banco (no MVP, `V1__schema_inicial.sql`, que consolida as antigas migrations). A busca por "auditoria" em todo o backend retorna **uma única ocorrência, e é um comentário admitindo a ausência** (`AtletaServiceImpl.java:392`).
 
 **A exceção, que a política pode e deve citar:** a migration V16 criou o **primeiro campo do sistema inteiro que grava QUEM praticou um ato**. A tabela de pagamentos tem a coluna `baixado_por` (`V16:25-26`), preenchida com o **e-mail do administrador** que confirmou ou recusou o pagamento (`PagamentoServiceImpl.java:214` e `:278`), junto com data e hora. Cobre **exclusivamente** a conferência de pagamentos.
 
 **Por que importa:** muda a redação de uma frase que a política provavelmente vai conter. Em vez de "não registramos acessos" (impreciso) ou "registramos todas as operações" (falso e perigoso), a redação correta é: *o sistema não mantém trilha de auditoria; apenas a conferência de pagamentos registra o autor e a data do ato.* Tudo o mais permanece sem rastro: aprovar um clube, aprovar ou rejeitar um atleta, editar o cadastro de um menor, consultar a ficha completa de qualquer pessoa, baixar o RG de uma criança — **nada disso registra o autor**. Continua impossível responder "quem viu os dados desta criança", e impossível comprovar que um pedido de titular foi atendido.
 
 ### [ALTA] A política NÃO pode oferecer o formulário de contato do site como canal do titular.
+
+⚠️ **DESATUALIZADO (ver nota do topo e §13):** no código atual o formulário envia por e-mail à caixa institucional (`POST /api/contato`) e só declara "enviada" quando a mensagem sai; em modo simulado, nada sai. O restante deste item descreve o estado de 04/08 e precisa ser revisto — a conclusão de não apontá-lo como canal do titular depende de a caixa de destino existir e ser monitorada.
 
 Ele não envia nada e mesmo assim exibe "MENSAGEM ENVIADA! Nossa equipe retornará em breve" (`Contact.tsx:17-20`).
 
@@ -784,23 +767,23 @@ O único autoatendimento é o representante do clube em `/clube > Meus Dados` �
 
 **Por que importa:** colide com o art. 18, III (correção de dados incompletos, inexatos ou desatualizados) e com o art. 6, V (exatidão). **É alteração de poucas linhas — preferível corrigir o sistema antes de publicar.**
 
-### [MEDIA] Os dados do mesmo representante estão em TRÊS lugares que não se sincronizam.
+### [MEDIA] Os dados do mesmo representante estão em DOIS lugares que só em parte se sincronizam.
 
-Nome, e-mail, telefone e CPF do representante existem em triplicata: no cadastro do clube (`Clube.java:22-35`), na ficha de pessoa do clube criada junto com a filiação (`ClubeServiceImpl.java:114-123`) e na conta de acesso (`Usuario.java:11-18`; `ClubeServiceImpl.java:104-111`). **Nenhuma das três é atualizada quando outra muda:** editar o clube altera só o clube (`:169-179`); editar a pessoa altera só a pessoa (`:346-351`); e **não existe em toda a API nenhum endereço que edite uma conta de acesso** — só há criação (`AuthResource.java:99-127`; `AdminResource.java:69-95`).
+*(Revisado no MVP: a ficha de pessoa do clube deixou de existir.)* Nome e e-mail do representante existem no cadastro do clube (colunas `representante_*` da tabela `clubes`) e na conta de acesso (`Usuario.java:11-18`). No código atual, **trocar o e-mail do representante em "Meus Dados" atualiza também o login** (`ClubeServiceImpl.java`, método `trocarEmailDoRepresentante`), mas **trocar o nome não atualiza o nome da conta**, e **não existe em toda a API nenhum endereço que edite uma conta de acesso** — só há criação (`AuthResource.java:99-127`; `AdminResource.java:69-95`).
 
-**Por que importa:** um representante que peça a correção do próprio e-mail terá o dado corrigido em um lugar e desatualizado em outros dois, **e o e-mail de login continuará sendo o antigo**. O art. 18, III e o art. 6, V pressupõem que corrigir uma vez corrija em todo lugar. Se a política prometer correção, o procedimento manual precisa incluir **expressamente as três cópias** — ou o sistema precisa passar a propagar a alteração.
+**Por que importa:** o art. 18, III e o art. 6, V pressupõem que corrigir uma vez corrija em todo lugar. Se a política prometer correção, o procedimento manual precisa incluir **expressamente as duas cópias** do nome — ou o sistema precisa passar a propagar a alteração.
 
 ### [MEDIA] A política NÃO pode declarar prazos de retenção que o sistema não cumpre, nem descrever o descarte como era antes.
 
-Só existe **um** prazo em código: 90 dias, contados da data de cadastro, para atleta em "aguardando pagamento" (`application.properties:60`; `AtletaExpurgoJob.java:33`; `AtletaRepository.java:36-38`). **Mas o critério mudou:** hoje esse status inclui quem **já pagou e espera a conferência** — ver §8. A política **não deve** prometer que o descarte atinge apenas "cadastros abandonados".
+Só existe **um** prazo em código: 90 dias, contados da entrada na fila de pagamento, para atleta em "aguardando pagamento" que não esteja num lote já enviado (`AtletaExpurgoJob.java`; `AtletaRepository.java:44-49`) — ver §8. O único outro prazo automático é o dos backups: os últimos 30 dumps diários (`.github/workflows/backup.yml`) — o que significa que **dado apagado continua existindo nos backups por até 30 dias**, e a política não pode prometer eliminação imediata e integral.
 
-**Por que importa:** e a categoria de dado criada em agosto — os registros de pagamento, com nome do atleta, valor e comprovante bancário — **não tem prazo de retenção nenhum**, nem automático nem declarado, e foi desenhada expressamente para sobreviver à exclusão do atleta. Todo o resto continua retido indefinidamente, inclusive árbitros que apenas se candidataram no antigo formulário público e nunca terão relação com a federação.
+**Por que importa:** e a categoria de dado criada em agosto — os registros de pagamento, com nome do atleta, valor e comprovante bancário — **não tem prazo de retenção nenhum**, nem automático nem declarado, e foi desenhada expressamente para sobreviver à exclusão do atleta. Todo o resto continua retido indefinidamente.
 
-### [MEDIA] A política NÃO pode afirmar que a base legal para publicar árbitro e diretor é o consentimento — e a lista de titulares sem consentimento cresceu.
+### [MEDIA] A política NÃO pode afirmar que a base legal para publicar diretor é o consentimento.
 
-Não existe **nenhum** registro de consentimento para árbitro, diretor, autor de publicação ou pessoa fotografada — a tabela de consentimento é exclusiva de atleta, com vínculo obrigatório (`V12:35`). Não existe botão "não quero aparecer no site": a única forma de sair da vitrine é o administrador suspender ou apagar o registro.
+Não existe **nenhum** registro de consentimento para diretor, autor de publicação ou pessoa fotografada — a tabela de consentimento é exclusiva de atleta, com vínculo obrigatório (`V12:35`). Não existe botão "não quero aparecer no site": a única forma de sair do site é o administrador apagar o registro.
 
-**Por que importa:** surgiu em agosto **mais uma categoria de pessoa sem qualquer registro de consentimento** e, diferente de árbitros e diretores, essa nem sequer é pública — **as pessoas da comissão técnica do clube** (`V15:19-35`). Segundo representante, técnico e auxiliares passaram a ter cadastro com nome, CPF, cargo, e-mail e telefone, preenchido pelo representante do clube. **Não têm login, não recebem aviso nenhum, não consentem e não conseguem acessar nem corrigir os próprios dados.** A lista de titulares da política precisa incluí-las, e a base legal precisa ser escrita expressamente — **não pode ser consentimento, porque não existe**.
+**Por que importa:** a base legal desses titulares precisa ser escrita expressamente — **não pode ser consentimento, porque não existe**.
 
 ### [MEDIA] A política NÃO pode chamar o aviso atual de "gestão de consentimento de cookies".
 
@@ -812,13 +795,13 @@ Tudo o que diz respeito ao aviso continua verdadeiro e sem qualquer mudança: s�
 
 **Metade foi resolvida:** CEP, logradouro, número e bairro **não são mais coletados** de atletas (`ClubeDashboard.tsx:946`). *Atenção: os campos continuam existindo na API (`AtletaForm.java:40-53`) e no banco, então cadastros feitos antes de agosto ainda guardam esses endereços, e ninguém os apagou.*
 
-**Continua valendo:** **órgão emissor do RG** e **naturalidade (cidade e UF)** seguem sendo pedidos e enviados no cadastro de atleta, inclusive de menores (`ClubeDashboard.tsx:941-943`), e seguem sem aparecer em nenhuma resposta do sistema (`AtletaResponseDTO.java:15-46`). São coletados e nunca usados. O campo "sexo" do árbitro continua na mesma situação. *(O cargo do representante do clube saiu desta lista — passou a ser devolvido e editável.)*
+**Continua valendo:** **órgão emissor do RG** e **naturalidade (cidade e UF)** seguem sendo pedidos e enviados no cadastro de atleta, inclusive de menores (`ClubeDashboard.tsx:941-943`), e seguem sem aparecer em nenhuma resposta do sistema (`AtletaResponseDTO.java:15-46`). São coletados e nunca usados. *(O cargo do representante do clube saiu desta lista — passou a ser devolvido e editável.)*
 
 **Por que importa:** choque direto com o princípio da necessidade (art. 6, III). Ou se declara a finalidade, ou se remove a coleta antes de publicar.
 
-### [MEDIA] A política NÃO pode afirmar que adotamos criptografia dos dados ou que mantemos backups.
+### [MEDIA] A política NÃO pode afirmar que adotamos criptografia dos dados — e só pode citar o backup com as ressalvas dele.
 
-Continua valendo integralmente — ver §11 para a lista afirmativa completa e a lista de ausências. **Nada foi acrescentado desde 02/08.**
+A ausência de criptografia em repouso aplicada pelo sistema continua valendo — ver §11 para a lista afirmativa completa e a lista de ausências. **Mudou no MVP:** o backup agora existe (diário, últimos 30 dumps, bucket privado — §8). A política pode citá-lo, mas não pode dizer que a exclusão é imediata em todas as cópias: o dado apagado permanece nos dumps por até 30 dias, e uma restauração pode reintroduzi-lo se as eliminações não forem reaplicadas.
 
 ### [MEDIA] A política NÃO pode descrever a evidência de consentimento como sendo do responsável legal.
 
@@ -836,13 +819,13 @@ A versão é uma constante fixa `'1.0'` escrita no código (`Consentimento.java:
 
 Zero ocorrências de "esqueci"/"forgot"/"reset"/"recuperar" em todo o repositório; o login aceita tentativas ilimitadas (`AuthResource.java:51-69`); não há revogação de token no servidor.
 
-**Por que importa:** e **ficou pior**. Agora que a senha é escolhida pelo clube e é o único meio de acesso, a ausência de recuperação tem consequência prática imediata. **O próprio e-mail automático de aprovação já instrui: "Se esqueceu a senha, fale com a federação"** (`EmailService.java:80-81`). Ou seja, o sistema **assume por escrito** que a redefinição de senha acontece por canal informal, fora de qualquer controle. Na prática, será por WhatsApp ou telefone, sem registro. **A política NÃO pode prometer "você pode alterar sua senha a qualquer momento" nem descrever um procedimento de recuperação, porque não existem** — e a federação precisa definir, antes do lançamento, como vai redefinir a senha de um clube sem virar canal informal. Continua existindo também o administrador de instalação com senha `123456`, só trocável por comando direto no banco.
+**Por que importa:** e **ficou pior**. Agora que a senha é escolhida pelo clube e é o único meio de acesso, a ausência de recuperação tem consequência prática imediata. **O próprio e-mail automático de aprovação já instrui: "Se esqueceu a senha, fale com a federação"** (`EmailService.java:80-81`). Ou seja, o sistema **assume por escrito** que a redefinição de senha acontece por canal informal, fora de qualquer controle. Na prática, será por WhatsApp ou telefone, sem registro. **A política NÃO pode prometer "você pode alterar sua senha a qualquer momento" nem descrever um procedimento de recuperação, porque não existem** — e a federação precisa definir, antes do lançamento, como vai redefinir a senha de um clube sem virar canal informal. A senha do administrador de instalação (no MVP, definida pela variável `FHT_ADMIN_SENHA`) também só é trocável por comando direto no banco.
 
-### [MEDIA] O registro de execução (log) grava o nome completo de atletas — agora em DOIS pontos.
+### [MEDIA] O registro de execução (log) grava o nome completo de atletas — em UM ponto.
 
-(1) Ao apagar um cadastro sem pagamento confirmado, o sistema escreve o identificador **e o nome completo** do atleta (`AtletaExpurgoJob.java:44-46`). (2) Quando a federação ativa um atleta dispensando a baixa, escreve o identificador, **o nome completo** e o login de quem autorizou (`AtletaServiceImpl.java:392-394`) — o comentário no código admite que isso é substituto improvisado da auditoria inexistente.
+*(Corrigido no MVP em relação a 04/08: a rotina de descarte grava **só o identificador**, o clube e a data de entrada na fila, não o nome — `AtletaExpurgoJob.java:48-53`.)* Continua: quando a federação ativa um atleta dispensando a baixa, o sistema escreve o identificador, **o nome completo** e o login de quem autorizou (`AtletaServiceImpl.java:392-394`) — o comentário no código admite que isso é substituto improvisado da auditoria inexistente.
 
-**Por que importa:** o nome de um menor **sobrevive ao próprio descarte do cadastro**, dentro dos logs da hospedagem, sem prazo de retenção definido. Contradiz a finalidade da rotina de descarte. **Trocar o nome pelo identificador é correção de uma linha, nos dois pontos.** Some-se a isso que o log também recebe o endereço de cada destinatário de e-mail e o assunto (`EmailService.java:159`).
+**Por que importa:** o nome de um menor pode ficar nos logs do Render, com prazo de retenção **[A CONFIRMAR]**. **Trocar o nome pelo identificador é correção de uma linha.** Some-se a isso que o log também recebe o endereço de cada destinatário de e-mail e o assunto (`EmailService.java:159`).
 
 ### [MEDIA] O e-mail do administrador da federação circula para fora da federação.
 
@@ -855,6 +838,8 @@ O campo que registra quem deu baixa num pagamento guarda o **e-mail de login do 
 O lote de pagamento tem **dois**: uma observação escrita pelo clube ao enviar e um motivo de recusa escrito pela federação (`V16:21-22`). O motivo de recusa **é enviado por e-mail ao representante do clube** (`EmailService.java:137-147`). O mesmo vale para o motivo de rejeição de clube (`EmailService.java:87-97`) e de atleta. **Campo aberto significa que qualquer coisa pode ser digitada ali, inclusive dado pessoal de terceiro, sem validação** — e sai do sistema.
 
 ### [MEDIA] Efeito colateral de controle de acesso: trocar o e-mail do clube pode deixar o acesso aberto.
+
+✅ **RESOLVIDO no código atual (ver nota do topo):** o bloqueio/desbloqueio passou a procurar a conta pelo vínculo com o clube, e trocar o e-mail do representante atualiza o login (`ClubeServiceImpl.java`, métodos `definirAcesso` e `trocarEmailDoRepresentante`). O texto abaixo descreve o estado de 04/08; este item pode sair da lista na próxima revisão.
 
 O bloqueio e o desbloqueio da conta procuram o usuário **pelo e-mail gravado no cadastro do clube** (`ClubeServiceImpl.java:233-236`), mas o clube pode editar esse e-mail livremente (`ClubeUpdateForm.java:18`; `:175`) e a conta de login não é atualizada junto. **Depois de uma troca de e-mail, suspender ou rejeitar o clube não encontra mais a conta — e o acesso continua aberto.** **NÃO VERIFICADO em execução**, mas é o que o código determina.
 
@@ -886,7 +871,7 @@ Avaliando este documento contra a estrutura mínima de uma política de privacid
 - **(d) Finalidade e base legal de cada tratamento** — §3, com a ressalva correta de que a decisão é do advogado.
 - **(e) Compartilhamento e operadores** — §5, atualizada e exaustiva.
 - **(f) Transferência internacional** — §6, seção própria, com a lista completa e o status de cada destino.
-- **(g) Prazo de retenção** — §8, honesta ao dizer que só existe um prazo e que todo o resto é indeterminado.
+- **(g) Prazo de retenção** — §8, honesta ao dizer que só existe um prazo de descarte (mais a janela de 30 dias dos backups) e que todo o resto é indeterminado.
 - **(i) Medidas de segurança** — §11, com a lista afirmativa curta e a lista de ausências.
 - **(j) Cookies e armazenamento** — §10, com o inventário técnico factual.
 - **(k) Crianças e adolescentes** — §9, a parte mais desenvolvida do documento.
@@ -899,7 +884,7 @@ Avaliando este documento contra a estrutura mínima de uma política de privacid
 - **(b) Encarregado e canal do titular.** Nenhum Encarregado nomeado. Os três canais anunciados têm problemas verificados: o formulário não envia nada, o WhatsApp é um número de zeros, e as duas caixas de e-mail não foram confirmadas.
 - **(l) Vigência, política de alterações e data da última atualização.** Não existe página, rota, link nem qualquer controle de versão de texto jurídico. **Agravante com prazo:** o sistema já registra consentimentos hoje gravando apenas o **número** da versão do termo — se o texto mudar sem alguém trocar a constante, será impossível reconstruir o que cada responsável aceitou (§14).
 
-**A leitura prática:** este inventário é um retrato técnico completo do sistema, **e é insuficiente como insumo único de redação**, porque três dos doze pontos obrigatórios dependem inteiramente de informações que só a federação possui. **Sem razão social, CNPJ, endereço, Encarregado e hospedeiro definidos, não existe política possível — existe apenas um rascunho com lacunas.** E publicar uma política com endereço fictício e telefone de zeros é **pior do que não publicar**: transforma um documento de conformidade em prova de descuido.
+**A leitura prática:** este inventário é um retrato técnico completo do sistema, **e é insuficiente como insumo único de redação**, porque três dos doze pontos obrigatórios dependem inteiramente de informações que só a federação possui. **Sem razão social, CNPJ, endereço, Encarregado e a base legal da transferência internacional (§6) definidos, não existe política possível — existe apenas um rascunho com lacunas.** E publicar uma política com endereço fictício e telefone de zeros é **pior do que não publicar**: transforma um documento de conformidade em prova de descuido.
 
 ---
 
@@ -927,18 +912,17 @@ Avaliando este documento contra a estrutura mínima de uma política de privacid
 - Se ligar, **qual servidor de saída será usado**? O valor padrão configurado no projeto é o do **Google**, e mantê-lo cria transferência internacional de dado de menor, exigindo contrato de operador e declaração expressa na política.
 - **A lista nominal de atletas menores realmente deve sair do sistema por e-mail**, ou basta o aviso remeter ao painel autenticado? *(Esta é a pergunta de maior impacto de todo o levantamento.)*
 
-### Sobre a hospedagem
-- **Onde o sistema vai efetivamente rodar em produção, e onde ficará o banco de dados?** A esteira de publicação que está no repositório aponta para **Railway** (EUA), mas está numa pasta em que o GitHub não a executa. O provedor será nomeado como operador na política e determina se há ou não transferência internacional da base inteira.
+### Sobre a hospedagem (definida no MVP: Render + Neon + Cloudflare R2 + GitHub Actions, todos nos EUA)
+- A federação **aceita manter a base inteira hospedada nos EUA** (API no Render e banco no Neon, ambos em Virginia; arquivos e backups no R2; backup executado no GitHub Actions), ou prefere **região no Brasil**? A resposta decide se a política declara transferência internacional da base inteira (§6).
+- Se mantiver nos EUA: qual **hipótese do art. 33** sustenta a transferência, e quem providencia e guarda os **contratos/termos de tratamento de dados (DPA)** com **Render, Neon, GitHub e Cloudflare**? Em nome de quem estão as contas desses serviços — da federação ou do desenvolvedor?
+- Em qual **região** estão os buckets do R2 (`fht-documentos` e `fht-backups`)? Hoje: **[A CONFIRMAR]**.
+- Qual é o **prazo de retenção dos logs no Render**? Hoje: **[A CONFIRMAR]**.
+- Onde é hospedado o **site público (frontend)**? O comentário da configuração cita Cloudflare Pages — **[A CONFIRMAR]**.
 
 ### Sobre menores (as mais urgentes)
 - A FHT **autoriza a publicação de NOME COMPLETO DE ATLETAS MENORES** na vitrine pública do site? **É a decisão jurídica mais urgente — o código já publica hoje.** Alternativas: exibir só o primeiro nome, exibir só o total por categoria, ou condicionar à autorização do responsável (o que exigiria implementar a checagem, que hoje não existe).
-- Qual a política da federação para **fotos de menores** na galeria e nas notícias? Autorização por evento (termo assinado na inscrição da competição), autorização individual no cadastro, ou não publicar rostos identificáveis de categorias de base?
+- Qual a política da federação para **fotos de menores** na galeria e nas notícias? Autorização por evento (termo assinado na inscrição do evento), autorização individual no cadastro, ou não publicar rostos identificáveis de categorias de base?
 - Há **idade mínima** para cadastro de atleta? Hoje não existe nenhuma no sistema.
-
-### Sobre a comissão técnica (categoria nova)
-- Os **técnicos e auxiliares** cadastrados pelos clubes **serão informados** de que seus dados estão no sistema? De quem é esse dever — provavelmente do próprio clube, o que deveria virar **obrigação contratual da filiação**.
-- Existe algum **termo, ficha ou autorização assinada por eles fora do sistema**?
-- **Pode haver menor de idade** exercendo essas funções?
 
 ### Sobre o financeiro (categoria nova)
 - Existe **prazo legal, contábil ou fiscal** que obrigue a federação a guardar os comprovantes de pagamento e a lista nominal dos atletas pagos? **Por quantos anos?** Essa resposta é o que permite justificar a retenção que hoje sobrevive à exclusão do cadastro.
@@ -948,8 +932,9 @@ Avaliando este documento contra a estrutura mínima de uma política de privacid
 ### Sobre retenção
 - Por quanto tempo guardar o **cadastro de um atleta APÓS a desfiliação** ou o fim da anuidade? Há norma da CBHb, do sistema desportivo ou obrigação contábil/fiscal que imponha prazo mínimo?
 - Por quanto tempo guardar **cadastros de clubes REJEITADOS**, que hoje ficam para sempre com nome, CPF, e-mail e telefone do representante e os PDFs de ata e estatuto — **mais uma conta de acesso com hash de senha**?
-- Por quanto tempo guardar **contas de acesso desativadas** e **árbitros que se candidataram e nunca foram credenciados** (CPF, RG e documentos preservados pela migration V14)?
-- Qual será o **prazo de retenção dos registros de execução (logs)** da hospedagem, que contêm nome completo de atletas apagados?
+- Por quanto tempo guardar **contas de acesso desativadas**?
+- Qual será o **prazo de retenção dos registros de execução (logs)** no Render, que podem conter o nome completo de atleta ativado sem baixa de pagamento e os destinatários de e-mail?
+- A federação **aceita a retenção de 30 dias dos backups** — ou seja, que um dado apagado continue nos dumps por até 30 dias? E aceita a regra de que, **ao restaurar um backup, as eliminações feitas depois da data do dump sejam reaplicadas** (quem faz, e com base em qual registro, já que não há auditoria)?
 
 ### Sobre práticas FORA do sistema (o código nunca revelará)
 - A federação **envia listas de atletas por planilha ou por e-mail** para a CBHb, para a Secretaria de Esportes, para o Governo do Estado, para patrocinadores ou para organizadores de competição?
@@ -959,8 +944,7 @@ Avaliando este documento contra a estrutura mínima de uma política de privacid
 *Tudo isso é tratamento de dado pessoal que a política precisa cobrir, mesmo acontecendo fora do sistema.*
 
 ### Sobre correções antes do lançamento
-- A federação **autoriza auto-hospedar as fontes** do site, eliminando a transferência de IP de todo visitante para o Google? **É a correção de melhor custo-benefício de todo o levantamento** — elimina a única transferência internacional em curso.
-- O formulário **"Fale com a FHT"** deve ser **desativado ou implementado** antes do lançamento? Hoje ele afirma ao cidadão que a mensagem foi enviada e não envia nada.
-- A federação aceita manter os **campos coletados e nunca usados** (órgão emissor do RG, naturalidade, sexo do árbitro), ou autoriza removê-los dos formulários antes do lançamento? Removê-los simplifica a política e resolve a questão da minimização.
-- A federação quer manter o **Sentry** (monitoramento de erros, servidores nos EUA)? Se sim, a política precisa declarar transferência internacional, será necessário contrato de operador, e recomenda-se ativar filtro de dados pessoais antes.
-- A federação vai assumir **compromisso público com algum prazo** para corrigir os pontos críticos (arquivos sem autenticação, exclusão incompleta, revogação inexistente, descarte que apaga atleta já pago)? **A frase "Dados protegidos pela LGPD" já está publicada no site — sem prazo definido, ela é declaração enganosa.**
+- A federação **autoriza auto-hospedar as fontes** do site, eliminando a transferência de IP de todo visitante para o Google? **É a correção de melhor custo-benefício de todo o levantamento** — elimina a única transferência internacional feita a partir do navegador do visitante.
+- O formulário **"Fale com a FHT"** deve ser **desativado ou implementado** antes do lançamento? *(Desatualizado: no código atual ele já envia por e-mail — ver §13; a pergunta passa a ser se a caixa de destino existe e é monitorada.)*
+- A federação aceita manter os **campos coletados e nunca usados** (órgão emissor do RG, naturalidade), ou autoriza removê-los dos formulários antes do lançamento? Removê-los simplifica a política e resolve a questão da minimização.
+- A federação vai assumir **compromisso público com algum prazo** para corrigir os pontos críticos (arquivos sem autenticação, exclusão incompleta, revogação inexistente)? **A frase "Dados protegidos pela LGPD" já está publicada no site — sem prazo definido, ela é declaração enganosa.**

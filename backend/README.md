@@ -67,12 +67,17 @@ GitHub Actions: deploy.yml (build da imagem → GHCR → Deploy Hook do Render)
 ```
 
 - **Render free** hiberna o serviço após 15 min sem tráfego e limita a 512 MB de RAM. O
-  keep-alive (abaixo) evita a hibernação. Região **Oregon (EUA)** — o free tier não tem São Paulo.
+  keep-alive (abaixo) evita a hibernação. Região **Virginia (EUA)** — o Render não tem São Paulo.
 - **Neon free** hiberna o banco ocioso e limita conexões; por isso o pool Agroal é `max=5`,
-  `min=0`, `initial=0`. Crie o projeto em **São Paulo (`sa-east-1`)** se a opção existir no free.
-- **Onde os dados ficam:** a aplicação roda nos EUA e o banco fica onde o projeto Neon for criado.
-  Isso precisa constar na Política de Privacidade (ver `docs/POLITICA-DE-PRIVACIDADE.md`, seções
-  de terceiros e transferência internacional — texto jurídico, não alterado aqui).
+  `min=0`, `initial=0`. Crie o projeto em **AWS us-east-1 (Virginia)**.
+- **API e banco na mesma região, por latência.** Cada requisição da API faz várias consultas ao
+  banco, uma atrás da outra. Com os dois em Virginia, cada ida e volta custa ~1–2 ms. Com o banco
+  em **São Paulo (`aws-sa-east-1`)** e a API em Virginia, cada ida e volta passa a ~110–130 ms: uma
+  tela que faz 4 consultas ganha perto de meio segundo, e o cold start do Neon soma mais. São Paulo
+  só compensa se a API também for pro Brasil, o que o free tier do Render não oferece.
+- **Onde os dados ficam:** API (Render) e banco (Neon) em Virginia, EUA; arquivos e backups no R2.
+  Isso é transferência internacional e está descrito na Política de Privacidade
+  (`docs/POLITICA-DE-PRIVACIDADE.md`, seções 6.3 e 8).
 
 ---
 
@@ -155,7 +160,7 @@ Nada de segredo é commitado: `.env`, `*.pem` estão no `.gitignore` e no `.dock
 
 ### 1. Neon (banco)
 
-1. Crie o projeto (Postgres **16**, região São Paulo se o free permitir), banco `neondb`.
+1. Crie o projeto (Postgres **16**, região **AWS us-east-1 — Virginia**, a mesma do Render), banco `neondb`.
 2. Copie a connection string. Você vai precisar dela em dois formatos:
    - **JDBC** (Render → `DATABASE_URL`): `jdbc:postgresql://<host>/neondb?sslmode=require`, com usuário e senha em `DATABASE_USER`/`DATABASE_PASSWORD`;
    - **libpq** (GitHub → `DATABASE_URL_BACKUP`): `postgresql://<user>:<senha>@<host>/neondb?sslmode=require`.
@@ -183,10 +188,10 @@ Guarde os `.pem` num cofre e apague da máquina.
 ### 4. Render (API)
 
 1. **Blueprint:** New → Blueprint → aponte pro repositório; o `render.yaml` da raiz cria o serviço
-   `fht-backend` (plano free, Oregon, imagem `ghcr.io/gustavo16378/fht-backend:latest`, health
+   `fht-backend` (plano free, Virginia, imagem `ghcr.io/gustavo16378/fht-backend:latest`, health
    check em `/q/health/ready`) e pede os valores marcados `sync: false`.
    **Se o free tier recusar blueprint com imagem:** New → Web Service → *Existing image* →
-   `ghcr.io/gustavo16378/fht-backend:latest`, plano Free, região Oregon, Health Check Path
+   `ghcr.io/gustavo16378/fht-backend:latest`, plano Free, região Virginia (US East), Health Check Path
    `/q/health/ready`, e cadastre as variáveis da tabela acima à mão.
 2. A imagem no GHCR nasce **privada**. Ou torne o pacote público (GitHub → Packages →
    `fht-backend` → Package settings → Change visibility), ou cadastre no Render uma credencial de

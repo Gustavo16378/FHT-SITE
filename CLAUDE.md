@@ -4,6 +4,8 @@ Contexto persistente do projeto pra eu (Claude) não perder o fio entre sessões
 
 > ⚠️ **Atenção, repositório:** o repo REAL é este aqui (`FHT-SITE/`), conectado ao GitHub `Gustavo16378/FHT-SITE`, branch `main`. Existe uma pasta-pai `c:\Users\Gustavo\Documents\fht-site\` que virou um repo git por engano ("No commits yet", com `FHT-SITE/` como untracked) — **ignore o repo de fora**, trabalhe e commite sempre dentro de `FHT-SITE/`.
 
+> 🔻 **Branch `mvp-free-tier` (set/2026) — regressão pro MVP em free tier**, por decisão do presidente (sem orçamento). A versão completa está congelada na tag **`v-full`**. Nesta branch **saíram** árbitros, competições, pessoas do clube (2º representante/técnico) e Sentry; as migrations viraram `V1__schema_inicial.sql` + `V2__seed_admin.sql` (senha do admin pela env **obrigatória** `FHT_ADMIN_SENHA`, só o hash vai pro banco) + seed de demo `db/dev/R__seed_dev.sql` (só perfil dev). Infra: Render (Oregon, imagem JVM do GHCR — o nativo falha no AWS SDK do R2) + Neon + R2 + Actions (`.github/workflows/deploy.yml` e `backup.yml` na raiz; o backup só roda depois do merge na `main`). Chaves JWT em prod vêm de `JWT_PUBLIC_KEY`/`JWT_PRIVATE_KEY` em base64. **Backend (Parte A) pronto e commitado, NÃO pushado** (Gustavo vai tornar o repo privado antes). **Frontend (Parte B) não começou** — esperar o Gustavo mandar. Tudo o que está abaixo neste arquivo descreve a versão completa. Guia de deploy: `backend/README.md`. Volume de dev antigo precisa de `docker compose down -v` uma vez (histórico V1–V19).
+
 ---
 
 ## O que é

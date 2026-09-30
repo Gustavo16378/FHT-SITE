@@ -78,8 +78,8 @@ GitHub Actions: deploy.yml (build da imagem → GHCR → Deploy Hook do Render)
 
 ## Rodar local
 
-Pré-requisitos: Docker Desktop, Git Bash (Windows) ou shell POSIX, OpenSSL. Java/Maven só se
-quiser rodar fora do container (o Maven vem embutido em `.mvn/wrapper/apache-maven-3.9.9/bin/mvn`).
+Pré-requisitos: Docker Desktop, Git Bash (Windows) ou shell POSIX, OpenSSL. Java 21 só se quiser
+rodar a API fora do container.
 
 ```bash
 cd FHT-SITE
@@ -90,16 +90,30 @@ docker compose up --build  # postgres:16 + backend (JVM) + frontend
 - API: http://localhost:8080 — Swagger: http://localhost:8080/swagger — Health: http://localhost:8080/q/health
 - Postgres: `localhost:5433`, banco `fht_db`, usuário `fht_user`, senha `fht_pass`
 
+> **Volume de dev antigo:** se a sua máquina já rodou a versão completa, o volume do Postgres guarda
+> o histórico das migrations V1–V19 e a `V1` nova não bate com ele (checksum mismatch). Uma vez só:
+> `docker compose down -v` (apaga os dados de dev) e suba de novo.
+
+No compose a API roda em perfil **prod**: nasce só o admin. Pra ter os dados de demonstração:
+
+```bash
+docker exec -i fht_postgres psql -U fht_user -d fht_db < backend/src/main/resources/db/dev/R__seed_dev.sql
+```
+
 Sem Docker pra API (banco ainda no compose):
 
 ```bash
 cd backend
-.mvn/wrapper/apache-maven-3.9.9/bin/mvn quarkus:dev      # Linux/Mac/Git Bash
-mvnw.cmd quarkus:dev                                       # cmd/PowerShell
+mvnw.cmd quarkus:dev     # Windows: baixa o Maven na primeira execução
+mvn quarkus:dev          # Linux/Mac, com Maven instalado
 ```
 
+Os jars do Maven não vão pro git (`*.jar` no `.gitignore`), então num clone novo o
+`.mvn/wrapper/apache-maven-3.9.9/bin/mvn` só funciona depois que o `mvnw.cmd` rodar uma vez.
+
 No perfil **dev** o Hibernate roda com `database.generation=validate` (confere a `V1` contra as
-entidades ao subir) e a Flyway aplica também o seed de demonstração (`db/dev/`).
+entidades ao subir) e a Flyway aplica também o seed de demonstração (`db/dev/R__seed_dev.sql`,
+repetível e idempotente).
 
 ### Credenciais de desenvolvimento
 
@@ -128,7 +142,7 @@ Nada de segredo é commitado: `.env`, `*.pem` estão no `.gitignore` e no `.dock
 | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | ✅ | Credenciais do R2. Sem elas o upload cai em disco (só serve pra dev) |
 | `R2_BUCKET` | | Bucket dos uploads (`fht-documentos`) |
 | `R2_PUBLIC_URL` | ✅ | URL pública do bucket (as URLs gravadas no banco começam com ela) |
-| `FHT_ADMIN_SENHA` | ✅ na 1ª subida | Senha do primeiro `ADMIN_FHT`, lida pela `V2__seed_admin.sql` **uma vez**. Sem aspas simples |
+| `FHT_ADMIN_SENHA` | ✅ sempre | Senha do primeiro `ADMIN_FHT`. A `V2__seed_admin.sql` usa o valor **uma vez** e grava só o hash bcrypt. Sem default em prod: se faltar, a app não sobe (`SRCFG00011 ... quarkus.flyway.placeholders.admin_senha`), inclusive nos boots seguintes. Sem aspas simples |
 | `SMTP_MOCK` | | `true` (padrão) = e-mail simulado no log. Pra enviar: `false` + `SMTP_HOST/PORT/USER/PASS/FROM` |
 | `FHT_EMAIL_ADMIN` | | Caixa que recebe os avisos (padrão `contato@fht.org.br`) |
 | `FHT_ANUIDADE_VALOR` | | Valor da anuidade (padrão `35.00`) |
@@ -197,7 +211,8 @@ imagem e só avisa que não disparou o deploy.
 `git push` na branch `mvp-free-tier` (ou `main`, depois do merge) com mudança em `backend/**`
 dispara `deploy.yml`: build da imagem → push `latest` + `sha` no GHCR → Deploy Hook. Acompanhe em
 Actions e nos logs do Render. Na primeira subida a Flyway cria o schema (`V1`) e o admin (`V2`) com
-a senha de `FHT_ADMIN_SENHA`.
+a senha de `FHT_ADMIN_SENHA`. O disparo manual (*Run workflow*) e o backup agendado só existem
+depois que os workflows chegam na `main` (ver [Backup](#backup)).
 
 ### 7. Keep-alive (não dá pra automatizar por código)
 
@@ -212,7 +227,8 @@ O `/q/health` também toca o banco, então mantém os dois acordados.
 ### 8. Admin em produção
 
 O `ADMIN_FHT` (`admin@fht.org.br`) nasce na `V2__seed_admin.sql` com a senha de `FHT_ADMIN_SENHA`.
-Pra trocar depois, no SQL Editor do Neon:
+A variável continua obrigatória no Render depois disso, mas mudar o valor dela não muda a senha.
+Pra trocar a senha, no SQL Editor do Neon:
 
 ```sql
 UPDATE usuarios SET senha_hash = crypt('NOVA-SENHA', gen_salt('bf', 10)) WHERE email = 'admin@fht.org.br';
@@ -230,7 +246,15 @@ Configure `VITE_API_URL` no Cloudflare Pages com a URL do Render e inclua a URL 
 `.github/workflows/backup.yml` roda todo dia às **03:00 UTC** (00:00 em Palmas) e também sob demanda
 (*Run workflow*): `pg_dump` com a imagem `postgres:16` (mesma major do Neon) → gzip → `aws s3 cp`
 pro bucket **privado** `fht-backups` (prefixo `postgres/`), mantendo os **últimos 30** dumps.
-O conteúdo nunca vai pro log. Pra restaurar:
+O conteúdo nunca vai pro log.
+
+> ⚠️ **O backup só começa depois do merge na `main`.** É regra do GitHub: workflow agendado
+> (`schedule`) só roda a partir da branch padrão do repositório, e o botão *Run workflow* também só
+> aparece quando o arquivo existe nela. Enquanto o deploy sair da `mvp-free-tier`, **nenhum backup
+> roda**. Depois do merge, abra Actions → "Backup diário do banco" e dispare um *Run workflow* de
+> teste pra conferir o dump no bucket.
+
+Pra restaurar:
 
 ```bash
 aws s3 cp s3://fht-backups/postgres/fht-AAAAMMDD-HHMMSS.sql.gz . --endpoint-url https://<R2_ACCOUNT_ID>.r2.cloudflarestorage.com

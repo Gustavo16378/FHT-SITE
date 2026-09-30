@@ -1,0 +1,47 @@
+# Blueprint do Render (Infrastructure as Code) — https://render.com/docs/blueprint-spec
+#
+# Um serviço web no plano FREE que só PUXA a imagem pronta do GHCR: o build roda no GitHub
+# Actions (.github/workflows/deploy.yml), nada é compilado no Render. Região Oregon (o free tier
+# não oferece São Paulo): a aplicação roda nos EUA e os dados ficam no Neon. Os valores com
+# `sync: false` são pedidos no painel na hora do sync do blueprint.
+#
+# Se o blueprint com imagem não for aceito no free tier, o mesmo serviço se cria pelo painel
+# (New → Web Service → Existing image) — passo a passo no backend/README.md.
+services:
+  - type: web
+    name: fht-backend
+    runtime: image
+    image:
+      url: ghcr.io/gustavo16378/fht-backend:latest
+    plan: free
+    region: oregon
+    healthCheckPath: /q/health/ready
+    envVars:
+      - key: TZ
+        value: America/Araguaina
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_USER
+        sync: false
+      - key: DATABASE_PASSWORD
+        sync: false
+      - key: JWT_PUBLIC_KEY
+        sync: false
+      - key: JWT_PRIVATE_KEY
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET
+        value: fht-documentos
+      - key: R2_PUBLIC_URL
+        sync: false
+      - key: SMTP_MOCK
+        value: "true"
+      - key: FHT_ADMIN_SENHA
+        sync: false

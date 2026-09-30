@@ -1,0 +1,13 @@
+# Fora do contexto de build da imagem.
+target/
+.git/
+.github/
+# Chaves JWT locais NUNCA entram na imagem: em produção vêm por env (JWT_PUBLIC_KEY/JWT_PRIVATE_KEY).
+**/*.pem
+.env
+.env.example
+README.md
+mvnw.cmd
+gerar-chaves-jwt.sh
+docker-compose.yml
+.mvn/

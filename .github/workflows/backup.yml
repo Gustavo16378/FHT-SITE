@@ -1,0 +1,65 @@
+name: Backup diário do banco (Neon → R2)
+
+on:
+  schedule:
+    - cron: '0 3 * * *'   # 03:00 UTC = 00:00 em Palmas
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    name: pg_dump + gzip + R2
+    runs-on: ubuntu-latest
+    env:
+      BUCKET: fht-backups
+      PREFIX: postgres
+      KEEP: 30
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: auto
+      AWS_EC2_METADATA_DISABLED: 'true'
+      # O R2 recusa os checksums CRC que o aws cli >= 2.23 manda por padrão.
+      AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+      AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+      R2_ENDPOINT: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+    steps:
+      # Os dumps contêm dados pessoais de menores: nada do conteúdo vai pro log,
+      # o bucket é privado e sem URL pública.
+      - name: pg_dump (postgres 16, mesma major do Neon) comprimido com gzip
+        env:
+          DATABASE_URL_BACKUP: ${{ secrets.DATABASE_URL_BACKUP }}
+        run: |
+          set -euo pipefail
+          if [ -z "$DATABASE_URL_BACKUP" ]; then
+            echo "::error::DATABASE_URL_BACKUP não configurado"; exit 1
+          fi
+          DUMP="fht-$(date -u +%Y%m%d-%H%M%S).sql.gz"
+          echo "DUMP=$DUMP" >> "$GITHUB_ENV"
+          docker run --rm -e PGCONNECT_TIMEOUT=30 postgres:16 \
+            pg_dump --no-owner --no-privileges "$DATABASE_URL_BACKUP" | gzip -9 > "$DUMP"
+          test -s "$DUMP"
+          echo "dump gerado ($(du -h "$DUMP" | cut -f1))"
+
+      - name: Enviar pro bucket privado no R2
+        run: aws s3 cp "$DUMP" "s3://$BUCKET/$PREFIX/$DUMP" --endpoint-url "$R2_ENDPOINT" --only-show-errors
+
+      - name: Manter só os últimos 30 dumps
+        run: |
+          set -euo pipefail
+          aws s3api list-objects-v2 --bucket "$BUCKET" --prefix "$PREFIX/" --endpoint-url "$R2_ENDPOINT" \
+            --query 'sort_by(Contents, &LastModified)[].Key' --output text \
+            | tr '\t' '\n' | grep -v '^None$' > todos.txt || true
+          TOTAL=$(grep -c . todos.txt || true)
+          if [ "$TOTAL" -gt "$KEEP" ]; then
+            head -n $((TOTAL - KEEP)) todos.txt | while read -r KEY; do
+              aws s3 rm "s3://$BUCKET/$KEY" --endpoint-url "$R2_ENDPOINT" --only-show-errors
+            done
+            echo "removidos $((TOTAL - KEEP)) dumps antigos"
+          fi
+          echo "dumps no bucket: $(( TOTAL < KEEP ? TOTAL : KEEP ))"
+
+      - name: Apagar o dump do runner
+        if: always()
+        run: rm -f "$DUMP" todos.txt

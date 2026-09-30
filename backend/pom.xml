@@ -74,6 +74,12 @@
       <artifactId>quarkus-smallrye-openapi</artifactId>
     </dependency>
 
+    <!-- Health check (/q/health e /q/health/ready): usado pelo Render e pelo keep-alive -->
+    <dependency>
+      <groupId>io.quarkus</groupId>
+      <artifactId>quarkus-smallrye-health</artifactId>
+    </dependency>
+
     <!-- JSON Logging (quarkus.log.console.json) -->
     <dependency>
       <groupId>io.quarkus</groupId>
@@ -130,13 +136,6 @@
       <groupId>software.amazon.awssdk</groupId>
       <artifactId>url-connection-client</artifactId>
       <version>${aws.sdk.version}</version>
-    </dependency>
-
-    <!-- Sentry -->
-    <dependency>
-      <groupId>io.sentry</groupId>
-      <artifactId>sentry</artifactId>
-      <version>7.14.0</version>
     </dependency>
 
     <!-- Tests -->

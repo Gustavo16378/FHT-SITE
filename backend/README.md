@@ -1,236 +1,278 @@
-# FHT Backend
+# FHT Backend — MVP free tier
 
-API da Federação de Handebol do Tocantins — **Java 21 + Quarkus 3.15 + PostgreSQL 16**.
+API da Federação de Handebol do Tocantins — **Java 21 + Quarkus 3.15.1 + PostgreSQL 16**, rodando
+inteira em **free tier** (Render + Neon + Cloudflare R2 + GitHub Actions).
+
+> **Versão completa:** este branch é a regressão do sistema pro escopo mínimo, por decisão do
+> presidente (sem orçamento). Tudo o que saiu (árbitros, competições, financeiro além do comprovante,
+> comissão técnica do clube, Sentry) continua intacto na tag **`v-full`** (`git checkout v-full`).
+
+---
+
+## Escopo do MVP
+
+**Fica**
+
+- Autenticação JWT com dois perfis: `ADMIN_FHT` e `ADMIN_CLUBE`
+- Filiação de clube pelo formulário público, com **um** representante por clube
+- Cadastro de atleta pelo painel do clube (dados pessoais, endereço, responsável legal se menor de 18, foto e RG)
+- Pagamento da anuidade **em lote**: o clube junta os atletas pendentes, faz um Pix, anexa um comprovante; a federação dá baixa ou rejeita
+- Notícias, documentos oficiais e galeria de fotos (CRUD no admin, leitura pública)
+- Diretoria e formulário de contato do site institucional
+- LGPD: consentimentos por finalidade, responsável legal, expurgo de cadastro abandonado
+- Health check, CORS, validação, tratamento de erros, Swagger/OpenAPI
+
+**Saiu** (só na `v-full`): árbitros, competições e tudo derivado (inscrições, jogos, rankings),
+relatórios financeiros, pessoas do clube (2º representante/técnico), Sentry.
+
+---
 
 ## Stack
 
 | Camada | Tecnologia |
 |--------|-----------|
-| Framework | Quarkus 3.15.1 (JVM mode) |
-| Linguagem | Java 21 (Temurin) |
-| ORM | Hibernate ORM Panache |
-| Banco | PostgreSQL 16 (Docker local) |
-| Migrations | Flyway |
-| Autenticação | SmallRye JWT (RSA 2048) |
-| Storage | Cloudflare R2 (AWS SDK v2 S3) |
-| Validação | Hibernate Validator (Jakarta) |
-| Monitoramento | Sentry Core SDK |
-| Documentação | MicroProfile OpenAPI + Swagger UI |
-| Deploy | Railway + Docker + GitHub Actions |
+| Framework | Quarkus 3.15.1 — **modo JVM** (ver "Por que não nativo") |
+| Linguagem | Java 21 |
+| ORM / migrations | Hibernate ORM Panache / Flyway (`V1__schema_inicial.sql`) |
+| Banco | PostgreSQL 16 — Neon (prod) / Docker (dev) |
+| Autenticação | SmallRye JWT, RSA 2048, chaves por variável de ambiente |
+| Storage | Cloudflare R2 (AWS SDK v2 S3) com fallback em disco quando não configurado |
+| E-mail | Quarkus Mailer — **simulado por padrão** (`SMTP_MOCK=true`, aparece no log) |
+| Documentação | MicroProfile OpenAPI + Swagger UI em `/swagger` |
+| Health | SmallRye Health em `/q/health` e `/q/health/ready` |
+| Deploy | Docker → GHCR → Render (Deploy Hook), via GitHub Actions |
+
+### Por que não nativo
+
+Tentou-se o build nativo (GraalVM/Mandrel 23.1) e ele falha numa dependência incompatível: o AWS
+SDK v2 usado pro R2 referencia classes da biblioteca opcional `aws-crt` (`Crc32Checksum` /
+`Crc32CChecksum` do módulo `http-auth-aws`) e o `--link-at-build-time` que o Quarkus impõe recusa
+o tipo não resolvido. Sair disso exigiria a extensão Quarkiverse do S3 ou substituições GraalVM.
+Decisão: JVM enxuta com `-Xmx256m -XX:+UseSerialGC -XX:TieredStopAtLevel=1`, que cabe nos 512 MB
+do Render free.
 
 ---
 
-## Pré-requisitos
+## Arquitetura free tier
 
-- **Java 21** (JDK Temurin)
-- **Docker + Docker Compose**
-- **OpenSSL** (para gerar as chaves JWT)
+```
+Cloudflare Pages (frontend)  ──HTTPS──▶  Render web service free (esta API, imagem do GHCR)
+                                              │                 │
+                                              ▼                 ▼
+                                     Neon Postgres 16      Cloudflare R2
+                                     (banco, free)         (uploads + backups)
 
-> Maven não precisa estar instalado globalmente — o `mvnw.cmd` faz o download automático na primeira execução.
+GitHub Actions: deploy.yml (build da imagem → GHCR → Deploy Hook do Render)
+                backup.yml (pg_dump diário 03:00 UTC → bucket privado fht-backups no R2)
+```
+
+- **Render free** hiberna o serviço após 15 min sem tráfego e limita a 512 MB de RAM. O
+  keep-alive (abaixo) evita a hibernação. Região **Oregon (EUA)** — o free tier não tem São Paulo.
+- **Neon free** hiberna o banco ocioso e limita conexões; por isso o pool Agroal é `max=5`,
+  `min=0`, `initial=0`. Crie o projeto em **São Paulo (`sa-east-1`)** se a opção existir no free.
+- **Onde os dados ficam:** a aplicação roda nos EUA e o banco fica onde o projeto Neon for criado.
+  Isso precisa constar na Política de Privacidade (ver `docs/POLITICA-DE-PRIVACIDADE.md`, seções
+  de terceiros e transferência internacional — texto jurídico, não alterado aqui).
 
 ---
 
-## Setup inicial
+## Rodar local
 
-### 1. Banco de dados (Docker)
-
-```bash
-docker-compose up -d
-```
-
-Sobe PostgreSQL 16 na porta `5432` com healthcheck. Credenciais definidas no `docker-compose.yml`:
-- Usuário: `fht_user` / Senha: `fht_pass` / Banco: `fht_db`
-
-### 2. Chaves JWT (RSA 2048)
+Pré-requisitos: Docker Desktop, Git Bash (Windows) ou shell POSIX, OpenSSL. Java/Maven só se
+quiser rodar fora do container (o Maven vem embutido em `.mvn/wrapper/apache-maven-3.9.9/bin/mvn`).
 
 ```bash
-bash gerar-chaves-jwt.sh
+cd FHT-SITE
+bash setup.sh              # gera as chaves JWT (.pem, fora do git) e o .env, já com as chaves em base64
+docker compose up --build  # postgres:16 + backend (JVM) + frontend
 ```
 
-Gera dois arquivos em `src/main/resources/`:
-- `privateKey.pem` — assina tokens (**nunca commitar — já no `.gitignore`**)
-- `publicKey.pem` — verifica tokens (pode commitar)
+- API: http://localhost:8080 — Swagger: http://localhost:8080/swagger — Health: http://localhost:8080/q/health
+- Postgres: `localhost:5433`, banco `fht_db`, usuário `fht_user`, senha `fht_pass`
 
-### 3. Variáveis de ambiente
+Sem Docker pra API (banco ainda no compose):
 
 ```bash
-cp .env.example .env
-# Edite .env com suas credenciais R2 e Sentry (opcional em dev)
+cd backend
+.mvn/wrapper/apache-maven-3.9.9/bin/mvn quarkus:dev      # Linux/Mac/Git Bash
+mvnw.cmd quarkus:dev                                       # cmd/PowerShell
 ```
 
-### 4. Executar em modo dev
+No perfil **dev** o Hibernate roda com `database.generation=validate` (confere a `V1` contra as
+entidades ao subir) e a Flyway aplica também o seed de demonstração (`db/dev/`).
 
-```bash
-./mvnw.cmd quarkus:dev      # Windows
-./mvnw quarkus:dev          # Linux/Mac
-```
+### Credenciais de desenvolvimento
 
-API disponível em: `http://localhost:8080`
-Swagger UI: `http://localhost:8080/swagger`
-
----
-
-## Credenciais de desenvolvimento
-
-| Role | E-mail | Senha |
-|------|--------|-------|
+| Perfil | E-mail | Senha |
+|--------|--------|-------|
 | `ADMIN_FHT` | `admin@fht.org.br` | `123456` |
+| `ADMIN_CLUBE` | `clube@fht.org.br` | `123456` |
 
-> Criado automaticamente pela migration `V4__seed_admin.sql` via Flyway na primeira inicialização.
+O admin vem da migration `V2__seed_admin.sql` (senha do placeholder `FHT_ADMIN_SENHA`, padrão
+`123456`); o clube e o resto dos dados de demonstração vêm do seed do perfil dev.
 
 ---
 
-## Estrutura do projeto
+## Variáveis de ambiente
+
+Nada de segredo é commitado: `.env`, `*.pem` estão no `.gitignore` e no `.dockerignore`.
+
+| Variável | Obrigatória em prod | Descrição |
+|----------|:---:|-----------|
+| `PORT` | auto | Porta HTTP. O Render injeta; local cai em 8080 |
+| `DATABASE_URL` | ✅ | URL JDBC do Neon: `jdbc:postgresql://ep-xxx.<região>.aws.neon.tech/neondb?sslmode=require` |
+| `DATABASE_USER` / `DATABASE_PASSWORD` | ✅ | Credenciais do Neon (ou embuta na URL como `?user=…&password=…`) |
+| `JWT_PUBLIC_KEY` / `JWT_PRIVATE_KEY` | ✅ | O arquivo `.pem` **inteiro em base64, numa linha**: `openssl base64 -A -in publicKey.pem`. Sem elas o serviço **não sobe** (fail-fast: `Failed to load config value ... mp.jwt.verify.publickey.location`) |
+| `CORS_ORIGINS` | ✅ | Origens permitidas, separadas por vírgula: a URL do Pages e o domínio |
+| `TZ` | ✅ | `America/Araguaina` — regras de data usam o fuso do Tocantins |
+| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | ✅ | Credenciais do R2. Sem elas o upload cai em disco (só serve pra dev) |
+| `R2_BUCKET` | | Bucket dos uploads (`fht-documentos`) |
+| `R2_PUBLIC_URL` | ✅ | URL pública do bucket (as URLs gravadas no banco começam com ela) |
+| `FHT_ADMIN_SENHA` | ✅ na 1ª subida | Senha do primeiro `ADMIN_FHT`, lida pela `V2__seed_admin.sql` **uma vez**. Sem aspas simples |
+| `SMTP_MOCK` | | `true` (padrão) = e-mail simulado no log. Pra enviar: `false` + `SMTP_HOST/PORT/USER/PASS/FROM` |
+| `FHT_EMAIL_ADMIN` | | Caixa que recebe os avisos (padrão `contato@fht.org.br`) |
+| `FHT_ANUIDADE_VALOR` | | Valor da anuidade (padrão `35.00`) |
+| `ATLETA_EXPURGO_DIAS` | | Dias até apagar cadastro nunca pago (padrão `90`) |
+| `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS` | | Só pro docker compose; `DATABASE_URL` vence quando existe |
+
+---
+
+## Deploy em produção (passo a passo, nessa ordem)
+
+### 1. Neon (banco)
+
+1. Crie o projeto (Postgres **16**, região São Paulo se o free permitir), banco `neondb`.
+2. Copie a connection string. Você vai precisar dela em dois formatos:
+   - **JDBC** (Render → `DATABASE_URL`): `jdbc:postgresql://<host>/neondb?sslmode=require`, com usuário e senha em `DATABASE_USER`/`DATABASE_PASSWORD`;
+   - **libpq** (GitHub → `DATABASE_URL_BACKUP`): `postgresql://<user>:<senha>@<host>/neondb?sslmode=require`.
+
+### 2. Cloudflare R2
+
+1. Bucket `fht-documentos` (uploads) — ligue o acesso público ou um domínio e anote a URL (`R2_PUBLIC_URL`).
+2. Bucket `fht-backups` (dumps) — **privado, sem URL pública**: os dumps contêm dados de menores.
+3. Token de API S3 com leitura/escrita nos dois buckets → `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`; o `R2_ACCOUNT_ID` está no painel.
+
+### 3. Chaves JWT de produção
+
+Gere um par **novo** (não use o de dev) e converta pra base64 numa linha:
+
+```bash
+openssl genrsa -out _raw.pem 2048
+openssl pkcs8 -topk8 -inform PEM -in _raw.pem -outform PEM -nocrypt -out privateKey.pem
+openssl rsa -in _raw.pem -pubout -out publicKey.pem && rm _raw.pem
+openssl base64 -A -in publicKey.pem    # → JWT_PUBLIC_KEY
+openssl base64 -A -in privateKey.pem   # → JWT_PRIVATE_KEY
+```
+
+Guarde os `.pem` num cofre e apague da máquina.
+
+### 4. Render (API)
+
+1. **Blueprint:** New → Blueprint → aponte pro repositório; o `render.yaml` da raiz cria o serviço
+   `fht-backend` (plano free, Oregon, imagem `ghcr.io/gustavo16378/fht-backend:latest`, health
+   check em `/q/health/ready`) e pede os valores marcados `sync: false`.
+   **Se o free tier recusar blueprint com imagem:** New → Web Service → *Existing image* →
+   `ghcr.io/gustavo16378/fht-backend:latest`, plano Free, região Oregon, Health Check Path
+   `/q/health/ready`, e cadastre as variáveis da tabela acima à mão.
+2. A imagem no GHCR nasce **privada**. Ou torne o pacote público (GitHub → Packages →
+   `fht-backend` → Package settings → Change visibility), ou cadastre no Render uma credencial de
+   registry (Settings → Registry Credentials) com um PAT do GitHub de escopo `read:packages`.
+3. Copie o **Deploy Hook** do serviço (Settings → Deploy Hook) → secret `RENDER_DEPLOY_HOOK_URL`.
+
+### 5. Secrets no GitHub (Settings → Secrets and variables → Actions)
+
+| Secret | Usado por | Valor |
+|--------|-----------|-------|
+| `RENDER_DEPLOY_HOOK_URL` | `deploy.yml` | URL do Deploy Hook do serviço no Render |
+| `DATABASE_URL_BACKUP` | `backup.yml` | Connection string **libpq** do Neon (passo 1) |
+| `R2_ACCOUNT_ID` | `backup.yml` | ID da conta Cloudflare |
+| `R2_ACCESS_KEY_ID` | `backup.yml` | Token S3 do R2 |
+| `R2_SECRET_ACCESS_KEY` | `backup.yml` | Token S3 do R2 |
+
+`GITHUB_TOKEN` é automático (push no GHCR). Sem `RENDER_DEPLOY_HOOK_URL` o workflow publica a
+imagem e só avisa que não disparou o deploy.
+
+### 6. Primeiro deploy
+
+`git push` na branch `mvp-free-tier` (ou `main`, depois do merge) com mudança em `backend/**`
+dispara `deploy.yml`: build da imagem → push `latest` + `sha` no GHCR → Deploy Hook. Acompanhe em
+Actions e nos logs do Render. Na primeira subida a Flyway cria o schema (`V1`) e o admin (`V2`) com
+a senha de `FHT_ADMIN_SENHA`.
+
+### 7. Keep-alive (não dá pra automatizar por código)
+
+O Render free hiberna após 15 min sem requisição, e o Neon também dorme. Cadastre um monitor
+gratuito batendo em `https://<serviço>.onrender.com/q/health` a cada **10 minutos**:
+
+- **cron-job.org:** Create cronjob → URL acima → Schedule "every 10 minutes" → Save; ou
+- **UptimeRobot:** New monitor → HTTP(s) → URL acima → interval 10 min (o free permite 5).
+
+O `/q/health` também toca o banco, então mantém os dois acordados.
+
+### 8. Admin em produção
+
+O `ADMIN_FHT` (`admin@fht.org.br`) nasce na `V2__seed_admin.sql` com a senha de `FHT_ADMIN_SENHA`.
+Pra trocar depois, no SQL Editor do Neon:
+
+```sql
+UPDATE usuarios SET senha_hash = crypt('NOVA-SENHA', gen_salt('bf', 10)) WHERE email = 'admin@fht.org.br';
+```
+
+### 9. Frontend
+
+Configure `VITE_API_URL` no Cloudflare Pages com a URL do Render e inclua a URL do Pages em
+`CORS_ORIGINS`. Detalhes em `frontend/README.md`.
+
+---
+
+## Backup
+
+`.github/workflows/backup.yml` roda todo dia às **03:00 UTC** (00:00 em Palmas) e também sob demanda
+(*Run workflow*): `pg_dump` com a imagem `postgres:16` (mesma major do Neon) → gzip → `aws s3 cp`
+pro bucket **privado** `fht-backups` (prefixo `postgres/`), mantendo os **últimos 30** dumps.
+O conteúdo nunca vai pro log. Pra restaurar:
+
+```bash
+aws s3 cp s3://fht-backups/postgres/fht-AAAAMMDD-HHMMSS.sql.gz . --endpoint-url https://<R2_ACCOUNT_ID>.r2.cloudflarestorage.com
+gunzip -c fht-AAAAMMDD-HHMMSS.sql.gz | psql "postgresql://<user>:<senha>@<host>/neondb?sslmode=require"
+```
+
+---
+
+## Estrutura
 
 ```
 src/main/java/br/org/fht/
-├── admin/          # AdminResource — dashboard e gestão de usuários
-├── atleta/         # Atleta entity, repository, service, resource + DTOs
-├── auth/           # JwtService, AuthResource + DTOs de login
-├── clube/          # Clube entity, repository, service, resource + DTOs
-├── common/         # ApiResponse, OpenApiConfig, SentryInitializer, exceptions
-├── storage/        # R2StorageService (Cloudflare R2 via AWS SDK v2)
-├── upload/         # UploadResource — endpoint genérico de upload
-└── usuario/        # Usuario entity, UsuarioRepository, Role enum
+├── common/      ApiResponse, Campos, CPFValidator, Escopo, Fuso, JwtKeysEnvConfigSource, OpenApiConfig, OrigemRequisicao, SlugGenerator
+├── dto/         atleta, auth, clube, contato, galeria, institucional, noticia, pagamento
+├── exception/   GlobalExceptionMapper, ValidacaoExceptionMapper, ValidationException
+├── mapper/      Atleta, Clube, Diretor, Documento, Foto, Noticia
+├── model/       Usuario, Role, Clube, Atleta, Consentimento, PagamentoLote(+Item), Noticia, Foto, Diretor, DocumentoInstitucional
+├── repository/  Panache, um por entidade
+├── resource/    Auth, Admin, Clube, Atleta, Pagamento, Noticia, Documento, Galeria, Diretor, Contato, Upload, File
+├── service/     Clube, Atleta, Pagamento, Noticia, Documento, Galeria, Diretor, Email, Jwt, AtletaExpurgoJob
+└── storage/     R2StorageService
 
 src/main/resources/
-├── application.properties        # Configuração base (prod)
-├── application-dev.properties    # Overrides de desenvolvimento
-└── db/migration/
-    ├── V1__create_clubes.sql
-    ├── V2__create_usuarios.sql
-    ├── V3__create_atletas.sql
-    └── V4__seed_admin.sql
+├── application.properties         # base (prod): tudo por env
+├── application-dev.properties     # perfil dev: banco local, SQL no log, validate
+├── META-INF/services/…ConfigSource # registra o JwtKeysEnvConfigSource
+└── db/migration/V1__schema_inicial.sql, V2__seed_admin.sql
 ```
-
----
 
 ## Endpoints
 
-### Autenticação — `/api/auth`
+Todos devolvem `ApiResponse<T>` (`{ data, message, status }`). Lista completa e testável no Swagger.
 
-| Método | Rota | Acesso | Descrição |
-|--------|------|--------|-----------|
-| `POST` | `/api/auth/login` | Público | Login — retorna `token` + `refreshToken` |
-| `POST` | `/api/auth/refresh` | Público | Renova access token com refresh token |
-| `POST` | `/api/auth/usuarios` | `ADMIN_FHT` | Cria usuário `ADMIN_CLUBE` |
-
-### Clubes — `/api/clubes`
-
-| Método | Rota | Acesso | Descrição |
-|--------|------|--------|-----------|
-| `POST` | `/api/clubes/solicitar` | Público | Solicitar filiação (multipart: ata + estatuto) |
-| `GET` | `/api/clubes` | `ADMIN_FHT` | Listar todos os clubes |
-| `GET` | `/api/clubes/{id}` | Ambos | Buscar clube (ADMIN_CLUBE só vê o próprio) |
-| `PATCH` | `/api/clubes/{id}/aprovar` | `ADMIN_FHT` | Aprovar clube + criar credenciais |
-| `PATCH` | `/api/clubes/{id}/rejeitar` | `ADMIN_FHT` | Rejeitar com motivo |
-
-### Atletas — `/api/atletas`
-
-| Método | Rota | Acesso | Descrição |
-|--------|------|--------|-----------|
-| `POST` | `/api/atletas` | `ADMIN_CLUBE` | Cadastrar atleta (multipart: foto + docs) |
-| `GET` | `/api/atletas` | Ambos | Listar (FHT: todos | Clube: só do próprio) |
-| `GET` | `/api/atletas/{id}` | Ambos | Buscar atleta por ID |
-| `PATCH` | `/api/atletas/{id}/aprovar` | `ADMIN_FHT` | Aprovar (exige comprovante de pagamento) |
-| `PATCH` | `/api/atletas/{id}/rejeitar` | `ADMIN_FHT` | Rejeitar com motivo |
-| `DELETE` | `/api/atletas/{id}` | `ADMIN_FHT` | Deletar permanentemente |
-
-### Admin — `/api/admin`
-
-| Método | Rota | Acesso | Descrição |
-|--------|------|--------|-----------|
-| `GET` | `/api/admin/dashboard` | `ADMIN_FHT` | Totais: clubes, atletas, usuários |
-| `POST` | `/api/admin/usuarios` | `ADMIN_FHT` | Criar usuário ADMIN_CLUBE manualmente |
-
-### Upload — `/api/upload`
-
-| Método | Rota | Acesso | Descrição |
-|--------|------|--------|-----------|
-| `POST` | `/api/upload/arquivo` | Autenticado | Upload de arquivo para Cloudflare R2 |
-
----
-
-## Formato de resposta
-
-Todos os endpoints retornam `ApiResponse<T>`:
-
-```json
-{
-  "data": { ... },
-  "message": "Descrição do resultado",
-  "status": 200
-}
-```
-
-Erros retornam `data: null` e `status` com o código HTTP correspondente.
-
----
-
-## Status de entidades
-
-### Clube
-| Status | Significado |
-|--------|-------------|
-| `PENDENTE` | Aguardando análise da FHT |
-| `ATIVO` | Aprovado e filiado |
-| `REJEITADO` | Documentação recusada |
-| `SUSPENSO` | Suspenso pela federação |
-
-### Atleta
-| Status | Significado |
-|--------|-------------|
-| `AGUARDANDO_PAGAMENTO` | Cadastrado, aguardando comprovante Pix |
-| `ATIVO` | Aprovado e filiado |
-| `REJEITADO` | Cadastro recusado |
-| `SUSPENSO` | Suspenso pela federação |
-
----
-
-## Variáveis de ambiente (produção)
-
-| Variável | Descrição |
-|----------|-----------|
-| `DB_HOST` | Host do PostgreSQL |
-| `DB_NAME` | Nome do banco |
-| `DB_USER` | Usuário do banco |
-| `DB_PASS` | Senha do banco |
-| `R2_ACCOUNT_ID` | ID da conta Cloudflare |
-| `R2_ACCESS_KEY_ID` | Access Key ID do R2 |
-| `R2_SECRET_ACCESS_KEY` | Secret Access Key do R2 |
-| `R2_BUCKET` | Nome do bucket R2 |
-| `R2_PUBLIC_URL` | URL pública do bucket R2 |
-| `SENTRY_DSN` | DSN do projeto Sentry (opcional) |
-
-> Em desenvolvimento, as variáveis R2 são opcionais — o upload ficará desabilitado com aviso no log.
-
----
-
-## Build e deploy
-
-### Build local
-
-```bash
-./mvnw.cmd package -DskipTests      # Windows
-./mvnw package -DskipTests           # Linux/Mac
-```
-
-### Docker
-
-```bash
-docker build -t fht-backend .
-docker run -p 8080:8080 --env-file .env fht-backend
-```
-
-### GitHub Actions (CI/CD)
-
-O arquivo `.github/workflows/deploy.yml` faz:
-1. Build com Maven (Java 21 Temurin)
-2. Build e push da imagem Docker para o registry
-3. Trigger de deploy no Railway via webhook
-
-Dispara automaticamente em push na branch `main` com alterações em `backend/**`.
-
-**Secrets necessários no repositório:**
-- `REGISTRY_URL`, `REGISTRY_USER`, `REGISTRY_PASSWORD`
-- `RAILWAY_WEBHOOK_URL`
+| Grupo | Rotas |
+|-------|-------|
+| Auth | `POST /api/auth/login`, `POST /api/auth/refresh`, `POST /api/auth/usuarios` |
+| Admin | `GET /api/admin/dashboard`, `POST /api/admin/usuarios` |
+| Clubes | `POST /api/clubes/solicitar` (público), `GET /api/clubes`, `GET/PUT /api/clubes/{id}`, `PATCH …/aprovar|rejeitar|reconsiderar|suspender|reativar|vitrine`, `GET /api/clubes/publico[/{id}]` (vitrine da home) |
+| Atletas | `POST /api/atletas`, `GET /api/atletas`, `GET/PUT/DELETE /api/atletas/{id}`, `POST …/documentos`, `PATCH …/aprovar|rejeitar|reconsiderar|suspender|reativar` |
+| Pagamentos | `GET /api/pagamentos/pendentes`, `POST /api/pagamentos` (lote + comprovante), `GET /api/pagamentos[/meus|/{id}]`, `PATCH …/baixar|rejeitar` |
+| Notícias | `GET /api/noticias[/{slug}]` (público), `GET /api/noticias/gerenciar`, `POST/PUT/DELETE`, `POST …/upload-imagem` |
+| Documentos / Galeria / Diretores | `GET` público + `POST/PUT/DELETE` + upload (admin) |
+| Contato | `POST /api/contato` (público, vira e-mail) |
+| Upload / Files | `POST /api/upload/arquivo`, `GET /api/files/{path}` (fallback local sem R2) |
+| Infra | `GET /q/health`, `GET /q/health/ready`, `GET /swagger`, `GET /q/openapi` |

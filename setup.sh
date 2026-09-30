@@ -27,3 +27,15 @@ fi
 
 echo ""
 echo "Pronto! Rode agora: docker compose up --build"
+
+# Chaves JWT em base64 pro container do compose (os .pem não entram na imagem — em produção
+# vão por env JWT_PUBLIC_KEY / JWT_PRIVATE_KEY do mesmo jeito). Idempotente.
+if ! grep -q '^JWT_PUBLIC_KEY=' .env; then
+    {
+        echo ""
+        echo "# Chaves JWT em base64, geradas pelo setup.sh a partir dos .pem locais"
+        echo "JWT_PUBLIC_KEY=$(openssl base64 -A -in "$KEYS_DIR/publicKey.pem")"
+        echo "JWT_PRIVATE_KEY=$(openssl base64 -A -in "$KEYS_DIR/privateKey.pem")"
+    } >> .env
+    echo "  OK - chaves JWT gravadas no .env (base64)"
+fi
